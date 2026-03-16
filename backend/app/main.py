@@ -1,4 +1,4 @@
-"""JamIssue FastAPI ?좏뵆由ъ??댁뀡 吏꾩엯?먯엯?덈떎."""
+"""JamIssue FastAPI 애플리케이션 진입점입니다."""
 
 from pathlib import Path
 from uuid import uuid4
@@ -111,15 +111,15 @@ if settings.storage_backend == "local":
 app.include_router(public_event_router)
 
 PROVIDER_LABELS = {
-    "naver": "?ㅼ씠踰?,
-    "kakao": "移댁뭅??,
+    "naver": "네이버",
+    "kakao": "카카오",
 }
 SUPPORTED_PROVIDERS = tuple(PROVIDER_LABELS.keys())
 
 
 @app.on_event("startup")
 def on_startup() -> None:
-    """濡쒖뺄 媛쒕컻?섍꼍?먯꽌???낅줈???붾젆?곕━? 湲곕낯 DB瑜?以鍮꾪빀?덈떎."""
+    """로컬 개발환경에서는 업로드 디렉터리와 기본 DB를 준비합니다."""
 
     if settings.storage_backend == "local":
         settings.upload_path.mkdir(parents=True, exist_ok=True)
@@ -158,7 +158,7 @@ def get_session_user(request: Request, app_settings: Settings = Depends(get_sett
 
 def require_session_user(session_user: SessionUser | None = Depends(get_session_user)) -> SessionUser:
     if not session_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="濡쒓렇?몄씠 ?꾩슂?댁슂.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="로그인이 필요해요.")
     return session_user
 
 
@@ -167,7 +167,7 @@ def require_admin_user(
     app_settings: Settings = Depends(get_settings),
 ) -> SessionUser:
     if not app_settings.is_admin(session_user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="愿由ъ옄 沅뚰븳???꾩슂?댁슂.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자 권한이 필요해요.")
     return session_user.model_copy(update={"is_admin": True})
 
 
@@ -217,7 +217,7 @@ def start_login(
     app_settings: Settings = Depends(get_settings),
 ) -> RedirectResponse:
     if provider not in SUPPORTED_PROVIDERS:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="吏?먰븯吏 ?딅뒗 濡쒓렇???쒓났?먯삁??")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="지원하지 않는 로그인 제공자예요.")
 
     request.session["post_login_redirect"] = next or app_settings.frontend_url
     request.session.pop("oauth_link_user_id", None)
@@ -227,11 +227,11 @@ def start_login(
         if not app_settings.provider_enabled(provider):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"{PROVIDER_LABELS[provider]} 濡쒓렇???ㅼ젙??鍮꾩뼱 ?덉뼱??",
+                detail=f"{PROVIDER_LABELS[provider]} 로그인 설정이 비어 있어요.",
             )
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"{PROVIDER_LABELS[provider]} 濡쒓렇???곌껐? ?섍꼍 蹂?섎쭔 以鍮꾨맂 ?곹깭?덉슂.",
+            detail=f"{PROVIDER_LABELS[provider]} 로그인 연결은 환경 변수만 준비된 상태예요.",
         )
 
     state = generate_oauth_state()
@@ -248,7 +248,7 @@ def start_link_login(
     app_settings: Settings = Depends(get_settings),
 ) -> RedirectResponse:
     if provider not in SUPPORTED_PROVIDERS:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="吏?먰븯吏 ?딅뒗 濡쒓렇???쒓났?먯삁??")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="지원하지 않는 로그인 제공자예요.")
 
     request.session["post_login_redirect"] = next or app_settings.frontend_url
     request.session["oauth_link_user_id"] = session_user.id
@@ -258,11 +258,11 @@ def start_link_login(
         if not app_settings.provider_enabled(provider):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"{PROVIDER_LABELS[provider]} 濡쒓렇???ㅼ젙??鍮꾩뼱 ?덉뼱??",
+                detail=f"{PROVIDER_LABELS[provider]} 로그인 설정이 비어 있어요.",
             )
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"{PROVIDER_LABELS[provider]} 怨꾩젙 ?곌껐? ?섍꼍 蹂?섎쭔 以鍮꾨맂 ?곹깭?덉슂.",
+            detail=f"{PROVIDER_LABELS[provider]} 계정 연결은 환경 변수만 준비된 상태예요.",
         )
 
     state = generate_oauth_state()
@@ -410,7 +410,7 @@ def like_community_route(
     except ValueError as error:
         detail = str(error)
         status_code = status.HTTP_400_BAD_REQUEST
-        if "李얠? 紐? in detail:
+        if "찾지 못" in detail:
             status_code = status.HTTP_404_NOT_FOUND
         raise HTTPException(status_code=status_code, detail=detail) from error
 
@@ -459,7 +459,7 @@ def write_review(
     except ValueError as error:
         detail = str(error)
         status_code = status.HTTP_400_BAD_REQUEST
-        if "?μ냼" in detail:
+        if "장소" in detail:
             status_code = status.HTTP_404_NOT_FOUND
         raise HTTPException(status_code=status_code, detail=detail) from error
 
@@ -490,7 +490,7 @@ def like_review(
     except ValueError as error:
         detail = str(error)
         status_code = status.HTTP_400_BAD_REQUEST
-        if "李얠? 紐? in detail:
+        if "찾지 못" in detail:
             status_code = status.HTTP_404_NOT_FOUND
         raise HTTPException(status_code=status_code, detail=detail) from error
 
@@ -515,7 +515,7 @@ def write_review_comment(
     except ValueError as error:
         detail = str(error)
         status_code = status.HTTP_400_BAD_REQUEST
-        if "?꾧린" in detail:
+        if "후기" in detail:
             status_code = status.HTTP_404_NOT_FOUND
         raise HTTPException(status_code=status_code, detail=detail) from error
 
@@ -543,12 +543,12 @@ async def upload_review_image(
 ) -> UploadResponse:
     content_type = file.content_type or "application/octet-stream"
     if not content_type.startswith("image/"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="?대?吏 ?뚯씪留??낅줈?쒗븷 ???덉뼱??")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="이미지 파일만 업로드할 수 있어요.")
 
     extension = Path(file.filename or "upload.jpg").suffix.lower() or ".jpg"
     raw_bytes = await file.read()
     if len(raw_bytes) > app_settings.max_upload_size_bytes:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="?대?吏??5MB ?댄븯濡??щ젮 二쇱꽭??")
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="이미지는 5MB 이하로 올려 주세요.")
 
     filename = f"{session_user.id.replace(':', '_')}-{uuid4().hex}{extension}"
     storage = get_storage_adapter(app_settings)
