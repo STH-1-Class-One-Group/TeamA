@@ -22,6 +22,18 @@ jobs:
         with:
           node-version: '20'
       - run: npm ci
+      - name: Ensure Pages production branch matches deploy branch
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
+        run: |
+          curl --fail --show-error --silent \
+            --request PATCH \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${CLOUDFLARE_PAGES_PROJECT_NAME}" \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data '{"production_branch":"codex/production-deploy"}'
       - name: Build static frontend
         env:
           PUBLIC_APP_BASE_URL: ${{ vars.PUBLIC_APP_BASE_URL }}
