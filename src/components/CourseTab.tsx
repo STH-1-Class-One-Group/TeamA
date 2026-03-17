@@ -26,7 +26,7 @@ export function CourseTab({
   onRequestLogin,
 }: CourseTabProps) {
   return (
-    <section className="tab-overlay tab-overlay--scrollable">
+    <section className="page-panel page-panel--scrollable">
       <header className="panel-header">
         <p className="eyebrow">COURSE</p>
         <h2>코스</h2>

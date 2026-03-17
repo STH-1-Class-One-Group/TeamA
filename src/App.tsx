@@ -52,11 +52,11 @@ const emptyProviders: AuthProvider[] = [
 
 const validTabs: Tab[] = ['map', 'feed', 'course', 'my'];
 const categoryItems: { key: Category; label: string }[] = [
-  { key: 'all', label: '전체' },
-  { key: 'landmark', label: '명소' },
-  { key: 'food', label: '맛집' },
-  { key: 'cafe', label: '카페' },
-  { key: 'night', label: '야경' },
+  { key: 'all', label: '??' },
+  { key: 'landmark', label: '??' },
+  { key: 'food', label: '??' },
+  { key: 'cafe', label: '??' },
+  { key: 'night', label: '??' },
 ];
 const STAMP_UNLOCK_RADIUS_METERS = 120;
 
@@ -87,10 +87,10 @@ function getInitialNotice() {
   const auth = params.get('auth');
   const reason = params.get('reason');
   if (auth === 'naver-success') {
-    return '네이버 로그인이 연결됐어요.';
+    return '네이버 로그인을 연결했어요.';
   }
   if (auth === 'naver-linked') {
-    return '네이버 계정을 현재 계정과 연결했어요.';
+    return '네이버 계정을 연결했어요.';
   }
   if (auth === 'naver-error') {
     return reason ? `네이버 로그인에 실패했어요. (${reason})` : '네이버 로그인에 실패했어요.';
@@ -170,7 +170,7 @@ export default function App() {
   const [reviewLikeUpdatingId, setReviewLikeUpdatingId] = useState<string | null>(null);
   const [commentSubmittingReviewId, setCommentSubmittingReviewId] = useState<string | null>(null);
   const [stampActionStatus, setStampActionStatus] = useState<ApiStatus>('idle');
-  const [stampActionMessage, setStampActionMessage] = useState('마커를 누르면 오늘 스탬프 가능 여부를 바로 보여드릴게요.');
+  const [stampActionMessage, setStampActionMessage] = useState('장소를 선택하면 오늘 스탬프 가능 여부를 알려드릴게요.');
   const [routeSubmitting, setRouteSubmitting] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeLikeUpdatingId, setRouteLikeUpdatingId] = useState<string | null>(null);
@@ -238,31 +238,31 @@ export default function App() {
 
   useEffect(() => {
     if (!selectedPlace) {
-      setStampActionMessage('마커를 누르면 오늘 스탬프 가능 여부를 바로 보여드릴게요.');
+      setStampActionMessage('장소를 선택하면 오늘 스탬프 가능 여부를 알려드릴게요.');
       return;
     }
 
     if (!sessionUser) {
-      setStampActionMessage(`로그인하면 ${selectedPlace.name}에서 현장 스탬프를 찍을 수 있어요.`);
+      setStampActionMessage(`로그인하면 ${selectedPlace.name}에서 바로 스탬프를 찍을 수 있어요.`);
       return;
     }
 
     if (todayStamp) {
-      setStampActionMessage(`${todayStamp.visitLabel} 스탬프를 이미 찍었어요. 이제 피드 작성 버튼이 열려 있어요.`);
+      setStampActionMessage(`${todayStamp.visitLabel} 스탬프를 이미 찍었어요. 오늘 피드도 바로 남길 수 있어요.`);
       return;
     }
 
     if (typeof selectedPlaceDistanceMeters !== 'number') {
-      setStampActionMessage('현재 위치를 확인하면 스탬프 가능 여부를 바로 보여드릴게요.');
+      setStampActionMessage('현재 위치를 확인하면 스탬프 가능 여부를 바로 알려드릴게요.');
       return;
     }
 
     if (selectedPlaceDistanceMeters <= STAMP_UNLOCK_RADIUS_METERS) {
-      setStampActionMessage(`현재 약 ${formatDistanceMeters(selectedPlaceDistanceMeters)} 거리예요. 지금 스탬프를 찍을 수 있어요.`);
+      setStampActionMessage(`현재 약 ${formatDistanceMeters(selectedPlaceDistanceMeters)} 거리예요. 지금 바로 스탬프를 찍을 수 있어요.`);
       return;
     }
 
-    setStampActionMessage(`현재 약 ${formatDistanceMeters(selectedPlaceDistanceMeters)} 거리예요. 반경 ${STAMP_UNLOCK_RADIUS_METERS}m 안에 들어오면 스탬프를 찍을 수 있어요.`);
+    setStampActionMessage(`현재 약 ${formatDistanceMeters(selectedPlaceDistanceMeters)} 거리예요. ${STAMP_UNLOCK_RADIUS_METERS}m 안으로 들어오면 스탬프가 열려요.`);
   }, [selectedPlace, selectedPlaceDistanceMeters, sessionUser, todayStamp]);
 
   async function loadApp(withLoading: boolean) {
@@ -300,7 +300,7 @@ export default function App() {
       setBootstrapStatus('ready');
       if (authState === 'naver-success' && auth.user?.profileCompletedAt === null) {
         setActiveTab('my');
-        setNotice('로그인은 완료됐어요. 닉네임을 정하면 바로 기록을 이어갈 수 있어요.');
+        setNotice('닉네임을 먼저 저장하면 바로 피드와 코스를 이어서 쓸 수 있어요.');
       }
     } catch (error) {
       setBootstrapError(formatErrorMessage(error));
@@ -318,7 +318,7 @@ export default function App() {
       const nextPosition = await getCurrentDevicePosition();
       setCurrentPosition({ latitude: nextPosition.latitude, longitude: nextPosition.longitude });
       setMapLocationStatus('ready');
-      setMapLocationMessage(`현재 위치를 확인했어요. 위치 정확도는 약 ${formatDistanceMeters(nextPosition.accuracyMeters)}예요.`);
+      setMapLocationMessage(`현재 위치를 다시 잡았어요. 예상 오차는 약 ${formatDistanceMeters(nextPosition.accuracyMeters)}예요.`);
       if (shouldFocusMap) {
         setMapLocationFocusKey((current) => current + 1);
       }
@@ -361,7 +361,7 @@ export default function App() {
         longitude: nextPosition.longitude,
       });
       setStampState(nextStampState);
-      setNotice(`${place.name} 스탬프를 기록했어요.`);
+      setNotice(`${place.name}에서 오늘 스탬프를 찍었어요.`);
       setDrawerState('full');
       setMyPage(await getMySummary());
     } catch (error) {
@@ -394,7 +394,7 @@ export default function App() {
         imageUrl,
       });
 
-      setNotice('피드를 올렸어요. 오늘 방문 기록에 바로 반영됐어요.');
+      setNotice('피드를 남겼어요. 같은 여행 흐름으로 코스까지 이어갈 수 있어요.');
       await loadApp(false);
       setDrawerState('full');
     } catch (error) {
@@ -407,7 +407,7 @@ export default function App() {
   async function handleCreateComment(reviewId: string, body: string, parentId?: string) {
     if (!sessionUser) {
       setActiveTab('my');
-      setNotice('댓글은 로그인 후에만 남길 수 있어요.');
+      setNotice('댓글을 남기려면 먼저 로그인해 주세요.');
       return;
     }
 
@@ -425,7 +425,7 @@ export default function App() {
   async function handleToggleReviewLike(reviewId: string) {
     if (!sessionUser) {
       setActiveTab('my');
-      setNotice('좋아요는 로그인 후에만 누를 수 있어요.');
+      setNotice('좋아요를 누르려면 먼저 로그인해 주세요.');
       return;
     }
 
@@ -443,7 +443,7 @@ export default function App() {
   async function handleToggleRouteLike(routeId: string) {
     if (!sessionUser) {
       setActiveTab('my');
-      setNotice('좋아요는 로그인 후에만 누를 수 있어요.');
+      setNotice('좋아요를 누르려면 먼저 로그인해 주세요.');
       return;
     }
 
@@ -463,7 +463,7 @@ export default function App() {
   async function handlePublishRoute(payload: { travelSessionId: string; title: string; description: string; mood: string }) {
     if (!sessionUser) {
       setActiveTab('my');
-      setRouteError('로그인 후에만 코스를 발행할 수 있어요.');
+      setRouteError('로그인한 뒤에만 여행 세션을 코스로 발행할 수 있어요.');
       return;
     }
 
@@ -477,7 +477,7 @@ export default function App() {
         mood: payload.mood,
         isPublic: true,
       });
-      setNotice('여행 세션을 코스로 발행했어요. 이제 좋아요순과 최신순 목록에 올라가요.');
+      setNotice('여행 세션을 공개 코스로 발행했어요. 이제 다른 사용자도 이 경로를 볼 수 있어요.');
       await loadApp(false);
       setMyPageTab('routes');
     } catch (error) {
@@ -489,7 +489,7 @@ export default function App() {
 
   async function handleUpdateProfile(nextNickname: string) {
     if (!nextNickname || nextNickname.length < 2) {
-      setProfileError('닉네임은 두 글자 이상으로 적어 주세요.');
+      setProfileError('닉네임은 두 글자 이상으로 입력해 주세요.');
       return;
     }
 
@@ -501,7 +501,7 @@ export default function App() {
       if (auth.user) {
         setMyPage(await getMySummary());
       }
-      setNotice('닉네임을 저장했어요. 이제 스탬프와 피드를 이어볼 수 있어요.');
+      setNotice('닉네임을 저장했어요. 이제 메인 흐름으로 바로 이어갈 수 있어요.');
     } catch (error) {
       setProfileError(formatErrorMessage(error));
     } finally {
@@ -525,44 +525,41 @@ export default function App() {
   }
 
   const reviewProofMessage = !sessionUser
-    ? '로그인하고 현장 스탬프를 찍으면 이 장소의 피드를 바로 남길 수 있어요.'
+    ? '로그인한 뒤 스탬프를 찍어야 피드를 작성할 수 있어요.'
     : todayStamp
-      ? `${todayStamp.visitLabel} 스탬프를 찍었어요. 지금 바로 피드를 작성할 수 있어요.`
-      : '현장 반경 안에서 오늘 스탬프를 먼저 찍어야 후기 버튼이 열려요.';
+      ? `${todayStamp.visitLabel} 스탬프가 있어요. 지금 이 장소 피드를 바로 남길 수 있어요.`
+      : '오늘 스탬프를 찍으면 피드 작성 버튼이 바로 열려요.';
 
   return (
     <div className="map-app-shell">
-      <div className="phone-shell phone-shell--map">
-        <div className="map-stage">
-          <NaverMap
-            places={filteredPlaces}
-            selectedPlaceId={selectedPlace?.id ?? null}
-            onSelectPlace={openPlace}
-            currentPosition={currentPosition}
-            currentLocationStatus={mapLocationStatus}
-            currentLocationMessage={mapLocationMessage}
-            focusCurrentLocationKey={mapLocationFocusKey}
-            onLocateCurrentPosition={() => void refreshCurrentPosition(true)}
-            height="100%"
-          />
+      <div className={activeTab === 'map' ? 'phone-shell phone-shell--map' : 'phone-shell'}>
+        {activeTab === 'map' ? (
+          <div className="map-stage">
+            <NaverMap
+              places={filteredPlaces}
+              selectedPlaceId={selectedPlace?.id ?? null}
+              onSelectPlace={openPlace}
+              currentPosition={currentPosition}
+              currentLocationStatus={mapLocationStatus}
+              currentLocationMessage={mapLocationMessage}
+              focusCurrentLocationKey={mapLocationFocusKey}
+              onLocateCurrentPosition={() => void refreshCurrentPosition(true)}
+              height="100%"
+            />
 
-          <div className="map-stage__gradient" />
-          <header className="map-stage__header">
-            <div>
-              <p className="eyebrow">DAEJEON JAM ISSUE</p>
-              <h1>지도로 찾고, 스탬프로 남기고, 피드와 코스로 이어가는 대전 탐험</h1>
-            </div>
-            <button type="button" className="secondary-button map-stage__location-button" onClick={() => void refreshCurrentPosition(true)}>
-              {currentPosition ? '내 위치 보기' : '내 위치 켜기'}
-            </button>
-          </header>
+            <div className="map-stage__gradient" />
+            <header className="map-stage__header">
+              <div className="map-stage__brand">
+                <p className="eyebrow">DAEJEON JAM ISSUE</p>
+                <p className="map-stage__headline">지도를 보고 장소를 고른 뒤, 스탬프와 피드, 코스로 이어지는 흐름을 담았어요.</p>
+              </div>
+            </header>
 
-          {notice && <div className="floating-notice">{notice}</div>}
-          {bootstrapStatus === 'loading' && <section className="floating-status">데이터를 불러오는 중이에요.</section>}
-          {bootstrapStatus === 'error' && <section className="floating-status floating-status--error">{bootstrapError}</section>}
-          {!hasRealData && bootstrapStatus === 'ready' && <section className="floating-status">아직 공개 장소 데이터가 충분하지 않아요.</section>}
+            {notice && <div className="floating-notice">{notice}</div>}
+            {bootstrapStatus === 'loading' && <section className="floating-status">대전 장소를 불러오고 있어요.</section>}
+            {bootstrapStatus === 'error' && <section className="floating-status floating-status--error">{bootstrapError}</section>}
+            {!hasRealData && bootstrapStatus === 'ready' && <section className="floating-status">현재는 데모 데이터로 먼저 보여드리고 있어요.</section>}
 
-          {activeTab === 'map' && (
             <div className="map-filter-strip">
               <div className="chip-row compact-gap">
                 {categoryItems.map((item) => (
@@ -573,60 +570,7 @@ export default function App() {
               </div>
               <span className="counter-pill">{selectedCategoryCount}곳</span>
             </div>
-          )}
 
-          {activeTab === 'feed' && (
-            <FeedTab
-              reviews={reviews}
-              sessionUser={sessionUser}
-              reviewLikeUpdatingId={reviewLikeUpdatingId}
-              commentSubmittingReviewId={commentSubmittingReviewId}
-              onToggleReviewLike={handleToggleReviewLike}
-              onCreateComment={handleCreateComment}
-              onRequestLogin={() => setActiveTab('my')}
-              onOpenPlace={openPlace}
-            />
-          )}
-
-          {activeTab === 'course' && (
-            <CourseTab
-              curatedCourses={courses}
-              communityRoutes={communityRoutes}
-              sort={communityRouteSort}
-              sessionUser={sessionUser}
-              routeLikeUpdatingId={routeLikeUpdatingId}
-              placeNameById={placeNameById}
-              onChangeSort={(sort) => {
-                setCommunityRouteSort(sort);
-                void getCommunityRoutes(sort).then(setCommunityRoutes).catch((error) => setNotice(formatErrorMessage(error)));
-              }}
-              onToggleLike={handleToggleRouteLike}
-              onOpenPlace={openPlace}
-              onRequestLogin={() => setActiveTab('my')}
-            />
-          )}
-
-          {activeTab === 'my' && (
-            <MyPagePanel
-              sessionUser={sessionUser}
-              myPage={myPage}
-              providers={providers}
-              activeTab={myPageTab}
-              isLoggingOut={isLoggingOut}
-              profileSaving={profileSaving}
-              profileError={profileError}
-              routeSubmitting={routeSubmitting}
-              routeError={routeError}
-              onChangeTab={setMyPageTab}
-              onLogin={startProviderLogin}
-              onLogout={handleLogout}
-              onSaveNickname={handleUpdateProfile}
-              onPublishRoute={handlePublishRoute}
-              onOpenPlace={openPlace}
-            />
-          )}
-
-          {activeTab === 'map' && (
             <PlaceDetailSheet
               place={selectedPlace}
               reviews={selectedPlaceReviews}
@@ -653,8 +597,74 @@ export default function App() {
               onToggleReviewLike={handleToggleReviewLike}
               onCreateComment={handleCreateComment}
             />
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="page-stage">
+            {notice && <div className="floating-notice">{notice}</div>}
+            {bootstrapStatus === 'loading' && <section className="floating-status">화면을 준비하고 있어요.</section>}
+            {bootstrapStatus === 'error' && <section className="floating-status floating-status--error">{bootstrapError}</section>}
+
+            {activeTab === 'feed' && (
+              <FeedTab
+                reviews={reviews}
+                sessionUser={sessionUser}
+                reviewLikeUpdatingId={reviewLikeUpdatingId}
+                commentSubmittingReviewId={commentSubmittingReviewId}
+                onToggleReviewLike={handleToggleReviewLike}
+                onCreateComment={handleCreateComment}
+                onRequestLogin={() => setActiveTab('my')}
+                onOpenPlace={(placeId) => {
+                  setActiveTab('map');
+                  openPlace(placeId);
+                }}
+              />
+            )}
+
+            {activeTab === 'course' && (
+              <CourseTab
+                curatedCourses={courses}
+                communityRoutes={communityRoutes}
+                sort={communityRouteSort}
+                sessionUser={sessionUser}
+                routeLikeUpdatingId={routeLikeUpdatingId}
+                placeNameById={placeNameById}
+                onChangeSort={(sort) => {
+                  setCommunityRouteSort(sort);
+                  void getCommunityRoutes(sort).then(setCommunityRoutes).catch((error) => setNotice(formatErrorMessage(error)));
+                }}
+                onToggleLike={handleToggleRouteLike}
+                onOpenPlace={(placeId) => {
+                  setActiveTab('map');
+                  openPlace(placeId);
+                }}
+                onRequestLogin={() => setActiveTab('my')}
+              />
+            )}
+
+            {activeTab === 'my' && (
+              <MyPagePanel
+                sessionUser={sessionUser}
+                myPage={myPage}
+                providers={providers}
+                activeTab={myPageTab}
+                isLoggingOut={isLoggingOut}
+                profileSaving={profileSaving}
+                profileError={profileError}
+                routeSubmitting={routeSubmitting}
+                routeError={routeError}
+                onChangeTab={setMyPageTab}
+                onLogin={startProviderLogin}
+                onLogout={handleLogout}
+                onSaveNickname={handleUpdateProfile}
+                onPublishRoute={handlePublishRoute}
+                onOpenPlace={(placeId) => {
+                  setActiveTab('map');
+                  openPlace(placeId);
+                }}
+              />
+            )}
+          </div>
+        )}
 
         <BottomNav
           activeTab={activeTab}
@@ -670,5 +680,3 @@ export default function App() {
     </div>
   );
 }
-
-

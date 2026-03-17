@@ -109,28 +109,31 @@ textarea {
 
 .map-stage__header {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 14px;
+  left: 14px;
+  right: 14px;
   z-index: 20;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 22px 18px 0;
+  justify-content: flex-start;
+  pointer-events: none;
 }
 
-.map-stage__header h1 {
+.map-stage__brand {
+  max-width: 240px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  background: rgba(255, 252, 249, 0.84);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 24px rgba(255, 143, 183, 0.12);
+}
+
+.map-stage__headline {
   margin: 0;
-  max-width: 230px;
-  font-size: 28px;
-  line-height: 1.06;
-  letter-spacing: -0.045em;
-}
-
-.map-stage__location-button {
-  margin-top: 2px;
-  min-width: 108px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 600;
 }
 
 .floating-notice,
@@ -164,7 +167,7 @@ textarea {
 
 .map-filter-strip {
   position: absolute;
-  top: 148px;
+  top: 86px;
   left: 18px;
   right: 18px;
   z-index: 22;
@@ -174,6 +177,26 @@ textarea {
   gap: 12px;
 }
 
+.page-stage {
+  position: relative;
+  height: 100%;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(255, 248, 251, 0.92), rgba(255, 253, 248, 0.96));
+}
+
+.page-stage .tab-overlay {
+  position: absolute;
+  inset: 12px 12px calc(70px + env(safe-area-inset-bottom)) 12px;
+  height: auto;
+  border-radius: 28px;
+}
+
+.page-stage .floating-notice,
+.page-stage .floating-status {
+  left: 16px;
+  right: 16px;
+  top: 16px;
+}
 .tab-overlay {
   position: absolute;
   left: 12px;
@@ -446,7 +469,7 @@ textarea {
 .map-floating-controls {
   position: absolute;
   right: 16px;
-  top: 120px;
+  top: 22px;
   z-index: 12;
 }
 
@@ -493,11 +516,11 @@ textarea {
 }
 
 .place-drawer--partial {
-  height: 38%;
+  height: 34%;
 }
 
 .place-drawer--full {
-  height: 74%;
+  height: 66%;
 }
 
 .place-drawer__handle {
@@ -795,7 +818,7 @@ textarea {
   }
 
   .place-drawer--full {
-    height: 76%;
+    height: 68%;
   }
 
   .panel-header h2 {

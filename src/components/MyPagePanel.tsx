@@ -86,7 +86,7 @@ export function MyPagePanel({
 
   if (!sessionUser) {
     return (
-      <section className="tab-overlay tab-overlay--scrollable">
+      <section className="page-panel page-panel--scrollable">
         <header className="panel-header">
           <p className="eyebrow">MY PAGE</p>
           <h2>로그인하고 기록 이어보기</h2>
@@ -100,7 +100,7 @@ export function MyPagePanel({
   }
 
   return (
-    <section className="tab-overlay tab-overlay--scrollable">
+    <section className="page-panel page-panel--scrollable">
       <header className="panel-header panel-header--with-action">
         <div>
           <p className="eyebrow">MY PAGE</p>

@@ -23,7 +23,7 @@ export function FeedTab({
   onOpenPlace,
 }: FeedTabProps) {
   return (
-    <section className="tab-overlay tab-overlay--scrollable">
+    <section className="page-panel page-panel--scrollable">
       <header className="panel-header">
         <p className="eyebrow">FEED</p>
         <h2>방문 피드</h2>
