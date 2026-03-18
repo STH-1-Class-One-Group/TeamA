@@ -1,4 +1,4 @@
-import { getClientConfig } from '../config';
+﻿import { getClientConfig } from '../config';
 import type {
   AdminPlace,
   AdminSummaryResponse,
@@ -6,16 +6,24 @@ import type {
   BootstrapResponse,
   Comment,
   CommentCreateRequest,
+  CommunityRouteSort,
   MyPageResponse,
   PlaceVisibilityRequest,
+  ProfileUpdateRequest,
   ProviderKey,
   PublicImportResponse,
   Review,
   ReviewCreateRequest,
+  ReviewLikeResponse,
+  StampClaimRequest,
   StampState,
-  StampToggleRequest,
   UploadResponse,
+  UserRoute,
+  UserRouteCreateRequest,
+  UserRouteLikeResponse,
 } from '../types';
+import type { PublicEventBannerResponse } from '../publicEventTypes';
+import type { FestivalItem } from '../types';
 
 class ApiError extends Error {
   status: number;
@@ -66,8 +74,8 @@ export function getApiBaseUrl() {
   return getClientConfig().apiBaseUrl;
 }
 
-export function getProviderLoginUrl(provider: ProviderKey, nextUrl: string) {
-  return `${getApiBaseUrl()}/api/auth/${provider}/login?next=${encodeURIComponent(nextUrl)}`;
+export function getProviderLoginUrl(provider: ProviderKey, nextUrl: string, mode: 'login' | 'link' = 'login') {
+  return `${getApiBaseUrl()}/api/auth/${provider}/login?next=${encodeURIComponent(nextUrl)}&mode=${mode}`;
 }
 
 export function getAuthSession() {
@@ -80,8 +88,36 @@ export function logout() {
   });
 }
 
+export function updateProfile(payload: ProfileUpdateRequest) {
+  return fetchJson<AuthSessionResponse>('/api/auth/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getBootstrap() {
   return fetchJson<BootstrapResponse>('/api/bootstrap');
+}
+
+export function getCommunityRoutes(sort: CommunityRouteSort = 'popular') {
+  return fetchJson<UserRoute[]>(`/api/community-routes?sort=${sort}`);
+}
+
+export function createUserRoute(payload: UserRouteCreateRequest) {
+  return fetchJson<UserRoute>('/api/community-routes', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function toggleCommunityRouteLike(routeId: string) {
+  return fetchJson<UserRouteLikeResponse>(`/api/community-routes/${routeId}/like`, {
+    method: 'POST',
+  });
+}
+
+export function getMyRoutes() {
+  return fetchJson<UserRoute[]>('/api/my/routes');
 }
 
 export function getReviews(params?: { placeId?: string; userId?: string }) {
@@ -100,6 +136,12 @@ export function createReview(payload: ReviewCreateRequest) {
   return fetchJson<Review>('/api/reviews', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export function toggleReviewLike(reviewId: string) {
+  return fetchJson<ReviewLikeResponse>(`/api/reviews/${reviewId}/like`, {
+    method: 'POST',
   });
 }
 
@@ -127,7 +169,7 @@ export function getMySummary() {
   return fetchJson<MyPageResponse>('/api/my/summary');
 }
 
-export function toggleStamp(payload: StampToggleRequest) {
+export function claimStamp(payload: StampClaimRequest) {
   return fetchJson<StampState>('/api/stamps/toggle', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -150,3 +192,12 @@ export function importPublicData() {
     method: 'POST',
   });
 }
+
+export function getPublicEventBanner() {
+  return fetchJson<PublicEventBannerResponse>('/api/banner/events');
+}
+
+export function getFestivals() {
+  return fetchJson<FestivalItem[]>('/api/festivals');
+}
+
