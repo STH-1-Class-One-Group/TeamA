@@ -19,11 +19,9 @@ import {
 import { BottomNav } from './components/BottomNav';
 import { CourseTab } from './components/CourseTab';
 import { FeedTab } from './components/FeedTab';
-import { FestivalDetailSheet } from './components/FestivalDetailSheet';
+import { MapTabStage } from './components/MapTabStage';
 import { MyPagePanel } from './components/MyPagePanel';
-import { NaverMap } from './components/NaverMap';
-import { PlaceDetailSheet } from './components/PlaceDetailSheet';
-import { categoryInfo, categoryItems } from './lib/categories';
+import { useAppRouteState, clearAuthQueryParams, getInitialNotice, getLoginReturnUrl } from './hooks/useAppRouteState';
 import { getCurrentDevicePosition } from './lib/geolocation';
 import {
   calculateDistanceMeters,
@@ -38,14 +36,12 @@ import type {
   BootstrapResponse,
   Category,
   CommunityRouteSort,
-  DrawerState,
   FestivalItem,
   MyPageResponse,
   MyPageTabKey,
   Place,
   ReviewMood,
   SessionUser,
-  Tab,
   UserRoute,
 } from './types';
 
@@ -54,107 +50,7 @@ const emptyProviders: AuthProvider[] = [
   { key: 'kakao', label: '카카오', isEnabled: false, loginUrl: null },
 ];
 
-const validTabs: Tab[] = ['map', 'feed', 'course', 'my'];
 const STAMP_UNLOCK_RADIUS_METERS = 120;
-
-type RouteState = {
-  tab: Tab;
-  placeId: string | null;
-  festivalId: string | null;
-  drawerState: DrawerState;
-};
-
-function getInitialRouteState(): RouteState {
-  if (typeof window === 'undefined') {
-    return { tab: 'map', placeId: null, festivalId: null, drawerState: 'closed' };
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  const tab = params.get('tab');
-  const placeId = params.get('place');
-  const festivalId = params.get('festival');
-  const drawer = params.get('drawer');
-  const resolvedTab = tab && validTabs.includes(tab as Tab) ? (tab as Tab) : params.get('auth') ? 'my' : 'map';
-  const resolvedDrawer = drawer === 'full' || drawer === 'partial' ? drawer : placeId || festivalId ? 'partial' : 'closed';
-
-  return {
-    tab: resolvedTab,
-    placeId: placeId || null,
-    festivalId: festivalId || null,
-    drawerState: resolvedDrawer,
-  };
-}
-
-function buildRouteUrl(routeState: RouteState) {
-  if (typeof window === 'undefined') {
-    return '/';
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  params.set('tab', routeState.tab);
-
-  if (routeState.tab === 'map' && routeState.placeId) {
-    params.set('place', routeState.placeId);
-    params.delete('festival');
-    params.set('drawer', routeState.drawerState === 'closed' ? 'partial' : routeState.drawerState);
-  } else if (routeState.tab === 'map' && routeState.festivalId) {
-    params.set('festival', routeState.festivalId);
-    params.delete('place');
-    params.set('drawer', routeState.drawerState === 'closed' ? 'partial' : routeState.drawerState);
-  } else {
-    params.delete('place');
-    params.delete('festival');
-    params.delete('drawer');
-  }
-
-  const query = params.toString();
-  return `${window.location.pathname}${query ? `?${query}` : ''}`;
-}
-
-function getInitialNotice() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  const auth = params.get('auth');
-  const reason = params.get('reason');
-  if (auth === 'naver-success') {
-    return '네이버 로그인을 연결했어요.';
-  }
-  if (auth === 'naver-linked') {
-    return '네이버 계정을 연결했어요.';
-  }
-  if (auth === 'naver-error') {
-    return reason ? `네이버 로그인에 실패했어요. (${reason})` : '네이버 로그인에 실패했어요.';
-  }
-  return null;
-}
-
-function clearAuthQueryParams() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  if (!params.has('auth') && !params.has('reason')) {
-    return;
-  }
-
-  params.delete('auth');
-  params.delete('reason');
-  const nextQuery = params.toString();
-  const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
-  window.history.replaceState({}, '', nextUrl);
-}
-
-function getLoginReturnUrl() {
-  if (typeof window === 'undefined') {
-    return 'http://localhost:8000/?tab=my';
-  }
-
-  return `${window.location.origin}/?tab=my`;
-}
 
 function filterPlacesByCategory(places: Place[], category: Category) {
   if (category === 'all') {
@@ -168,16 +64,27 @@ function formatErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message;
   }
+
   return '요청을 처리하지 못했어요.';
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>(() => getInitialRouteState().tab);
+  const {
+    activeTab,
+    drawerState,
+    selectedPlaceId,
+    selectedFestivalId,
+    setSelectedPlaceId,
+    setSelectedFestivalId,
+    commitRouteState,
+    goToTab,
+    openPlace,
+    openFestival,
+    closeDrawer,
+  } = useAppRouteState();
+
   const [myPageTab, setMyPageTab] = useState<MyPageTabKey>('stamps');
   const [activeCategory, setActiveCategory] = useState<Category>('all');
-  const [drawerState, setDrawerState] = useState<DrawerState>(() => getInitialRouteState().drawerState);
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(() => getInitialRouteState().placeId);
-  const [selectedFestivalId, setSelectedFestivalId] = useState<string | null>(() => getInitialRouteState().festivalId);
   const [notice, setNotice] = useState<string | null>(getInitialNotice);
   const [bootstrapStatus, setBootstrapStatus] = useState<ApiStatus>('idle');
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -237,50 +144,10 @@ export default function App() {
       ? calculateDistanceMeters(currentPosition.latitude, currentPosition.longitude, selectedPlace.latitude, selectedPlace.longitude)
       : null;
   const canCreateReview = Boolean(sessionUser && selectedPlace && todayStamp);
-  const selectedCategoryCount = filteredPlaces.length;
   const placeNameById = useMemo(() => Object.fromEntries(places.map((place) => [place.id, place.name])), [places]);
-  function applyRouteState(routeState: RouteState) {
-    setActiveTab(routeState.tab);
-    setSelectedPlaceId(routeState.tab === 'map' ? routeState.placeId : null);
-    setSelectedFestivalId(routeState.tab === 'map' ? routeState.festivalId : null);
-    setDrawerState(routeState.tab === 'map' ? routeState.drawerState : 'closed');
-  }
-  function commitRouteState(routeState: RouteState, mode: 'push' | 'replace' = 'push') {
-    applyRouteState(routeState);
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const nextUrl = buildRouteUrl(routeState);
-    if (mode === 'replace') {
-      window.history.replaceState(routeState, '', nextUrl);
-      return;
-    }
-    window.history.pushState(routeState, '', nextUrl);
-  }
-  function goToTab(nextTab: Tab, mode: 'push' | 'replace' = 'push') {
-    commitRouteState(
-      {
-        tab: nextTab,
-        placeId: null,
-        festivalId: null,
-        drawerState: 'closed',
-      },
-      mode,
-    );
-  }
 
   useEffect(() => {
     void loadApp(true);
-  }, []);
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined;
-    }
-    const handlePopState = () => {
-      applyRouteState(getInitialRouteState());
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   useEffect(() => {
@@ -300,10 +167,11 @@ export default function App() {
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (!selectedPlaceId) {
       return;
     }
+
     const isVisibleInCurrentCategory = filteredPlaces.some((place) => place.id === selectedPlaceId);
     if (!isVisibleInCurrentCategory) {
       commitRouteState(
@@ -316,7 +184,7 @@ export default function App() {
         'replace',
       );
     }
-  }, [filteredPlaces, selectedPlaceId]);
+  }, [commitRouteState, filteredPlaces, selectedPlaceId]);
 
   useEffect(() => {
     if (!selectedPlace) {
@@ -414,31 +282,6 @@ export default function App() {
     }
   }
 
-  function openPlace(placeId: string) {
-    commitRouteState({
-      tab: 'map',
-      placeId,
-      festivalId: null,
-      drawerState: 'partial',
-    });
-  }
-  function openFestival(festivalId: string) {
-    commitRouteState({
-      tab: 'map',
-      placeId: null,
-      festivalId,
-      drawerState: 'partial',
-    });
-  }
-  function closeDrawer() {
-    commitRouteState({
-      tab: 'map',
-      placeId: null,
-      festivalId: null,
-      drawerState: 'closed',
-    });
-  }
-
   function startProviderLogin(provider: 'naver' | 'kakao') {
     window.location.assign(getProviderLoginUrl(provider, getLoginReturnUrl()));
   }
@@ -461,12 +304,15 @@ export default function App() {
       });
       setStampState(nextStampState);
       setNotice(`${place.name}에서 오늘 스탬프를 찍었어요.`);
-      commitRouteState({
-        tab: 'map',
-        placeId: place.id,
-        festivalId: null,
-        drawerState: 'full',
-      }, 'replace');
+      commitRouteState(
+        {
+          tab: 'map',
+          placeId: place.id,
+          festivalId: null,
+          drawerState: 'full',
+        },
+        'replace',
+      );
       setMyPage(await getMySummary());
     } catch (error) {
       setNotice(formatErrorMessage(error));
@@ -500,14 +346,15 @@ export default function App() {
 
       setNotice('피드를 남겼어요. 같은 여행 흐름으로 코스까지 이어갈 수 있어요.');
       await loadApp(false);
-      if (selectedPlace) {
-        commitRouteState({
+      commitRouteState(
+        {
           tab: 'map',
           placeId: selectedPlace.id,
           festivalId: null,
           drawerState: 'full',
-        }, 'replace');
-      }
+        },
+        'replace',
+      );
     } catch (error) {
       setReviewError(formatErrorMessage(error));
     } finally {
@@ -645,113 +492,60 @@ export default function App() {
     <div className="map-app-shell">
       <div className={activeTab === 'map' ? 'phone-shell phone-shell--map' : 'phone-shell'}>
         {activeTab === 'map' ? (
-          <div className="map-stage">
-            <header className="map-stage__header">
-              <div className="map-stage__brand">
-                <p className="eyebrow">DAEJEON JAM ISSUE</p>
-                <p className="map-stage__headline">꽃 마커로 장소와 축제를 가볍게 골라보세요.</p>
-              </div>
-              <div className="map-stage__guide">
-                <strong>아래 시트에서 확인</strong>
-                <span>마커를 누르면 장소 정보와 스탬프가 바로 열려요.</span>
-              </div>
-            </header>
-
-            <div className="map-filter-strip">
-              <div className="chip-row compact-gap">
-                {categoryItems.map((item) => {
-                  const isActive = item.key === activeCategory;
-                  const info = item.key === 'all' ? null : categoryInfo[item.key];
-
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className={isActive ? 'chip is-active map-filter-chip' : 'chip map-filter-chip'}
-                      onClick={() => setActiveCategory(item.key)}
-                      style={
-                        info
-                          ? {
-                              background: isActive ? info.color : 'rgba(255,255,255,0.94)',
-                              borderColor: info.jamColor,
-                              color: '#4a3140',
-                            }
-                          : undefined
-                      }
-                    >
-                      {info ? `${info.icon} ${item.label}` : item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {notice && <div className="floating-notice">{notice}</div>}
-            {bootstrapStatus === 'loading' && <section className="floating-status">대전 장소와 축제를 불러오고 있어요.</section>}
-            {bootstrapStatus === 'error' && <section className="floating-status floating-status--error">{bootstrapError}</section>}
-
-
-            <NaverMap
-              places={filteredPlaces}
-              festivals={festivals}
-              selectedPlaceId={selectedPlace?.id ?? null}
-              selectedFestivalId={selectedFestival?.id ?? null}
-              onSelectPlace={openPlace}
-              onSelectFestival={openFestival}
-              currentPosition={currentPosition}
-              currentLocationStatus={mapLocationStatus}
-              currentLocationMessage={drawerState === 'closed' ? mapLocationMessage : null}
-              focusCurrentLocationKey={mapLocationFocusKey}
-              onLocateCurrentPosition={() => void refreshCurrentPosition(true)}
-              height="100%"
-            />
-
-            {!selectedPlace && !selectedFestival && (
-              <section className="map-drawer-teaser">
-                <span className="map-drawer-teaser__handle" aria-hidden="true" />
-                <div>
-                  <strong>아래 시트에서 상세를 확인해요</strong>
-                  <p>지도 마커를 누르면 장소 정보, 현장 스탬프, 축제 안내가 아래에서 바로 열립니다.</p>
-                </div>
-              </section>
-            )}
-
-            <PlaceDetailSheet
-              place={selectedPlace}
-              reviews={selectedPlaceReviews}
-              isOpen={Boolean(selectedPlace) && drawerState !== 'closed'}
-              drawerState={drawerState}
-              loggedIn={Boolean(sessionUser)}
-              visitCount={visitCount}
-              latestStamp={latestStamp}
-              todayStamp={todayStamp}
-              stampActionStatus={stampActionStatus}
-              stampActionMessage={stampActionMessage}
-              reviewProofMessage={reviewProofMessage}
-              reviewError={reviewError}
-              reviewSubmitting={reviewSubmitting}
-              reviewLikeUpdatingId={reviewLikeUpdatingId}
-              commentSubmittingReviewId={commentSubmittingReviewId}
-              canCreateReview={canCreateReview}
-              onClose={closeDrawer}
-              onExpand={() => selectedPlace && commitRouteState({ tab: 'map', placeId: selectedPlace.id, festivalId: null, drawerState: 'full' }, 'replace')}
-              onCollapse={() => selectedPlace && commitRouteState({ tab: 'map', placeId: selectedPlace.id, festivalId: null, drawerState: 'partial' }, 'replace')}
-              onRequestLogin={() => goToTab('my')}
-              onClaimStamp={handleClaimStamp}
-              onCreateReview={handleCreateReview}
-              onToggleReviewLike={handleToggleReviewLike}
-              onCreateComment={handleCreateComment}
-            />
-
-            <FestivalDetailSheet
-              festival={selectedFestival}
-              isOpen={Boolean(selectedFestival) && drawerState !== 'closed'}
-              drawerState={drawerState}
-              onClose={closeDrawer}
-              onExpand={() => selectedFestival && commitRouteState({ tab: 'map', placeId: null, festivalId: selectedFestival.id, drawerState: 'full' }, 'replace')}
-              onCollapse={() => selectedFestival && commitRouteState({ tab: 'map', placeId: null, festivalId: selectedFestival.id, drawerState: 'partial' }, 'replace')}
-            />
-          </div>
+          <MapTabStage
+            activeCategory={activeCategory}
+            setActiveCategory={setActiveCategory}
+            notice={notice}
+            bootstrapStatus={bootstrapStatus}
+            bootstrapError={bootstrapError}
+            filteredPlaces={filteredPlaces}
+            festivals={festivals}
+            selectedPlace={selectedPlace}
+            selectedFestival={selectedFestival}
+            currentPosition={currentPosition}
+            mapLocationStatus={mapLocationStatus}
+            mapLocationMessage={mapLocationMessage}
+            mapLocationFocusKey={mapLocationFocusKey}
+            drawerState={drawerState}
+            sessionUser={sessionUser}
+            selectedPlaceReviews={selectedPlaceReviews}
+            visitCount={visitCount}
+            latestStamp={latestStamp}
+            todayStamp={todayStamp}
+            stampActionStatus={stampActionStatus}
+            stampActionMessage={stampActionMessage}
+            reviewProofMessage={reviewProofMessage}
+            reviewError={reviewError}
+            reviewSubmitting={reviewSubmitting}
+            reviewLikeUpdatingId={reviewLikeUpdatingId}
+            commentSubmittingReviewId={commentSubmittingReviewId}
+            canCreateReview={canCreateReview}
+            onOpenPlace={openPlace}
+            onOpenFestival={openFestival}
+            onCloseDrawer={closeDrawer}
+            onExpandPlaceDrawer={() =>
+              selectedPlace &&
+              commitRouteState({ tab: 'map', placeId: selectedPlace.id, festivalId: null, drawerState: 'full' }, 'replace')
+            }
+            onCollapsePlaceDrawer={() =>
+              selectedPlace &&
+              commitRouteState({ tab: 'map', placeId: selectedPlace.id, festivalId: null, drawerState: 'partial' }, 'replace')
+            }
+            onExpandFestivalDrawer={() =>
+              selectedFestival &&
+              commitRouteState({ tab: 'map', placeId: null, festivalId: selectedFestival.id, drawerState: 'full' }, 'replace')
+            }
+            onCollapseFestivalDrawer={() =>
+              selectedFestival &&
+              commitRouteState({ tab: 'map', placeId: null, festivalId: selectedFestival.id, drawerState: 'partial' }, 'replace')
+            }
+            onRequestLogin={() => goToTab('my')}
+            onClaimStamp={handleClaimStamp}
+            onCreateReview={handleCreateReview}
+            onToggleReviewLike={handleToggleReviewLike}
+            onCreateComment={handleCreateComment}
+            onLocateCurrentPosition={() => void refreshCurrentPosition(true)}
+          />
         ) : (
           <div className="page-stage">
             {notice && <div className="floating-notice">{notice}</div>}
@@ -781,7 +575,9 @@ export default function App() {
                 placeNameById={placeNameById}
                 onChangeSort={(sort) => {
                   setCommunityRouteSort(sort);
-                  void getCommunityRoutes(sort).then(setCommunityRoutes).catch((error) => setNotice(formatErrorMessage(error)));
+                  void getCommunityRoutes(sort)
+                    .then(setCommunityRoutes)
+                    .catch((error) => setNotice(formatErrorMessage(error)));
                 }}
                 onToggleLike={handleToggleRouteLike}
                 onOpenPlace={openPlace}
@@ -811,30 +607,8 @@ export default function App() {
           </div>
         )}
 
-        <BottomNav
-          activeTab={activeTab}
-          onChange={(nextTab) => {
-            goToTab(nextTab);
-          }}
-        />
+        <BottomNav activeTab={activeTab} onChange={goToTab} />
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

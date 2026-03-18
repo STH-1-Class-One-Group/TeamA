@@ -1,13 +1,14 @@
-import { StrictMode } from 'react';
+﻿import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { RoadmapBannerPreview } from './components/RoadmapBannerPreview';
 import './index.css';
+import './styles/refinements.css';
 
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
-  throw new Error('루트 노드를 찾지 못했어요.');
+  throw new Error('루트 노드를 찾을 수 없어요.');
 }
 
 function resolveEntry() {
@@ -28,3 +29,4 @@ createRoot(rootElement).render(
     {resolveEntry()}
   </StrictMode>,
 );
+
