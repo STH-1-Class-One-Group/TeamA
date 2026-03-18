@@ -57,22 +57,58 @@ const emptyProviders: AuthProvider[] = [
 const validTabs: Tab[] = ['map', 'feed', 'course', 'my'];
 const STAMP_UNLOCK_RADIUS_METERS = 120;
 
-function getInitialTab(): Tab {
+type RouteState = {
+  tab: Tab;
+  placeId: string | null;
+  festivalId: string | null;
+  drawerState: DrawerState;
+};
+
+function getInitialRouteState(): RouteState {
   if (typeof window === 'undefined') {
-    return 'map';
+    return { tab: 'map', placeId: null, festivalId: null, drawerState: 'closed' };
   }
 
   const params = new URLSearchParams(window.location.search);
   const tab = params.get('tab');
-  if (tab && validTabs.includes(tab as Tab)) {
-    return tab as Tab;
+  const placeId = params.get('place');
+  const festivalId = params.get('festival');
+  const drawer = params.get('drawer');
+  const resolvedTab = tab && validTabs.includes(tab as Tab) ? (tab as Tab) : params.get('auth') ? 'my' : 'map';
+  const resolvedDrawer = drawer === 'full' || drawer === 'partial' ? drawer : placeId || festivalId ? 'partial' : 'closed';
+
+  return {
+    tab: resolvedTab,
+    placeId: placeId || null,
+    festivalId: festivalId || null,
+    drawerState: resolvedDrawer,
+  };
+}
+
+function buildRouteUrl(routeState: RouteState) {
+  if (typeof window === 'undefined') {
+    return '/';
   }
 
-  if (params.get('auth')) {
-    return 'my';
+  const params = new URLSearchParams(window.location.search);
+  params.set('tab', routeState.tab);
+
+  if (routeState.tab === 'map' && routeState.placeId) {
+    params.set('place', routeState.placeId);
+    params.delete('festival');
+    params.set('drawer', routeState.drawerState === 'closed' ? 'partial' : routeState.drawerState);
+  } else if (routeState.tab === 'map' && routeState.festivalId) {
+    params.set('festival', routeState.festivalId);
+    params.delete('place');
+    params.set('drawer', routeState.drawerState === 'closed' ? 'partial' : routeState.drawerState);
+  } else {
+    params.delete('place');
+    params.delete('festival');
+    params.delete('drawer');
   }
 
-  return 'map';
+  const query = params.toString();
+  return `${window.location.pathname}${query ? `?${query}` : ''}`;
 }
 
 function getInitialNotice() {
@@ -136,12 +172,12 @@ function formatErrorMessage(error: unknown) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>(getInitialTab);
+  const [activeTab, setActiveTab] = useState<Tab>(() => getInitialRouteState().tab);
   const [myPageTab, setMyPageTab] = useState<MyPageTabKey>('stamps');
   const [activeCategory, setActiveCategory] = useState<Category>('all');
-  const [drawerState, setDrawerState] = useState<DrawerState>('closed');
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
-  const [selectedFestivalId, setSelectedFestivalId] = useState<string | null>(null);
+  const [drawerState, setDrawerState] = useState<DrawerState>(() => getInitialRouteState().drawerState);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(() => getInitialRouteState().placeId);
+  const [selectedFestivalId, setSelectedFestivalId] = useState<string | null>(() => getInitialRouteState().festivalId);
   const [notice, setNotice] = useState<string | null>(getInitialNotice);
   const [bootstrapStatus, setBootstrapStatus] = useState<ApiStatus>('idle');
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -203,9 +239,48 @@ export default function App() {
   const canCreateReview = Boolean(sessionUser && selectedPlace && todayStamp);
   const selectedCategoryCount = filteredPlaces.length;
   const placeNameById = useMemo(() => Object.fromEntries(places.map((place) => [place.id, place.name])), [places]);
+  function applyRouteState(routeState: RouteState) {
+    setActiveTab(routeState.tab);
+    setSelectedPlaceId(routeState.tab === 'map' ? routeState.placeId : null);
+    setSelectedFestivalId(routeState.tab === 'map' ? routeState.festivalId : null);
+    setDrawerState(routeState.tab === 'map' ? routeState.drawerState : 'closed');
+  }
+  function commitRouteState(routeState: RouteState, mode: 'push' | 'replace' = 'push') {
+    applyRouteState(routeState);
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const nextUrl = buildRouteUrl(routeState);
+    if (mode === 'replace') {
+      window.history.replaceState(routeState, '', nextUrl);
+      return;
+    }
+    window.history.pushState(routeState, '', nextUrl);
+  }
+  function goToTab(nextTab: Tab, mode: 'push' | 'replace' = 'push') {
+    commitRouteState(
+      {
+        tab: nextTab,
+        placeId: null,
+        festivalId: null,
+        drawerState: 'closed',
+      },
+      mode,
+    );
+  }
 
   useEffect(() => {
     void loadApp(true);
+  }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const handlePopState = () => {
+      applyRouteState(getInitialRouteState());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   useEffect(() => {
@@ -225,15 +300,21 @@ export default function App() {
     return () => window.clearTimeout(timeout);
   }, [notice]);
 
-  useEffect(() => {
+    useEffect(() => {
     if (!selectedPlaceId) {
       return;
     }
-
     const isVisibleInCurrentCategory = filteredPlaces.some((place) => place.id === selectedPlaceId);
     if (!isVisibleInCurrentCategory) {
-      setDrawerState('closed');
-      setSelectedPlaceId(null);
+      commitRouteState(
+        {
+          tab: 'map',
+          placeId: null,
+          festivalId: null,
+          drawerState: 'closed',
+        },
+        'replace',
+      );
     }
   }, [filteredPlaces, selectedPlaceId]);
 
@@ -303,7 +384,7 @@ export default function App() {
 
       setBootstrapStatus('ready');
       if (authState === 'naver-success' && auth.user?.profileCompletedAt === null) {
-        setActiveTab('my');
+        goToTab('my');
         setNotice('닉네임을 먼저 저장하면 바로 피드와 코스로 이어갈 수 있어요.');
       }
     } catch (error) {
@@ -334,23 +415,28 @@ export default function App() {
   }
 
   function openPlace(placeId: string) {
-    setActiveTab('map');
-    setSelectedFestivalId(null);
-    setSelectedPlaceId(placeId);
-    setDrawerState('partial');
+    commitRouteState({
+      tab: 'map',
+      placeId,
+      festivalId: null,
+      drawerState: 'partial',
+    });
   }
-
   function openFestival(festivalId: string) {
-    setActiveTab('map');
-    setSelectedPlaceId(null);
-    setSelectedFestivalId(festivalId);
-    setDrawerState('partial');
+    commitRouteState({
+      tab: 'map',
+      placeId: null,
+      festivalId,
+      drawerState: 'partial',
+    });
   }
-
   function closeDrawer() {
-    setDrawerState('closed');
-    setSelectedPlaceId(null);
-    setSelectedFestivalId(null);
+    commitRouteState({
+      tab: 'map',
+      placeId: null,
+      festivalId: null,
+      drawerState: 'closed',
+    });
   }
 
   function startProviderLogin(provider: 'naver' | 'kakao') {
@@ -359,7 +445,7 @@ export default function App() {
 
   async function handleClaimStamp(place: Place) {
     if (!sessionUser) {
-      setActiveTab('my');
+      goToTab('my');
       setNotice('로그인해야 현장 스탬프를 찍을 수 있어요.');
       return;
     }
@@ -375,7 +461,12 @@ export default function App() {
       });
       setStampState(nextStampState);
       setNotice(`${place.name}에서 오늘 스탬프를 찍었어요.`);
-      setDrawerState('full');
+      commitRouteState({
+        tab: 'map',
+        placeId: place.id,
+        festivalId: null,
+        drawerState: 'full',
+      }, 'replace');
       setMyPage(await getMySummary());
     } catch (error) {
       setNotice(formatErrorMessage(error));
@@ -386,7 +477,7 @@ export default function App() {
 
   async function handleCreateReview(payload: { stampId: string; body: string; mood: ReviewMood; file: File | null }) {
     if (!sessionUser || !selectedPlace) {
-      setActiveTab('my');
+      goToTab('my');
       return;
     }
 
@@ -409,7 +500,14 @@ export default function App() {
 
       setNotice('피드를 남겼어요. 같은 여행 흐름으로 코스까지 이어갈 수 있어요.');
       await loadApp(false);
-      setDrawerState('full');
+      if (selectedPlace) {
+        commitRouteState({
+          tab: 'map',
+          placeId: selectedPlace.id,
+          festivalId: null,
+          drawerState: 'full',
+        }, 'replace');
+      }
     } catch (error) {
       setReviewError(formatErrorMessage(error));
     } finally {
@@ -419,7 +517,7 @@ export default function App() {
 
   async function handleCreateComment(reviewId: string, body: string, parentId?: string) {
     if (!sessionUser) {
-      setActiveTab('my');
+      goToTab('my');
       setNotice('댓글을 남기려면 먼저 로그인해 주세요.');
       return;
     }
@@ -437,7 +535,7 @@ export default function App() {
 
   async function handleToggleReviewLike(reviewId: string) {
     if (!sessionUser) {
-      setActiveTab('my');
+      goToTab('my');
       setNotice('좋아요를 누르려면 먼저 로그인해 주세요.');
       return;
     }
@@ -455,7 +553,7 @@ export default function App() {
 
   async function handleToggleRouteLike(routeId: string) {
     if (!sessionUser) {
-      setActiveTab('my');
+      goToTab('my');
       setNotice('좋아요를 누르려면 먼저 로그인해 주세요.');
       return;
     }
@@ -475,7 +573,7 @@ export default function App() {
 
   async function handlePublishRoute(payload: { travelSessionId: string; title: string; description: string; mood: string }) {
     if (!sessionUser) {
-      setActiveTab('my');
+      goToTab('my');
       setRouteError('로그인한 뒤에만 여행 세션을 코스로 발행할 수 있어요.');
       return;
     }
@@ -548,33 +646,16 @@ export default function App() {
       <div className={activeTab === 'map' ? 'phone-shell phone-shell--map' : 'phone-shell'}>
         {activeTab === 'map' ? (
           <div className="map-stage">
-            <NaverMap
-              places={filteredPlaces}
-              festivals={festivals}
-              selectedPlaceId={selectedPlace?.id ?? null}
-              selectedFestivalId={selectedFestival?.id ?? null}
-              onSelectPlace={openPlace}
-              onSelectFestival={openFestival}
-              currentPosition={currentPosition}
-              currentLocationStatus={mapLocationStatus}
-              currentLocationMessage={drawerState === 'closed' ? mapLocationMessage : null}
-              focusCurrentLocationKey={mapLocationFocusKey}
-              onLocateCurrentPosition={() => void refreshCurrentPosition(true)}
-              height="100%"
-            />
-
-            <div className="map-stage__gradient" />
             <header className="map-stage__header">
               <div className="map-stage__brand">
                 <p className="eyebrow">DAEJEON JAM ISSUE</p>
-                <p className="map-stage__headline">꽃 마커로 장소와 축제를 가볍게 고르세요.</p>
+                <p className="map-stage__headline">꽃 마커로 장소와 축제를 가볍게 골라보세요.</p>
+              </div>
+              <div className="map-stage__guide">
+                <strong>아래 시트에서 확인</strong>
+                <span>마커를 누르면 장소 정보와 스탬프가 바로 열려요.</span>
               </div>
             </header>
-
-            {notice && <div className="floating-notice">{notice}</div>}
-            {bootstrapStatus === 'loading' && <section className="floating-status">대전 장소와 축제를 불러오고 있어요.</section>}
-            {bootstrapStatus === 'error' && <section className="floating-status floating-status--error">{bootstrapError}</section>}
-            {!hasRealData && bootstrapStatus === 'ready' && <section className="floating-status">현재는 데모 데이터로 먼저 보여드리고 있어요.</section>}
 
             <div className="map-filter-strip">
               <div className="chip-row compact-gap">
@@ -603,13 +684,37 @@ export default function App() {
                   );
                 })}
               </div>
-              <div className="map-filter-strip__meta">
-                <span className="counter-pill">장소 {selectedCategoryCount}곳</span>
-                <span className={festivals.length > 0 ? 'counter-pill counter-pill--festival' : 'counter-pill counter-pill--muted'}>
-                  {festivals.length > 0 ? `행사 ${festivals.length}개` : '행사 예정 없음'}
-                </span>
-              </div>
             </div>
+
+            {notice && <div className="floating-notice">{notice}</div>}
+            {bootstrapStatus === 'loading' && <section className="floating-status">대전 장소와 축제를 불러오고 있어요.</section>}
+            {bootstrapStatus === 'error' && <section className="floating-status floating-status--error">{bootstrapError}</section>}
+
+
+            <NaverMap
+              places={filteredPlaces}
+              festivals={festivals}
+              selectedPlaceId={selectedPlace?.id ?? null}
+              selectedFestivalId={selectedFestival?.id ?? null}
+              onSelectPlace={openPlace}
+              onSelectFestival={openFestival}
+              currentPosition={currentPosition}
+              currentLocationStatus={mapLocationStatus}
+              currentLocationMessage={drawerState === 'closed' ? mapLocationMessage : null}
+              focusCurrentLocationKey={mapLocationFocusKey}
+              onLocateCurrentPosition={() => void refreshCurrentPosition(true)}
+              height="100%"
+            />
+
+            {!selectedPlace && !selectedFestival && (
+              <section className="map-drawer-teaser">
+                <span className="map-drawer-teaser__handle" aria-hidden="true" />
+                <div>
+                  <strong>아래 시트에서 상세를 확인해요</strong>
+                  <p>지도 마커를 누르면 장소 정보, 현장 스탬프, 축제 안내가 아래에서 바로 열립니다.</p>
+                </div>
+              </section>
+            )}
 
             <PlaceDetailSheet
               place={selectedPlace}
@@ -629,9 +734,9 @@ export default function App() {
               commentSubmittingReviewId={commentSubmittingReviewId}
               canCreateReview={canCreateReview}
               onClose={closeDrawer}
-              onExpand={() => setDrawerState('full')}
-              onCollapse={() => setDrawerState('partial')}
-              onRequestLogin={() => setActiveTab('my')}
+              onExpand={() => selectedPlace && commitRouteState({ tab: 'map', placeId: selectedPlace.id, festivalId: null, drawerState: 'full' }, 'replace')}
+              onCollapse={() => selectedPlace && commitRouteState({ tab: 'map', placeId: selectedPlace.id, festivalId: null, drawerState: 'partial' }, 'replace')}
+              onRequestLogin={() => goToTab('my')}
               onClaimStamp={handleClaimStamp}
               onCreateReview={handleCreateReview}
               onToggleReviewLike={handleToggleReviewLike}
@@ -643,8 +748,8 @@ export default function App() {
               isOpen={Boolean(selectedFestival) && drawerState !== 'closed'}
               drawerState={drawerState}
               onClose={closeDrawer}
-              onExpand={() => setDrawerState('full')}
-              onCollapse={() => setDrawerState('partial')}
+              onExpand={() => selectedFestival && commitRouteState({ tab: 'map', placeId: null, festivalId: selectedFestival.id, drawerState: 'full' }, 'replace')}
+              onCollapse={() => selectedFestival && commitRouteState({ tab: 'map', placeId: null, festivalId: selectedFestival.id, drawerState: 'partial' }, 'replace')}
             />
           </div>
         ) : (
@@ -661,11 +766,8 @@ export default function App() {
                 commentSubmittingReviewId={commentSubmittingReviewId}
                 onToggleReviewLike={handleToggleReviewLike}
                 onCreateComment={handleCreateComment}
-                onRequestLogin={() => setActiveTab('my')}
-                onOpenPlace={(placeId) => {
-                  setActiveTab('map');
-                  openPlace(placeId);
-                }}
+                onRequestLogin={() => goToTab('my')}
+                onOpenPlace={openPlace}
               />
             )}
 
@@ -682,11 +784,8 @@ export default function App() {
                   void getCommunityRoutes(sort).then(setCommunityRoutes).catch((error) => setNotice(formatErrorMessage(error)));
                 }}
                 onToggleLike={handleToggleRouteLike}
-                onOpenPlace={(placeId) => {
-                  setActiveTab('map');
-                  openPlace(placeId);
-                }}
-                onRequestLogin={() => setActiveTab('my')}
+                onOpenPlace={openPlace}
+                onRequestLogin={() => goToTab('my')}
               />
             )}
 
@@ -706,10 +805,7 @@ export default function App() {
                 onLogout={handleLogout}
                 onSaveNickname={handleUpdateProfile}
                 onPublishRoute={handlePublishRoute}
-                onOpenPlace={(placeId) => {
-                  setActiveTab('map');
-                  openPlace(placeId);
-                }}
+                onOpenPlace={openPlace}
               />
             )}
           </div>
@@ -718,18 +814,23 @@ export default function App() {
         <BottomNav
           activeTab={activeTab}
           onChange={(nextTab) => {
-            setActiveTab(nextTab);
-            if (nextTab !== 'map') {
-              setDrawerState('closed');
-              setSelectedPlaceId(null);
-              setSelectedFestivalId(null);
-            }
+            goToTab(nextTab);
           }}
         />
       </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -111,8 +111,8 @@ export function PlaceDetailSheet({
             <h2>{place.name}</h2>
             <p className="place-drawer__summary">{place.summary}</p>
           </div>
-          <button type="button" className="text-button" onClick={onClose}>
-            닫기
+          <button type="button" className="place-drawer__close" onClick={onClose} aria-label="닫기">
+            ×
           </button>
         </div>
 
@@ -126,24 +126,33 @@ export function PlaceDetailSheet({
         </div>
 
         <div className="sheet-card place-drawer__proof-card">
-          <div>
+          <div className="place-drawer__proof-copy">
             <strong>현장 스탬프</strong>
             <p>{stampActionMessage}</p>
           </div>
-          <button
-            type="button"
-            className={todayStamp ? 'secondary-button is-complete' : 'primary-button'}
-            onClick={() => void onClaimStamp(place)}
-            disabled={!canClaimStamp || stampActionStatus === 'loading'}
-          >
-            {!loggedIn
-              ? '로그인 필요'
-              : todayStamp
-                ? `${todayStamp.visitLabel} 완료`
-                : stampActionStatus === 'loading'
-                  ? '확인 중'
-                  : '오늘 스탬프 찍기'}
-          </button>
+          <div className="place-drawer__proof-action">
+            {!loggedIn ? (
+              <>
+                <span className="place-drawer__proof-kicker">피드와 코스 시작</span>
+                <button type="button" className="primary-button place-drawer__proof-button" onClick={onRequestLogin}>
+                  로그인하고 시작
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className={todayStamp ? 'secondary-button is-complete place-drawer__proof-button' : 'primary-button place-drawer__proof-button'}
+                onClick={() => void onClaimStamp(place)}
+                disabled={!canClaimStamp || stampActionStatus === 'loading'}
+              >
+                {todayStamp
+                  ? `${todayStamp.visitLabel} 완료`
+                  : stampActionStatus === 'loading'
+                    ? '확인 중'
+                    : '오늘 스탬프 찍기'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="sheet-card route-hint-box">
@@ -204,3 +213,5 @@ export function PlaceDetailSheet({
     </section>
   );
 }
+
+

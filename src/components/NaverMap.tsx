@@ -49,17 +49,18 @@ function placeMarkerContent(place: Place, isActive: boolean) {
   const ring = isActive ? '#5f4660' : 'rgba(95, 70, 96, 0.18)';
   const scale = isActive ? 'scale(1.08)' : 'scale(1)';
   const shadow = isActive ? '0 14px 28px rgba(255,127,168,0.28)' : '0 10px 22px rgba(255,156,96,0.18)';
+  const label = '';
 
   return `
     <div style="transform:${scale};display:flex;flex-direction:column;align-items:center;gap:6px;">
-      <div style="position:relative;width:50px;height:50px;">
-        <div style="position:absolute;left:50%;top:3px;width:18px;height:18px;border-radius:999px;background:${info.jamColor};transform:translateX(-50%);"></div>
-        <div style="position:absolute;left:50%;bottom:3px;width:18px;height:18px;border-radius:999px;background:${info.jamColor};transform:translateX(-50%);"></div>
-        <div style="position:absolute;left:3px;top:50%;width:18px;height:18px;border-radius:999px;background:${info.jamColor};transform:translateY(-50%);"></div>
-        <div style="position:absolute;right:3px;top:50%;width:18px;height:18px;border-radius:999px;background:${info.jamColor};transform:translateY(-50%);"></div>
-        <div style="position:absolute;inset:11px;border-radius:999px;background:${info.color};border:2px solid ${ring};box-shadow:${shadow};display:flex;align-items:center;justify-content:center;color:#5f4660;font-size:15px;font-weight:900;">${info.icon}</div>
+      <div style="position:relative;width:30px;height:30px;">
+        <div style="position:absolute;left:50%;top:1px;width:10px;height:10px;border-radius:999px;background:${info.jamColor};transform:translateX(-50%);"></div>
+        <div style="position:absolute;left:50%;bottom:1px;width:10px;height:10px;border-radius:999px;background:${info.jamColor};transform:translateX(-50%);"></div>
+        <div style="position:absolute;left:1px;top:50%;width:10px;height:10px;border-radius:999px;background:${info.jamColor};transform:translateY(-50%);"></div>
+        <div style="position:absolute;right:1px;top:50%;width:10px;height:10px;border-radius:999px;background:${info.jamColor};transform:translateY(-50%);"></div>
+        <div style="position:absolute;inset:7px;border-radius:999px;background:${info.color};border:2px solid ${ring};box-shadow:${shadow};display:flex;align-items:center;justify-content:center;color:#5f4660;font-size:10px;font-weight:900;">${info.icon}</div>
       </div>
-      <div style="min-width:92px;max-width:120px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.95);color:#402833;font-size:11px;font-weight:700;text-align:center;box-shadow:0 8px 18px rgba(255,127,168,0.12);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${place.name}</div>
+      ${label}
     </div>
   `;
 }
@@ -67,21 +68,18 @@ function placeMarkerContent(place: Place, isActive: boolean) {
 function festivalMarkerContent(festival: FestivalItem, isActive: boolean) {
   const ring = isActive ? '#ff4f93' : 'rgba(255, 79, 147, 0.22)';
   const scale = isActive ? 'scale(1.06)' : 'scale(1)';
-  const statusLabel = festival.isOngoing ? '진행 중' : '예정';
+  const label = '';
 
   return `
     <div style="transform:${scale};display:flex;flex-direction:column;align-items:center;gap:6px;">
-      <div style="position:relative;width:50px;height:50px;">
-        <div style="position:absolute;left:50%;top:0;width:20px;height:20px;border-radius:999px;background:#ffd4e6;transform:translateX(-50%);"></div>
-        <div style="position:absolute;left:50%;bottom:0;width:20px;height:20px;border-radius:999px;background:#ffd4e6;transform:translateX(-50%);"></div>
-        <div style="position:absolute;left:0;top:50%;width:20px;height:20px;border-radius:999px;background:#ffd4e6;transform:translateY(-50%);"></div>
-        <div style="position:absolute;right:0;top:50%;width:20px;height:20px;border-radius:999px;background:#ffd4e6;transform:translateY(-50%);"></div>
-        <div style="position:absolute;inset:12px;border-radius:999px;background:#fff4fa;border:2px solid ${ring};box-shadow:0 10px 24px rgba(255,93,146,0.18);display:flex;align-items:center;justify-content:center;color:#7b1948;font-size:10px;font-weight:900;">축제</div>
+      <div style="position:relative;width:30px;height:30px;">
+        <div style="position:absolute;left:50%;top:1px;width:10px;height:10px;border-radius:999px;background:#ffd4e6;transform:translateX(-50%);"></div>
+        <div style="position:absolute;left:50%;bottom:1px;width:10px;height:10px;border-radius:999px;background:#ffd4e6;transform:translateX(-50%);"></div>
+        <div style="position:absolute;left:1px;top:50%;width:10px;height:10px;border-radius:999px;background:#ffd4e6;transform:translateY(-50%);"></div>
+        <div style="position:absolute;right:1px;top:50%;width:10px;height:10px;border-radius:999px;background:#ffd4e6;transform:translateY(-50%);"></div>
+        <div style="position:absolute;inset:8px;border-radius:999px;background:#fff4fa;border:2px solid ${ring};box-shadow:0 10px 24px rgba(255,93,146,0.18);display:flex;align-items:center;justify-content:center;color:#7b1948;font-size:8px;font-weight:900;">축제</div>
       </div>
-      <div style="min-width:98px;max-width:124px;padding:7px 10px;border-radius:16px;background:rgba(255,255,255,0.95);color:#402833;font-size:11px;font-weight:700;text-align:center;box-shadow:0 8px 18px rgba(255,127,168,0.14);">
-        <div style="margin-bottom:3px;color:#ff4f93;font-size:10px;">${statusLabel}</div>
-        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${festival.title}</div>
-      </div>
+      ${label}
     </div>
   `;
 }
@@ -153,20 +151,15 @@ export function NaverMap({
 
         mapRef.current = new maps.Map(mapElementRef.current, {
           center: new maps.LatLng(DAEJEON_CENTER.latitude, DAEJEON_CENTER.longitude),
-          zoom: 12,
-          minZoom: 10,
+          zoom: 13,
+          minZoom: 11,
           scaleControl: false,
           logoControl: false,
           mapDataControl: false,
           zoomControl: true,
         });
 
-        const bounds = new maps.LatLngBounds(
-          new maps.LatLng(DAEJEON_BOUNDS.southWest.latitude, DAEJEON_BOUNDS.southWest.longitude),
-          new maps.LatLng(DAEJEON_BOUNDS.northEast.latitude, DAEJEON_BOUNDS.northEast.longitude),
-        );
 
-        mapRef.current.fitBounds(bounds, { top: 52, right: 20, bottom: 96, left: 20 });
         setStatus('ready');
       })
       .catch((error: Error) => {
@@ -195,10 +188,10 @@ export function NaverMap({
       const marker = new maps.Marker({
         map: mapRef.current,
         position: new maps.LatLng(place.latitude, place.longitude),
-        title: place.name,
+        title: '',
         icon: {
           content: placeMarkerContent(place, place.id === selectedPlaceId),
-          anchor: new maps.Point(46, 58),
+          anchor: new maps.Point(15, 15),
         },
       });
       maps.Event.addListener(marker, 'click', () => onSelectPlace(place.id));
@@ -219,11 +212,11 @@ export function NaverMap({
       const marker = new maps.Marker({
         map: mapRef.current,
         position: new maps.LatLng(festival.latitude, festival.longitude),
-        title: festival.title,
-        zIndex: 120,
+        title: '',
+        zIndex: festival.id === selectedFestivalId ? 170 : 110,
         icon: {
           content: festivalMarkerContent(festival, festival.id === selectedFestivalId),
-          anchor: new maps.Point(50, 60),
+          anchor: new maps.Point(15, 15),
         },
       });
       maps.Event.addListener(marker, 'click', () => onSelectFestival(festival.id));
@@ -251,11 +244,11 @@ export function NaverMap({
       currentMarkerRef.current = new maps.Marker({
         map: mapRef.current,
         position,
-        title: '현재 위치',
+        title: '',
         zIndex: 200,
         icon: {
           content: currentLocationMarkerContent(),
-          anchor: new maps.Point(14, 14),
+          anchor: new maps.Point(15, 15),
         },
       });
       return;
@@ -320,4 +313,9 @@ export function NaverMap({
     </div>
   );
 }
+
+
+
+
+
 

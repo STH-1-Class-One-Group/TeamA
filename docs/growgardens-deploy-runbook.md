@@ -43,24 +43,6 @@ Optional
 4. [20260318_seed_daejeon_activity.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_activity.sql)
 5. [20260318_normalize_place_categories.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_normalize_place_categories.sql)
 
-### 기존 프로젝트
-1. [20260318_stamp_session_refactor.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_stamp_session_refactor.sql)
-2. [20260318_seed_daejeon_places_50.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_places_50.sql)
-3. [20260318_seed_daejeon_activity.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_activity.sql)
-4. [20260318_normalize_place_categories.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_normalize_place_categories.sql)
-
-### 이미 20260318 시드를 넣은 프로젝트의 보정 패치
-기존에 20260318 시드를 먼저 넣고 테스트했다면 아래 파일만 추가 실행하면 됩니다.
-
-1. [20260318_fix_kalguksu_coordinates_and_add_oksu.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_fix_kalguksu_coordinates_and_add_oksu.sql)
-
-설명:
-- 초기 기준 데이터는 이미 [20260318_seed_daejeon_places_50.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_places_50.sql)에 반영되어 있습니다.
-- 위 보정 파일은 예전에 잘못 들어간 좌표와 누락된 `위대한 옥수칼국수`를 기존 DB에 덮어쓰기 위한 패치입니다.
-- 새로 세팅하는 경우에는 이 보정 파일이 필요 없습니다.
-
-`backend/sql/supabase_seed.sql` 은 레거시 파일이라 실행하지 않습니다.
-
 ## 2. Cloudflare Pages 값
 
 프로젝트: `jamissue-web`  
@@ -124,3 +106,5 @@ APP_PUBLIC_EVENT_SERVICE_KEY=<DATA_GO_KR_SERVICE_KEY>
 - 카카오는 아직 실제 OAuth 미구현
 - 관리자 기능은 별도 백오피스로 분리되지 않음
 - `APP_ORIGIN_API_URL` 은 FastAPI origin fallback이 필요할 때만 사용
+
+

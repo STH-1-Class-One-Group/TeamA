@@ -78,26 +78,6 @@ SQL Editor에서 아래 순서대로 실행합니다.
 4. [20260318_seed_daejeon_activity.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_activity.sql)
 5. [20260318_normalize_place_categories.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_normalize_place_categories.sql)
 
-### 기존 프로젝트
-기존 스키마가 있다면 아래 migration부터 실행합니다.
-
-1. [20260318_stamp_session_refactor.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_stamp_session_refactor.sql)
-2. [20260318_seed_daejeon_places_50.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_places_50.sql)
-3. [20260318_seed_daejeon_activity.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_activity.sql)
-4. [20260318_normalize_place_categories.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_normalize_place_categories.sql)
-
-### 이미 20260318 시드를 넣은 프로젝트의 보정 패치
-기존에 20260318 시드를 먼저 넣고 테스트했다면 아래 파일만 추가 실행하면 됩니다.
-
-1. [20260318_fix_kalguksu_coordinates_and_add_oksu.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_fix_kalguksu_coordinates_and_add_oksu.sql)
-
-설명:
-- 초기 기준 데이터는 이미 [20260318_seed_daejeon_places_50.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_places_50.sql)에 반영되어 있습니다.
-- 위 보정 파일은 예전에 잘못 들어간 좌표와 누락된 `위대한 옥수칼국수`를 기존 DB에 덮어쓰기 위한 패치입니다.
-- 새로 세팅하는 경우에는 이 보정 파일이 필요 없습니다.
-
-`backend/sql/supabase_seed.sql` 은 현재 기준에서 사용하지 않는 레거시 파일입니다.
-
 ## Cloudflare Pages 값
 
 위치: `Workers & Pages -> jamissue-web -> Settings -> Environment variables`
@@ -169,3 +149,4 @@ cd D:/Code305/JamIssue/backend
 - [docs/account-identity-schema.md](/D:/Code305/JamIssue/docs/account-identity-schema.md)
 - [docs/worker-first-poc.md](/D:/Code305/JamIssue/docs/worker-first-poc.md)
 - [docs/growgardens-deploy-runbook.md](/D:/Code305/JamIssue/docs/growgardens-deploy-runbook.md)
+

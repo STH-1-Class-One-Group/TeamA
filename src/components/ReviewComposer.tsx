@@ -82,10 +82,20 @@ export function ReviewComposer({
           />
         </label>
 
-        <label className="route-builder-field">
+        <div className="route-builder-field">
           <span>사진 첨부</span>
-          <input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-        </label>
+          <label className="file-picker" htmlFor="review-image-input">
+            <span>{file ? file.name : '사진을 고르세요'}</span>
+            <strong>{file ? '다시 선택' : '사진 선택'}</strong>
+          </label>
+          <input
+            id="review-image-input"
+            type="file"
+            accept="image/*"
+            className="visually-hidden"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+        </div>
 
         {errorMessage && <p className="form-error-copy">{errorMessage}</p>}
 
@@ -102,3 +112,4 @@ export function ReviewComposer({
     </section>
   );
 }
+

@@ -42,9 +42,9 @@ export function ReviewList({
       {reviews.map((review) => (
         <article key={review.id} className="review-card">
           <div className="review-card__top">
-            <div>
+            <div className="review-card__heading">
               <strong>{review.placeName}</strong>
-              <p>
+              <p className="review-card__author-line">
                 {review.author} · {review.visitLabel} · {review.visitedAt}
               </p>
             </div>
@@ -54,27 +54,34 @@ export function ReviewList({
           <div className="review-card__meta-line">
             <span className="review-card__visit-pill">{review.visitLabel}</span>
             {review.travelSessionId && <span className="soft-tag">연속 여행 기록</span>}
+            <span className="soft-tag">{review.badge}</span>
           </div>
 
           <p className="review-card__body">{review.body}</p>
 
-          <div className="chip-row compact-gap">
-            <span className="soft-tag">{review.badge}</span>
-          </div>
-
           {review.imageUrl && <img className="review-card__image" src={review.imageUrl} alt={`${review.placeName} 후기 이미지`} />}
 
           <div className="review-card__actions">
-            <button
-              type="button"
-              className={review.likedByMe ? 'secondary-button is-complete' : 'secondary-button'}
-              disabled={likingReviewId === review.id}
-              onClick={() => (canToggleLike ? onToggleLike(review.id) : onRequestLogin())}
-            >
-              {likingReviewId === review.id ? '반영 중' : `좋아요 ${review.likeCount}`}
-            </button>
+            <div className="review-card__action-group">
+              <button
+                type="button"
+                className={review.likedByMe ? 'review-action-button is-active' : 'review-action-button'}
+                disabled={likingReviewId === review.id}
+                onClick={() => (canToggleLike ? onToggleLike(review.id) : onRequestLogin())}
+                aria-pressed={review.likedByMe}
+              >
+                <span className="review-action-button__icon" aria-hidden="true">
+                  {review.likedByMe ? '♥' : '♡'}
+                </span>
+                <span className="review-action-button__label">{likingReviewId === review.id ? '반영 중' : review.likeCount}</span>
+              </button>
+              <span className="review-action-button review-action-button--static" aria-hidden="true">
+                <span className="review-action-button__icon">💬</span>
+                <span className="review-action-button__label">{review.comments.length}</span>
+              </span>
+            </div>
             {onOpenPlace && (
-              <button type="button" className="text-button" onClick={() => onOpenPlace(review.placeId)}>
+              <button type="button" className="review-link-button" onClick={() => onOpenPlace(review.placeId)}>
                 장소 보기
               </button>
             )}
@@ -93,3 +100,5 @@ export function ReviewList({
     </div>
   );
 }
+
+
