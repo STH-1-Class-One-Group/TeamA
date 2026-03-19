@@ -476,22 +476,69 @@ async function readUserRow(env, userId) {
   );
   return rows?.[0] ?? null;
 }
+
+async function findUserByNickname(env, nickname, excludeUserId = null) {
+  const normalized = String(nickname ?? '').trim();
+  if (!normalized) {
+    return null;
+  }
+  const rows = await supabaseRequest(env, 'user?select=user_id,nickname');
+  return (rows ?? []).find((row) => {
+    if (excludeUserId && row.user_id === excludeUserId) {
+      return false;
+    }
+    return String(row.nickname ?? '').toLowerCase() === normalized.toLowerCase();
+  }) ?? null;
+}
+
+async function ensureUniqueNickname(env, nickname, excludeUserId = null) {
+  const normalized = String(nickname ?? '').trim();
+  if (normalized.length < 2) {
+    const error = new Error('닉네임은 두 글자 이상으로 적어 주세요.');
+    error.status = 400;
+    throw error;
+  }
+  const existing = await findUserByNickname(env, normalized, excludeUserId);
+  if (existing) {
+    const error = new Error('이미 사용 중인 닉네임이에요.');
+    error.status = 409;
+    throw error;
+  }
+  return normalized;
+}
+
+async function buildUniqueSocialNickname(env, nickname) {
+  const base = String(nickname ?? '').trim() || '이름 없음';
+  const existing = await findUserByNickname(env, base);
+  if (!existing) {
+    return base;
+  }
+  for (let suffix = 2; suffix < 10000; suffix += 1) {
+    const candidate = `${base.slice(0, 95)}${suffix}`;
+    const duplicate = await findUserByNickname(env, candidate);
+    if (!duplicate) {
+      return candidate;
+    }
+  }
+  throw new Error('사용 가능한 닉네임을 만들 수 없어요.');
+}
+
 async function upsertNaverUser(env, profile) {
-  const fallbackNickname = profile.nickname || profile.name || "이름 없음";
+  const fallbackNickname = profile.nickname || profile.name || '이름 없음';
   const nowIso = new Date().toISOString();
-  const existingIdentity = await findIdentity(env, "naver", profile.id);
+  const existingIdentity = await findIdentity(env, 'naver', profile.id);
 
   if (existingIdentity) {
     await supabaseRequest(env, `user?user_id=eq.${encodeFilterValue(existingIdentity.user_id)}`, {
-      method: "PATCH",
+      method: 'PATCH',
       body: JSON.stringify({
         email: profile.email ?? null,
-        provider: "naver",
+        provider: 'naver',
         updated_at: nowIso,
       }),
     });
-    await supabaseRequest(env, `user_identity?identity_id=eq.${existingIdentity.identity_id}`, {
-      method: "PATCH",
+    await supabaseRequest(env, `user_identity?identity_id=eq.${encodeFilterValue(existingIdentity.identity_id)}`, {
+      method: 'PATCH',
       body: JSON.stringify({
         email: profile.email ?? null,
         profile_image: profile.profile_image ?? null,
@@ -503,7 +550,7 @@ async function upsertNaverUser(env, profile) {
       existingIdentity.user_id,
       user?.nickname ?? fallbackNickname,
       user?.email ?? profile.email,
-      "naver",
+      'naver',
       profile.profile_image,
       env,
       user?.profile_completed_at ?? null,
@@ -511,23 +558,24 @@ async function upsertNaverUser(env, profile) {
   }
 
   const userId = crypto.randomUUID();
-  await supabaseRequest(env, "user", {
-    method: "POST",
+  const safeNickname = await buildUniqueSocialNickname(env, fallbackNickname);
+  await supabaseRequest(env, 'user', {
+    method: 'POST',
     body: JSON.stringify({
       user_id: userId,
-      nickname: fallbackNickname,
+      nickname: safeNickname,
       email: profile.email ?? null,
-      provider: "naver",
+      provider: 'naver',
       profile_completed_at: null,
       created_at: nowIso,
       updated_at: nowIso,
     }),
   });
-  await supabaseRequest(env, "user_identity", {
-    method: "POST",
+  await supabaseRequest(env, 'user_identity', {
+    method: 'POST',
     body: JSON.stringify({
       user_id: userId,
-      provider: "naver",
+      provider: 'naver',
       provider_user_id: profile.id,
       email: profile.email ?? null,
       profile_image: profile.profile_image ?? null,
@@ -536,7 +584,7 @@ async function upsertNaverUser(env, profile) {
     }),
   });
 
-  return buildSessionUser(userId, fallbackNickname, profile.email, "naver", profile.profile_image, env, null);
+  return buildSessionUser(userId, safeNickname, profile.email, 'naver', profile.profile_image, env, null);
 }
 function normalizePlaceCategory(category, slug = '') {
   const cultureSlugHints = ['museum', 'arts-center', 'art-science', 'science-museum', 'observatory'];
@@ -869,16 +917,20 @@ async function handleUpdateProfile(request, env) {
     return sessionResult.response;
   }
   const payload = await readJsonBody(request);
-  const nickname = String(payload.nickname ?? "").trim();
-  if (nickname.length < 2) {
-    return jsonResponse(400, { detail: "닉네임은 두 글자 이상으로 적어 주세요." }, env, request);
+
+  let nickname;
+  try {
+    nickname = await ensureUniqueNickname(env, payload.nickname, sessionResult.sessionUser.id);
+  } catch (error) {
+    return jsonResponse(error.status ?? 400, { detail: error.message ?? '닉네임을 저장할 수 없어요.' }, env, request);
   }
+
   const nowIso = new Date().toISOString();
   await supabaseRequest(env, `user?user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}`, {
-    method: "PATCH",
+    method: 'PATCH',
     body: JSON.stringify({
       nickname,
-      profile_completed_at: nowIso,
+      profile_completed_at: sessionResult.sessionUser.profileCompletedAt ?? nowIso,
       updated_at: nowIso,
     }),
   });
@@ -890,16 +942,16 @@ async function handleUpdateProfile(request, env) {
     sessionResult.sessionUser.provider,
     sessionResult.sessionUser.profileImage,
     env,
-    userRow?.profile_completed_at ?? nowIso,
+    userRow?.profile_completed_at ?? sessionResult.sessionUser.profileCompletedAt ?? nowIso,
   );
   const sessionToken = await signPayload(getSigningSecret(env), { user: nextSessionUser, exp: nowSeconds() + SESSION_MAX_AGE_SECONDS });
   return jsonResponse(200, createAuthResponse(nextSessionUser, env), env, request, {
-    "set-cookie": serializeCookie(SESSION_COOKIE_NAME, sessionToken, {
+    'set-cookie': serializeCookie(SESSION_COOKIE_NAME, sessionToken, {
       maxAge: SESSION_MAX_AGE_SECONDS,
       httpOnly: true,
       secure: getSecureCookieFlag(request, env),
-      sameSite: "Lax",
-      path: "/",
+      sameSite: 'Lax',
+      path: '/',
     }),
   });
 }
@@ -1448,7 +1500,7 @@ async function loadSingleReview(env, reviewId, sessionUserId = null) {
   const [commentRows, likeRows, placeRows, stampRows, userFeedLikeRows = []] = await Promise.all([
     supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&feed_id=eq.${encodeFilterValue(reviewId)}&order=created_at.asc`),
     supabaseRequest(env, `feed_like?select=feed_id,user_id&feed_id=eq.${encodeFilterValue(reviewId)}`),
-    supabaseRequest(env, `map?select=position_id,slug,name,district,category,latitude,longitude,summary,description,vibe_tags,visit_time,route_hint,stamp_reward,hero_label,jam_color,accent_color,is_active&position_id=eq.${encodeFilterValue(reviewRow.position_id)}&limit=1`),
+    supabaseRequest(env, `map?select=position_id,slug,name,district,category,latitude,longitude,summary,description,image_url,vibe_tags,visit_time,route_hint,stamp_reward,hero_label,jam_color,accent_color,is_active&position_id=eq.${encodeFilterValue(reviewRow.position_id)}&limit=1`),
     reviewRow.stamp_id
       ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&stamp_id=eq.${encodeFilterValue(reviewRow.stamp_id)}&limit=1`)
       : Promise.resolve([]),

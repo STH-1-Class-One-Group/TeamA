@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { ProviderButtons } from './ProviderButtons';
 import type { AuthProvider, CourseMood, MyPageResponse, MyPageTabKey, SessionUser, TravelSession } from '../types';
 
@@ -57,7 +57,15 @@ export function MyPagePanel({
 }: MyPagePanelProps) {
   const [nickname, setNickname] = useState(sessionUser?.nickname ?? '');
   const [showVisitedDetail, setShowVisitedDetail] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
+
+  useEffect(() => {
+    setNickname(sessionUser?.nickname ?? '');
+    if (sessionUser && !sessionUser.profileCompletedAt) {
+      setShowSettings(true);
+    }
+  }, [sessionUser?.nickname, sessionUser?.profileCompletedAt]);
 
   const unpublishedSessions = useMemo(
     () => myPage?.travelSessions.filter((session) => session.canPublish && !session.publishedRouteId) ?? [],
@@ -89,6 +97,7 @@ export function MyPagePanel({
   async function handleNicknameSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onSaveNickname(nickname.trim());
+    setShowSettings(false);
   }
 
   if (!sessionUser) {
@@ -114,17 +123,34 @@ export function MyPagePanel({
           <h2>{sessionUser.nickname}님의 기록</h2>
           <p>스탬프를 모으고 피드를 남기고, 하나의 여행 세션을 코스로 발행할 수 있어요.</p>
         </div>
-        <button type="button" className="secondary-button" onClick={() => void onLogout()} disabled={isLoggingOut}>
-          {isLoggingOut ? '정리 중' : '로그아웃'}
-        </button>
+        <div className="panel-header__actions">
+          <button
+            type="button"
+            className={showSettings ? 'secondary-button icon-button is-complete' : 'secondary-button icon-button'}
+            onClick={() => setShowSettings((current) => !current)}
+            aria-label="설정 열기"
+          >
+            <span aria-hidden="true">⚙</span>
+          </button>
+          <button type="button" className="secondary-button" onClick={() => void onLogout()} disabled={isLoggingOut}>
+            {isLoggingOut ? '정리 중' : '로그아웃'}
+          </button>
+        </div>
       </header>
 
-      {!sessionUser.profileCompletedAt && (
-        <section className="sheet-card stack-gap">
-          <div>
-            <p className="eyebrow">NICKNAME</p>
-            <h3>닉네임을 먼저 정해 주세요</h3>
-            <p className="section-copy">닉네임은 중복을 허용합니다. 서비스 안에서 보일 이름만 정하면 돼요.</p>
+      {(showSettings || !sessionUser.profileCompletedAt) && (
+        <section className="sheet-card stack-gap settings-card">
+          <div className="settings-card__header">
+            <div>
+              <p className="eyebrow">SETTINGS</p>
+              <h3>{sessionUser.profileCompletedAt ? '닉네임 수정' : '닉네임을 먼저 정해 주세요'}</h3>
+              <p className="section-copy">닉네임은 서비스 전체에서 하나만 사용할 수 있어요.</p>
+            </div>
+            {sessionUser.profileCompletedAt && (
+              <button type="button" className="text-button" onClick={() => setShowSettings(false)}>
+                닫기
+              </button>
+            )}
           </div>
           <form className="route-builder-form" onSubmit={handleNicknameSubmit}>
             <label className="route-builder-field">

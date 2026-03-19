@@ -1,4 +1,4 @@
-﻿"""Normalized repository for JamIssue domain flows."""
+"""Normalized repository for JamIssue domain flows."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from .config import Settings
@@ -170,6 +171,7 @@ def to_place_out(place: MapPlace) -> PlaceOut:
         category=place.category,
         jamColor=place.jam_color,
         accentColor=place.accent_color,
+        imageUrl=place.image_url,
         latitude=place.latitude,
         longitude=place.longitude,
         summary=place.summary,
@@ -278,6 +280,33 @@ def get_or_create_user(
     return user
 
 
+def _nickname_exists(db: Session, nickname: str, *, exclude_user_id: str | None = None) -> bool:
+    stmt = select(User.user_id).where(func.lower(User.nickname) == nickname.lower())
+    if exclude_user_id:
+        stmt = stmt.where(User.user_id != exclude_user_id)
+    return db.scalar(stmt.limit(1)) is not None
+
+
+def ensure_unique_nickname(db: Session, nickname: str, *, exclude_user_id: str | None = None) -> str:
+    normalized = nickname.strip()
+    if len(normalized) < 2:
+        raise ValueError("닉네임은 두 글자 이상으로 적어 주세요.")
+    if _nickname_exists(db, normalized, exclude_user_id=exclude_user_id):
+        raise ValueError("이미 사용 중인 닉네임이에요.")
+    return normalized
+
+
+def build_unique_social_nickname(db: Session, nickname: str, *, exclude_user_id: str | None = None) -> str:
+    base = nickname.strip() or "이름 없음"
+    if not _nickname_exists(db, base, exclude_user_id=exclude_user_id):
+        return base
+    for suffix in range(2, 10000):
+        candidate = f"{base[:95]}{suffix}"
+        if not _nickname_exists(db, candidate, exclude_user_id=exclude_user_id):
+            return candidate
+    raise ValueError("사용 가능한 닉네임을 만들 수 없어요.")
+
+
 def upsert_social_user(
     db: Session,
     *,
@@ -297,9 +326,6 @@ def upsert_social_user(
     if identity:
         user = identity.user
         changed = False
-        if user.nickname != nickname:
-            user.nickname = nickname
-            changed = True
         if user.email != email:
             user.email = email
             changed = True
@@ -315,13 +341,14 @@ def upsert_social_user(
         if changed:
             identity.updated_at = now
             user.updated_at = now
-            db.commit()
-            db.refresh(user)
+        db.commit()
+        db.refresh(user)
         return user
 
+    safe_nickname = build_unique_social_nickname(db, nickname)
     user = User(
         user_id=generate_user_id(),
-        nickname=nickname,
+        nickname=safe_nickname,
         email=email,
         provider=provider,
         created_at=now,
@@ -340,10 +367,13 @@ def upsert_social_user(
             updated_at=now,
         )
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise ValueError("이미 사용 중인 닉네임이에요.") from error
     db.refresh(user)
     return user
-
 
 def link_social_identity(
     db: Session,
@@ -427,16 +457,17 @@ def update_user_profile(db: Session, user_id: str, payload: ProfileUpdateRequest
     if not user:
         raise ValueError("사용자 정보를 찾을 수 없어요.")
 
-    nickname = payload.nickname.strip()
-    if len(nickname) < 2:
-        raise ValueError("닉네임은 두 글자 이상으로 적어 주세요.")
-
+    nickname = ensure_unique_nickname(db, payload.nickname, exclude_user_id=user_id)
     now = utcnow_naive()
     user.nickname = nickname
     if user.profile_completed_at is None:
         user.profile_completed_at = now
     user.updated_at = now
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise ValueError("이미 사용 중인 닉네임이에요.") from error
     db.refresh(user)
     return user
 
@@ -987,3 +1018,9 @@ def load_public_bundle(settings: Settings) -> dict:
 
 def import_public_bundle(db: Session, settings: Settings) -> PublicImportResponse:
     return sync_public_bundle(db, settings)
+
+
+
+
+
+

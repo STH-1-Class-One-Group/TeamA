@@ -49,6 +49,7 @@ class PlaceOut(ApiModel):
     category: CategoryType
     jam_color: str = Field(alias='jamColor')
     accent_color: str = Field(alias='accentColor')
+    image_url: str | None = Field(default=None, alias='imageUrl')
     latitude: float
     longitude: float
     summary: str
@@ -266,3 +267,4 @@ class HealthResponse(ApiModel):
 
 
 CommentOut.model_rebuild()
+

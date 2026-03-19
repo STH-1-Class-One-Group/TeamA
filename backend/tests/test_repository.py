@@ -1,4 +1,4 @@
-﻿from datetime import timedelta
+from datetime import timedelta
 from pathlib import Path
 
 from sqlalchemy import create_engine, event, func, select
@@ -278,3 +278,28 @@ def test_delete_account_cascades_user_content_and_detaches_replies(tmp_path: Pat
     assert remaining_reply.parent_id is None
     assert session.scalar(select(func.count()).select_from(UserComment).where(UserComment.user_id == social_user.user_id)) == 0
     assert session.scalar(select(func.count()).select_from(Feed).where(Feed.feed_id == int(own_review.id))) == 0
+
+
+def test_profile_update_rejects_duplicate_nickname(tmp_path: Path):
+    session = build_session(tmp_path)
+    first = upsert_social_user(session, provider='naver', provider_user_id='naver-111', nickname='민서', email='a@example.com')
+    second = upsert_social_user(session, provider='kakao', provider_user_id='kakao-222', nickname='가은', email='b@example.com')
+
+    error = None
+    try:
+        update_user_profile(session, second.user_id, ProfileUpdateRequest(nickname=first.nickname))
+    except ValueError as exc:
+        error = str(exc)
+
+    assert error == '이미 사용 중인 닉네임이에요.'
+
+
+def test_social_signup_generates_distinct_duplicate_nickname(tmp_path: Path):
+    session = build_session(tmp_path)
+
+    first = upsert_social_user(session, provider='naver', provider_user_id='naver-123', nickname='민서', email='same@example.com')
+    second = upsert_social_user(session, provider='kakao', provider_user_id='kakao-456', nickname='민서', email='same@example.com')
+
+    assert first.nickname == '민서'
+    assert second.nickname != '민서'
+    assert second.nickname.startswith('민서')

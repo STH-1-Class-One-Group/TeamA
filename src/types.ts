@@ -41,6 +41,7 @@ export interface Place {
   category: PlaceCategory;
   jamColor: string;
   accentColor: string;
+  imageUrl?: string | null;
   latitude: number;
   longitude: number;
   summary: string;
@@ -274,5 +275,6 @@ export interface RoadmapBannerMilestone {
   body: string;
   deliverable: string;
 }
+
 
 
