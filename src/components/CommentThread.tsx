@@ -1,10 +1,11 @@
-﻿import { useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import type { Comment } from '../types';
 
 interface CommentThreadProps {
   comments: Comment[];
   canWriteComment: boolean;
   submittingReviewId: string | null;
+  highlightedCommentId: string | null;
   reviewId: string;
   onSubmitComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
   onRequestLogin: () => void;
@@ -15,6 +16,7 @@ interface CommentItemProps {
   reviewId: string;
   canWriteComment: boolean;
   submittingReviewId: string | null;
+  highlightedCommentId: string | null;
   onSubmitComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
   onRequestLogin: () => void;
   isReply?: boolean;
@@ -25,6 +27,7 @@ function CommentItem({
   reviewId,
   canWriteComment,
   submittingReviewId,
+  highlightedCommentId,
   onSubmitComment,
   onRequestLogin,
   isReply = false,
@@ -32,6 +35,17 @@ function CommentItem({
   const [replyBody, setReplyBody] = useState('');
   const [replyOpen, setReplyOpen] = useState(false);
   const itemRef = useRef<HTMLLIElement | null>(null);
+  const isHighlighted = highlightedCommentId === comment.id;
+
+  useEffect(() => {
+    if (!isHighlighted) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      itemRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isHighlighted]);
 
   async function handleReplySubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,7 +89,7 @@ function CommentItem({
       )}
 
       <div className="comment-thread__main">
-        <div className="comment-thread__bubble">
+        <div className={isHighlighted ? 'comment-thread__bubble is-highlighted' : 'comment-thread__bubble'}>
           <div className="comment-thread__meta">
             <strong>{comment.author}</strong>
             <span>{comment.createdAt}</span>
@@ -106,6 +120,7 @@ function CommentItem({
                 reviewId={reviewId}
                 canWriteComment={canWriteComment}
                 submittingReviewId={submittingReviewId}
+                highlightedCommentId={highlightedCommentId}
                 onSubmitComment={onSubmitComment}
                 onRequestLogin={onRequestLogin}
                 isReply={true}
@@ -122,6 +137,7 @@ export function CommentThread({
   comments,
   canWriteComment,
   submittingReviewId,
+  highlightedCommentId,
   reviewId,
   onSubmitComment,
   onRequestLogin,
@@ -159,6 +175,7 @@ export function CommentThread({
               reviewId={reviewId}
               canWriteComment={canWriteComment}
               submittingReviewId={submittingReviewId}
+              highlightedCommentId={highlightedCommentId}
               onSubmitComment={onSubmitComment}
               onRequestLogin={onRequestLogin}
             />

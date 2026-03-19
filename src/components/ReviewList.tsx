@@ -11,7 +11,6 @@ interface ReviewListProps {
   onSubmitComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
   onRequestLogin: () => void;
   onOpenPlace?: (placeId: string) => void;
-  /** When provided, tapping the comment button opens a sheet instead of rendering inline comments. */
   onOpenComments?: (reviewId: string) => void;
   emptyTitle: string;
   emptyBody: string;
@@ -107,6 +106,7 @@ export function ReviewList({
               comments={review.comments}
               canWriteComment={canWriteComment}
               submittingReviewId={submittingReviewId}
+              highlightedCommentId={null}
               reviewId={review.id}
               onSubmitComment={onSubmitComment}
               onRequestLogin={onRequestLogin}
@@ -117,5 +117,3 @@ export function ReviewList({
     </div>
   );
 }
-
-

@@ -42,6 +42,7 @@ import type {
   Place,
   ReviewMood,
   SessionUser,
+  Tab,
   UserRoute,
 } from './types';
 
@@ -113,6 +114,9 @@ export default function App() {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewLikeUpdatingId, setReviewLikeUpdatingId] = useState<string | null>(null);
   const [commentSubmittingReviewId, setCommentSubmittingReviewId] = useState<string | null>(null);
+  const [activeCommentReviewId, setActiveCommentReviewId] = useState<string | null>(null);
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
+  const [returnView, setReturnView] = useState<{ tab: Tab; myPageTab: MyPageTabKey; activeCommentReviewId: string | null; highlightedCommentId: string | null } | null>(null);
   const [stampActionStatus, setStampActionStatus] = useState<ApiStatus>('idle');
   const [stampActionMessage, setStampActionMessage] = useState('장소를 선택하면 오늘 스탬프 가능 여부를 바로 알려드릴게요.');
   const [routeSubmitting, setRouteSubmitting] = useState(false);
@@ -188,6 +192,29 @@ export default function App() {
     return nextMyPage;
   }
 
+  function handleOpenReviewComments(reviewId: string, commentId: string | null = null) {
+    goToTab('feed');
+    setActiveCommentReviewId(reviewId);
+    setHighlightedCommentId(commentId);
+  }
+
+  function handleCloseReviewComments() {
+    setActiveCommentReviewId(null);
+    setHighlightedCommentId(null);
+  }
+
+  function handleOpenPlaceWithReturn(placeId: string) {
+    if (activeTab !== 'map') {
+      setReturnView({
+        tab: activeTab,
+        myPageTab,
+        activeCommentReviewId,
+        highlightedCommentId,
+      });
+    }
+    openPlace(placeId);
+  }
+
   useEffect(() => {
     void loadApp(true);
   }, []);
@@ -212,6 +239,13 @@ export default function App() {
       void refreshMyPageForUser(sessionUser, true);
     }
   }, [activeTab, myPage, sessionUser]);
+
+  useEffect(() => {
+    if (activeTab !== 'feed' && activeCommentReviewId !== null) {
+      setActiveCommentReviewId(null);
+      setHighlightedCommentId(null);
+    }
+  }, [activeCommentReviewId, activeTab]);
 
   useEffect(() => {
     if (!selectedPlaceId) {
@@ -556,6 +590,33 @@ export default function App() {
     }
   }
 
+  const canNavigateBack = activeCommentReviewId !== null || activeTab !== 'map' || selectedPlaceId !== null || selectedFestivalId !== null || drawerState !== 'closed';
+
+  function handleNavigateBack() {
+    if (returnView && activeTab === 'map') {
+      setMyPageTab(returnView.myPageTab);
+      setActiveCommentReviewId(returnView.activeCommentReviewId);
+      setHighlightedCommentId(returnView.highlightedCommentId);
+      const nextTab = returnView.tab;
+      setReturnView(null);
+      commitRouteState({ tab: nextTab, placeId: null, festivalId: null, drawerState: 'closed' }, 'replace');
+      return;
+    }
+
+    if (activeCommentReviewId !== null) {
+      handleCloseReviewComments();
+      return;
+    }
+
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    handleCloseReviewComments();
+    goToTab('map', 'replace');
+  }
+
   const reviewProofMessage = !sessionUser
     ? '로그인한 뒤 스탬프를 찍어야 피드를 작성할 수 있어요.'
     : todayStamp
@@ -635,10 +696,14 @@ export default function App() {
                 sessionUser={sessionUser}
                 reviewLikeUpdatingId={reviewLikeUpdatingId}
                 commentSubmittingReviewId={commentSubmittingReviewId}
+                activeCommentReviewId={activeCommentReviewId}
+                highlightedCommentId={highlightedCommentId}
                 onToggleReviewLike={handleToggleReviewLike}
                 onCreateComment={handleCreateComment}
                 onRequestLogin={() => goToTab('my')}
-                onOpenPlace={openPlace}
+                onOpenPlace={handleOpenPlaceWithReturn}
+                onOpenComments={handleOpenReviewComments}
+                onCloseComments={handleCloseReviewComments}
               />
             )}
 
@@ -656,7 +721,7 @@ export default function App() {
                     .catch((error) => setNotice(formatErrorMessage(error)));
                 }}
                 onToggleLike={handleToggleRouteLike}
-                onOpenPlace={openPlace}
+                onOpenPlace={handleOpenPlaceWithReturn}
                 onRequestLogin={() => goToTab('my')}
               />
             )}
@@ -677,10 +742,18 @@ export default function App() {
                 onLogout={handleLogout}
                 onSaveNickname={handleUpdateProfile}
                 onPublishRoute={handlePublishRoute}
-                onOpenPlace={openPlace}
+                onOpenPlace={handleOpenPlaceWithReturn}
+                onOpenComment={(reviewId, commentId) => handleOpenReviewComments(reviewId, commentId)}
               />
             )}
           </div>
+        )}
+
+        {canNavigateBack && (
+          <button type="button" className="app-back-button" onClick={handleNavigateBack} aria-label="이전으로 돌아가기">
+            <span aria-hidden="true">←</span>
+            <span>이전</span>
+          </button>
         )}
 
         <BottomNav activeTab={activeTab} onChange={goToTab} />
@@ -688,6 +761,9 @@ export default function App() {
     </div>
   );
 }
+
+
+
 
 
 

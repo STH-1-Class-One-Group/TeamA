@@ -7,6 +7,7 @@ interface FeedCommentSheetProps {
   isOpen: boolean;
   canWriteComment: boolean;
   submittingReviewId: string | null;
+  highlightedCommentId: string | null;
   onClose: () => void;
   onSubmitComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
   onRequestLogin: () => void;
@@ -17,6 +18,7 @@ export function FeedCommentSheet({
   isOpen,
   canWriteComment,
   submittingReviewId,
+  highlightedCommentId,
   onClose,
   onSubmitComment,
   onRequestLogin,
@@ -76,6 +78,7 @@ export function FeedCommentSheet({
               comments={review.comments}
               canWriteComment={canWriteComment}
               submittingReviewId={submittingReviewId}
+              highlightedCommentId={highlightedCommentId}
               reviewId={review.id}
               onSubmitComment={onSubmitComment}
               onRequestLogin={onRequestLogin}

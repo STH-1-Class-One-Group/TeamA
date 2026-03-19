@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
+import { useScrollRestoration } from '../hooks/useScrollRestoration';
 import { ProviderButtons } from './ProviderButtons';
 import type { AuthProvider, CourseMood, MyPageResponse, MyPageTabKey, SessionUser, TravelSession } from '../types';
 
@@ -18,6 +19,7 @@ interface MyPagePanelProps {
   onSaveNickname: (nickname: string) => Promise<void>;
   onPublishRoute: (payload: { travelSessionId: string; title: string; description: string; mood: string }) => Promise<void>;
   onOpenPlace: (placeId: string) => void;
+  onOpenComment: (reviewId: string, commentId: string) => void;
 }
 
 const routeMoodOptions: CourseMood[] = ['데이트', '사진', '힐링', '비 오는 날'];
@@ -54,11 +56,13 @@ export function MyPagePanel({
   onSaveNickname,
   onPublishRoute,
   onOpenPlace,
+  onOpenComment,
 }: MyPagePanelProps) {
   const [nickname, setNickname] = useState(sessionUser?.nickname ?? '');
   const [showVisitedDetail, setShowVisitedDetail] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
+  const scrollRef = useScrollRestoration<HTMLElement>(`my:${activeTab}`);
 
   useEffect(() => {
     setNickname(sessionUser?.nickname ?? '');
@@ -102,7 +106,7 @@ export function MyPagePanel({
 
   if (!sessionUser) {
     return (
-      <section className="page-panel page-panel--scrollable">
+      <section ref={scrollRef} className="page-panel page-panel--scrollable">
         <header className="panel-header">
           <p className="eyebrow">MY PAGE</p>
           <h2>로그인하고 기록 이어보기</h2>
@@ -116,7 +120,7 @@ export function MyPagePanel({
   }
 
   return (
-    <section className="page-panel page-panel--scrollable">
+    <section ref={scrollRef} className="page-panel page-panel--scrollable">
       <header className="panel-header panel-header--with-action">
         <div>
           <p className="eyebrow">MY PAGE</p>
@@ -147,8 +151,8 @@ export function MyPagePanel({
               <p className="section-copy">닉네임은 서비스 전체에서 하나만 사용할 수 있어요.</p>
             </div>
             {sessionUser.profileCompletedAt && (
-              <button type="button" className="text-button" onClick={() => setShowSettings(false)}>
-                닫기
+              <button type="button" className="settings-card__close" onClick={() => setShowSettings(false)} aria-label="설정 닫기">
+                <span aria-hidden="true">×</span>
               </button>
             )}
           </div>
@@ -223,7 +227,7 @@ export function MyPagePanel({
           </section>
 
           <section className="sheet-card stack-gap">
-            <div className="chip-row compact-gap">
+            <div className="chip-row compact-gap my-page-primary-tabs">
               <button type="button" className={activeTab === 'stamps' ? 'chip is-active' : 'chip'} onClick={() => onChangeTab('stamps')}>
                 얻은 스탬프
               </button>
@@ -245,11 +249,15 @@ export function MyPagePanel({
                     <div className="review-card__top">
                       <div>
                         <strong>{stampLog.placeName}</strong>
-                        <p>{stampLog.stampedAt}</p>
+                        <p>{stampLog.isToday ? '오늘 찍은 스탬프' : '방문 스탬프 기록'}</p>
                       </div>
                       <span className="counter-pill">{stampLog.visitLabel}</span>
                     </div>
-                    <p className="section-copy">{stampLog.stampedDate} 기준 방문 기록이에요.</p>
+                    <div className="chip-row compact-gap review-card__meta-wrap">
+                      <span className="soft-tag">획득 {stampLog.stampedAt}</span>
+                      {stampLog.isToday && <span className="soft-tag is-complete">오늘</span>}
+                      {stampLog.travelSessionId && <span className="soft-tag">여행 세션 연결</span>}
+                    </div>
                     <button type="button" className="text-button review-card__place-link" onClick={() => onOpenPlace(stampLog.placeId)}>
                       장소 열기
                     </button>
@@ -283,18 +291,28 @@ export function MyPagePanel({
             {activeTab === 'comments' && (
               <div className="review-stack">
                 {myPage.comments.map((comment) => (
-                  <article key={comment.id} className="review-card">
-                    <div className="review-card__top">
-                      <div>
-                        <strong>{comment.placeName}</strong>
-                        <p>{comment.parentId ? '답글' : '댓글'} · {comment.createdAt}</p>
+                  <article key={comment.id} className="review-card review-card--comment-log">
+                    <div className="review-card__top review-card__top--comment-log">
+                      <div className="review-card__title-block">
+                        <button type="button" className="review-card__place-anchor" onClick={() => onOpenPlace(comment.placeId)}>
+                          <strong>{comment.placeName}</strong>
+                        </button>
+                        <p className="review-card__meta-line">{comment.parentId ? '답글 남김' : '댓글 남김'} · {comment.createdAt}</p>
                       </div>
                       <span className="counter-pill">{comment.isDeleted ? '삭제됨' : '작성됨'}</span>
                     </div>
-                    <p className="review-card__body">{comment.body}</p>
-                    <p className="section-copy">원문: {comment.reviewBody}</p>
-                    <button type="button" className="text-button review-card__place-link" onClick={() => onOpenPlace(comment.placeId)}>
-                      장소 열기
+                    <div className="review-card__content-stack">
+                      <div className="review-card__quote-block">
+                        <p className="review-card__label">내 댓글</p>
+                        <p className="review-card__body">{comment.body}</p>
+                      </div>
+                      <div className="review-card__quote-block review-card__quote-block--muted">
+                        <p className="review-card__label">피드 원문</p>
+                        <p className="section-copy">{comment.reviewBody}</p>
+                      </div>
+                    </div>
+                    <button type="button" className="review-card__place-link" onClick={() => onOpenComment(comment.reviewId, comment.id)}>
+                      내 댓글 보기
                     </button>
                   </article>
                 ))}
@@ -393,3 +411,12 @@ export function MyPagePanel({
     </section>
   );
 }
+
+
+
+
+
+
+
+
+
