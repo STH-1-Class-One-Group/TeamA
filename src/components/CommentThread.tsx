@@ -48,6 +48,7 @@ function CommentItem({
 
   return (
     <li className="comment-thread__item">
+      {isReply && <span className="comment-thread__reply-indent" aria-hidden="true">ㄴ</span>}
       <div className="comment-thread__bubble">
         <div className="comment-thread__meta">
           <strong>{comment.author}</strong>
