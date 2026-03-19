@@ -9,6 +9,25 @@ if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
   window.history.scrollRestoration = 'manual';
 }
 
+function syncViewportMetrics() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+  document.documentElement.style.setProperty('--app-height', `${Math.round(viewportHeight)}px`);
+  document.documentElement.style.setProperty('--app-width', `${Math.round(viewportWidth)}px`);
+}
+
+if (typeof window !== 'undefined') {
+  syncViewportMetrics();
+  window.addEventListener('resize', syncViewportMetrics, { passive: true });
+  window.addEventListener('orientationchange', syncViewportMetrics, { passive: true });
+  window.visualViewport?.addEventListener('resize', syncViewportMetrics, { passive: true });
+  window.visualViewport?.addEventListener('scroll', syncViewportMetrics, { passive: true });
+}
+
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
