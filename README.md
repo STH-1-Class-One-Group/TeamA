@@ -8,24 +8,89 @@ JamIssue는 대전 장소를 지도에서 탐색하고, 스탬프를 찍은 뒤 
 - 데이터/스토리지: Supabase
 - 기준 브랜치: `codex/production-deploy`
 
-## 현재 구현 범위
+## 핵심 사용자 흐름
 
+### 1. 지도에서 장소 탐색
 - 하단 탭 `지도 / 피드 / 코스 / 마이`
-- 지도 탭 장소/축제 마커 및 바텀시트 상세
-- 스탬프 로그 기반 반복 방문 기록
-- `stamp_id` 기반 방문 증명 후기 작성 제한
-- 24시간 기준 `travel_session` 코스 묶음
-- 피드 좋아요/댓글, 코스 좋아요
-- 마이페이지 탭
+- 지도 탭에서 장소 마커와 축제 마커를 탐색
+- 장소를 누르면 바텀시트가 열리고 상세 정보, 방문 상태, 현장 스탬프 액션을 확인
+- 축제는 정보 레이어이며 스탬프/피드/코스와 분리
+
+### 2. 스탬프 획득
+- 스탬프는 `user_stamp` 로그 구조로 저장
+- 같은 장소도 날짜가 다르면 다시 적립 가능
+- 같은 날짜에는 같은 장소를 중복 적립하지 않음
+- 각 로그는 `visit_ordinal`을 가져서 `n번째 방문` 표기가 가능
+- 스탬프 간격이 24시간 이내면 같은 `travel_session`으로 묶음
+
+### 3. 피드 작성
+- 피드는 방문 증명 후에만 작성 가능
+- 단순 GPS 반경 진입만으로는 작성 불가
+- 후기 작성은 반드시 `stamp_id`가 필요
+- API에서도 `stamp_id` 소유 여부와 장소 일치를 검증
+- 피드에는 좋아요, 댓글, 답글(깊이 제한 `부모 0 / 자식 1`)이 연결됨
+
+### 4. 코스 발행
+- 운영자 큐레이션 코스와 사용자 코스가 함께 존재
+- 사용자 코스는 스탬프/여행 세션 기반으로 생성
+- 24시간 기준 `travel_session` 흐름을 따라 코스를 묶을 수 있음
+- 코스 정렬은 `popular / latest`
+- 코스도 좋아요 가능
+
+### 5. 마이페이지
+- 탭 구성
   - 얻은 스탬프
   - 내가 쓴 피드
   - 내가 쓴 댓글
   - 생성한 코스
-- 네이버 로그인 및 닉네임 수정
-- 닉네임 유니크 정책
+- 프로필 상단에 통계 표시
+  - 고유 장소 방문 수
+  - 누적 스탬프 수
+- 설정에서 닉네임 수정 가능
+
+## 현재 구현 기능 상세
+
+### 지도 / 장소 / 축제
+- 장소 마커, 축제 마커, 카테고리 필터
+- 장소 바텀시트 `closed / partial / full`
+- 장소 상세에서 방문 회차, 태그, 설명, 스탬프 액션 확인
+- 축제는 공공데이터 API 기반으로 동기화
+- 축제는 대전 범위 / 진행 중 및 예정 행사 중심 정보 제공
+
+### 스탬프
+- `UNIQUE(user_id, position_id, stamp_date)` 구조
+- 반복 방문 수는 `visit_ordinal`
+- 여행 세션은 `travel_session`
+- 스탬프는 피드와 코스의 선행 조건
+
+### 피드
+- 스탬프를 찍은 뒤에만 작성 가능
+- 이미지 업로드 지원
+- 좋아요 / 댓글 / 답글 지원
+- 댓글 시트에서 특정 댓글 하이라이트 및 이동 지원
+- 마이페이지의 `내가 쓴 댓글`에서 해당 댓글 위치로 점프 가능
+
+### 코스
+- 운영자 큐레이션 코스
+- 사용자 생성 코스
+- 좋아요순 / 최신순 정렬
+- 좋아요 지원
+
+### 마이페이지
+- 스탬프, 피드, 댓글, 코스 탭
+- 프로필 설정 진입
+- 닉네임 수정
+- 닉네임 유니크 정책 적용
+
+### 인증
+- 내부 사용자 식별: `user`
+- 제공자 식별: `user_identity`
+- 네이버 로그인 구현
+- 카카오는 정책상 자리만 있고 실제 연결은 미구현
 
 ## Worker에서 직접 처리하는 API
 
+### 인증 / 프로필
 - `GET /api/health`
 - `GET /api/auth/providers`
 - `GET /api/auth/me`
@@ -33,6 +98,8 @@ JamIssue는 대전 장소를 지도에서 탐색하고, 스탬프를 찍은 뒤 
 - `PATCH /api/auth/profile`
 - `GET /api/auth/naver/login`
 - `GET /api/auth/naver/callback`
+
+### 지도 / 장소 / 피드 / 코스
 - `GET /api/bootstrap`
 - `GET /api/map-bootstrap`
 - `GET /api/reviews`
@@ -46,10 +113,34 @@ JamIssue는 대전 장소를 지도에서 탐색하고, 스탬프를 찍은 뒤 
 - `GET /api/community-routes`
 - `POST /api/community-routes`
 - `POST /api/community-routes/:routeId/like`
+
+### 마이 / 부가 데이터
 - `GET /api/my/routes`
 - `GET /api/my/summary`
 - `GET /api/banner/events`
 - `GET /api/festivals`
+
+## 데이터 구조 기준
+
+### 스탬프
+- `user_stamp`는 로그성 테이블
+- 반복 방문 허용
+- 동일 날짜 중복 적립 차단
+- 방문 증명 후기 = `feed.stamp_id`
+
+### 코스
+- `travel_session`이 24시간 기준 세션을 관리
+- 사용자 코스는 세션과 연결 가능
+- 운영자 코스와 사용자 코스를 구분
+
+### 댓글
+- 깊이 제한 `부모 0 / 자식 1`
+- soft delete 유지
+- 피드 삭제 시 댓글 연쇄 정리
+
+### 장소 이미지
+- `map.image_url` 사용
+- live DB가 과거 상태여도 worker는 null 허용으로 처리
 
 ## Supabase SQL 적용 순서
 
@@ -119,7 +210,7 @@ cd D:/Code305/JamIssue/backend
 .\.venv\Scripts\python.exe -m pytest tests
 ```
 
-## 문서
+## 기준 문서
 
 - [docs/README.md](/D:/Code305/JamIssue/docs/README.md)
 - [docs/prd-compliance.md](/D:/Code305/JamIssue/docs/prd-compliance.md)
