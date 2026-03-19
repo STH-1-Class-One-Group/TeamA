@@ -43,17 +43,18 @@ export function ReviewList({
     <div className="review-stack">
       {reviews.map((review) => (
         <article key={review.id} className="review-card">
-          <div className="review-card__top">
-            <div className="review-card__heading">
-              <strong>{review.placeName}</strong>
+          <div className="review-card__top review-card__top--feed">
+            <div className="review-card__title-block review-card__title-block--feed">
+              <p className="eyebrow">{review.mood}</p>
+              <strong className="review-card__title">{review.placeName}</strong>
               <p className="review-card__author-line">
                 {review.author} · {review.visitLabel} · {review.visitedAt}
               </p>
             </div>
-            <span className="mood-pill">{review.mood}</span>
+            <span className="counter-pill">{review.visitedAt}</span>
           </div>
 
-          <div className="review-card__meta-line">
+          <div className="review-card__tag-row">
             <span className="review-card__visit-pill">{review.visitLabel}</span>
             {review.travelSessionId && <span className="soft-tag">연속 여행 기록</span>}
             <span className="soft-tag">{review.badge}</span>
@@ -96,7 +97,7 @@ export function ReviewList({
             </div>
             {onOpenPlace && (
               <button type="button" className="review-link-button" onClick={() => onOpenPlace(review.placeId)}>
-                장소 보기
+                이 장소 보기
               </button>
             )}
           </div>

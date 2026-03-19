@@ -724,3 +724,35 @@ input.visually-hidden[type='file'] {
   font-size: 15px !important;
   line-height: 1 !important;
 }
+
+/* 2026-03-19 feed card hierarchy alignment */
+.review-card__top--feed {
+  align-items: flex-start !important;
+}
+
+.review-card__title-block--feed {
+  gap: 4px !important;
+}
+
+.review-card__title {
+  font-size: 17px !important;
+  line-height: 1.18 !important;
+  letter-spacing: -0.03em !important;
+  color: var(--ink) !important;
+}
+
+.review-card__author-line {
+  margin: 0 !important;
+  color: rgba(93, 77, 101, 0.74) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.review-card__tag-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  margin-top: 4px !important;
+}
