@@ -64,6 +64,13 @@ export function MyPagePanel({
     [myPage],
   );
 
+  const visitPct = useMemo(
+    () => (myPage && myPage.stats.totalPlaceCount > 0
+      ? Math.round((myPage.stats.uniquePlaceCount / myPage.stats.totalPlaceCount) * 100)
+      : 0),
+    [myPage],
+  );
+
   function readDraft(session: TravelSession) {
     return drafts[session.id] ?? buildDefaultDraft(session);
   }
@@ -145,23 +152,38 @@ export function MyPagePanel({
                 <span>누적 스탬프 수</span>
               </article>
             </div>
+            {myPage.stats.totalPlaceCount > 0 && (
+              <div className="my-visit-progress">
+                <div className="my-visit-progress__bar">
+                  <div className="my-visit-progress__fill" style={{ width: `${visitPct}%` }} />
+                </div>
+                <span className="my-visit-progress__label">{visitPct}% 달성</span>
+              </div>
+            )}
             <button type="button" className="secondary-button" onClick={() => setShowVisitedDetail((current) => !current)}>
               {showVisitedDetail ? '방문 상세 닫기' : '방문 상세 보기'}
             </button>
             {showVisitedDetail && (
               <div className="my-visited-grid">
                 <div>
-                  <strong>가본 곳</strong>
+                  <div className="my-visited-section-header">
+                    <strong>가본 곳</strong>
+                    <span className="counter-pill">{myPage.visitedPlaces.length}곳</span>
+                  </div>
                   <div className="chip-row compact-gap">
                     {myPage.visitedPlaces.map((place) => (
                       <button key={place.id} type="button" className="soft-tag soft-tag--button" onClick={() => onOpenPlace(place.id)}>
                         {place.name}
                       </button>
                     ))}
+                    {myPage.visitedPlaces.length === 0 && <p className="empty-copy">아직 방문한 곳이 없어요.</p>}
                   </div>
                 </div>
                 <div>
-                  <strong>아직 못 가본 곳</strong>
+                  <div className="my-visited-section-header">
+                    <strong>아직 못 가본 곳</strong>
+                    <span className="counter-pill counter-pill--muted">{myPage.unvisitedPlaces.length}곳</span>
+                  </div>
                   <div className="chip-row compact-gap">
                     {myPage.unvisitedPlaces.map((place) => (
                       <button key={place.id} type="button" className="soft-tag soft-tag--button is-muted" onClick={() => onOpenPlace(place.id)}>
