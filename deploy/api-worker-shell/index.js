@@ -113,6 +113,18 @@ function encodeFilterValue(value) {
   return encodeURIComponent(String(value));
 }
 
+function uniqueValues(values) {
+  return [...new Set((values ?? []).filter((value) => value !== null && value !== undefined && value !== ''))];
+}
+
+function buildInFilter(values) {
+  const unique = uniqueValues(values);
+  if (unique.length === 0) {
+    return null;
+  }
+  return `in.(${unique.map((value) => encodeFilterValue(value)).join(',')})`;
+}
+
 function formatDateTime(value) {
   if (!value) {
     return '';
@@ -727,27 +739,50 @@ function mapCommunityRoutes(routeRows, routePlaceRows, usersById, placesByPositi
   });
 }
 async function loadBaseData(env, sessionUserId = null) {
-  const requests = [
+  const [placeRows, courseRows, coursePlaceRows, feedRows] = await Promise.all([
     supabaseRequest(env, "map?select=position_id,slug,name,district,category,latitude,longitude,summary,description,vibe_tags,visit_time,route_hint,stamp_reward,hero_label,jam_color,accent_color,is_active&is_active=eq.true&order=position_id.asc"),
     supabaseRequest(env, "course?select=course_id,title,mood,duration,note,color,display_order&order=display_order.asc"),
     supabaseRequest(env, "course_place?select=course_id,position_id,stop_order&order=stop_order.asc"),
     supabaseRequest(env, "feed?select=feed_id,position_id,user_id,stamp_id,body,mood,badge,image_url,created_at&order=created_at.desc"),
-    supabaseRequest(env, "user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&order=created_at.asc"),
-    supabaseRequest(env, "feed_like?select=feed_id,user_id"),
-    supabaseRequest(env, "user?select=user_id,nickname"),
-    supabaseRequest(env, "user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&order=created_at.desc"),
-  ];
+  ]);
 
-  if (sessionUserId) {
-    requests.push(
-      supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}`),
-      supabaseRequest(env, `travel_session?select=travel_session_id,user_id,started_at,ended_at,last_stamp_at,stamp_count,created_at&user_id=eq.${encodeFilterValue(sessionUserId)}&order=started_at.desc`),
-      supabaseRequest(env, `user_route?select=route_id,travel_session_id&user_id=eq.${encodeFilterValue(sessionUserId)}&order=created_at.desc`),
-    );
-  }
+  const feedIdsFilter = buildInFilter(feedRows.map((row) => row.feed_id));
+  const reviewStampIdsFilter = buildInFilter(feedRows.map((row) => row.stamp_id).filter(Boolean));
 
-  const [placeRows, courseRows, coursePlaceRows, feedRows, commentRows, likeRows, userRows, allStampRows, userFeedLikeRows = [], userSessionRows = [], ownerRouteRows = []] = await Promise.all(requests);
-  const userStampRows = sessionUserId ? (allStampRows ?? []).filter((row) => row.user_id === sessionUserId) : [];
+  const [commentRows, likeRows, reviewStampRows, userFeedLikeRows = [], userSessionRows = [], ownerRouteRows = [], userStampRows = []] = await Promise.all([
+    feedIdsFilter
+      ? supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&feed_id=${feedIdsFilter}&order=created_at.asc`)
+      : Promise.resolve([]),
+    feedIdsFilter
+      ? supabaseRequest(env, `feed_like?select=feed_id,user_id&feed_id=${feedIdsFilter}`)
+      : Promise.resolve([]),
+    reviewStampIdsFilter
+      ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&stamp_id=${reviewStampIdsFilter}`)
+      : Promise.resolve([]),
+    sessionUserId && feedIdsFilter
+      ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=${feedIdsFilter}`)
+      : Promise.resolve([]),
+    sessionUserId
+      ? supabaseRequest(env, `travel_session?select=travel_session_id,user_id,started_at,ended_at,last_stamp_at,stamp_count,created_at&user_id=eq.${encodeFilterValue(sessionUserId)}&order=started_at.desc`)
+      : Promise.resolve([]),
+    sessionUserId
+      ? supabaseRequest(env, `user_route?select=route_id,travel_session_id&user_id=eq.${encodeFilterValue(sessionUserId)}&order=created_at.desc`)
+      : Promise.resolve([]),
+    sessionUserId
+      ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&user_id=eq.${encodeFilterValue(sessionUserId)}&order=created_at.desc`)
+      : Promise.resolve([]),
+  ]);
+
+  const userIdsFilter = buildInFilter([
+    ...feedRows.map((row) => row.user_id),
+    ...commentRows.map((row) => row.user_id),
+    ...(sessionUserId ? [sessionUserId] : []),
+  ]);
+  const userRows = userIdsFilter
+    ? await supabaseRequest(env, `user?select=user_id,nickname&user_id=${userIdsFilter}`)
+    : [];
+
+  const allStampRows = [...reviewStampRows, ...userStampRows.filter((row) => !reviewStampRows.some((stamp) => String(stamp.stamp_id) === String(row.stamp_id)))];
   const places = placeRows.map(mapPlace);
   const placesByPositionId = new Map(places.map((place) => [place.positionId, place]));
   const usersById = new Map(userRows.map((row) => [row.user_id, row]));
@@ -773,18 +808,30 @@ async function loadCommunityRoutes(env, options = {}) {
     ? `user_id=eq.${encodeFilterValue(ownerUserId)}&order=created_at.desc`
     : `is_public=eq.true&order=${sort === "popular" ? "like_count.desc,created_at.desc" : "created_at.desc"}`;
 
-  const requests = [
-    supabaseRequest(env, `user_route?select=route_id,user_id,travel_session_id,title,description,mood,like_count,created_at,is_public,is_user_generated&${routeFilter}`),
-    supabaseRequest(env, "user_route_place?select=route_id,position_id,stop_order&order=stop_order.asc"),
-    supabaseRequest(env, "map?select=position_id,slug,name&is_active=eq.true"),
-    supabaseRequest(env, "user?select=user_id,nickname"),
-  ];
-
-  if (sessionUserId) {
-    requests.push(supabaseRequest(env, `user_route_like?select=route_id&user_id=eq.${encodeFilterValue(sessionUserId)}`));
+  const routeRows = await supabaseRequest(env, `user_route?select=route_id,user_id,travel_session_id,title,description,mood,like_count,created_at,is_public,is_user_generated&${routeFilter}`);
+  const routeIdsFilter = buildInFilter(routeRows.map((row) => row.route_id));
+  if (!routeIdsFilter) {
+    return [];
   }
 
-  const [routeRows, routePlaceRows, placeRows, userRows, userRouteLikeRows = []] = await Promise.all(requests);
+  const [routePlaceRows, userRouteLikeRows = []] = await Promise.all([
+    supabaseRequest(env, `user_route_place?select=route_id,position_id,stop_order&route_id=${routeIdsFilter}&order=stop_order.asc`),
+    sessionUserId
+      ? supabaseRequest(env, `user_route_like?select=route_id&user_id=eq.${encodeFilterValue(sessionUserId)}&route_id=${routeIdsFilter}`)
+      : Promise.resolve([]),
+  ]);
+
+  const positionIdsFilter = buildInFilter(routePlaceRows.map((row) => row.position_id));
+  const userIdsFilter = buildInFilter(routeRows.map((row) => row.user_id));
+  const [placeRows, userRows] = await Promise.all([
+    positionIdsFilter
+      ? supabaseRequest(env, `map?select=position_id,slug,name&is_active=eq.true&position_id=${positionIdsFilter}`)
+      : Promise.resolve([]),
+    userIdsFilter
+      ? supabaseRequest(env, `user?select=user_id,nickname&user_id=${userIdsFilter}`)
+      : Promise.resolve([]),
+  ]);
+
   const placesByPositionId = new Map(placeRows.map((row) => [String(row.position_id), { id: row.slug, name: row.name }]));
   const usersById = new Map(userRows.map((row) => [row.user_id, row]));
   const likedRouteIds = new Set(userRouteLikeRows.map((row) => String(row.route_id)));
@@ -1389,8 +1436,42 @@ async function readRouteRow(env, routeId) {
 }
 
 async function loadSingleReview(env, reviewId, sessionUserId = null) {
-  const baseData = await loadBaseData(env, sessionUserId);
-  return baseData.reviews.find((review) => review.id === String(reviewId)) ?? null;
+  const reviewRows = await supabaseRequest(
+    env,
+    `feed?select=feed_id,position_id,user_id,stamp_id,body,mood,badge,image_url,created_at&feed_id=eq.${encodeFilterValue(reviewId)}&limit=1`,
+  );
+  const reviewRow = reviewRows?.[0] ?? null;
+  if (!reviewRow) {
+    return null;
+  }
+
+  const [commentRows, likeRows, placeRows, stampRows, userFeedLikeRows = []] = await Promise.all([
+    supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&feed_id=eq.${encodeFilterValue(reviewId)}&order=created_at.asc`),
+    supabaseRequest(env, `feed_like?select=feed_id,user_id&feed_id=eq.${encodeFilterValue(reviewId)}`),
+    supabaseRequest(env, `map?select=position_id,slug,name,district,category,latitude,longitude,summary,description,vibe_tags,visit_time,route_hint,stamp_reward,hero_label,jam_color,accent_color,is_active&position_id=eq.${encodeFilterValue(reviewRow.position_id)}&limit=1`),
+    reviewRow.stamp_id
+      ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&stamp_id=eq.${encodeFilterValue(reviewRow.stamp_id)}&limit=1`)
+      : Promise.resolve([]),
+    sessionUserId
+      ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=eq.${encodeFilterValue(reviewId)}&limit=1`)
+      : Promise.resolve([]),
+  ]);
+
+  const userIdsFilter = buildInFilter([reviewRow.user_id, ...commentRows.map((row) => row.user_id)]);
+  const userRows = userIdsFilter
+    ? await supabaseRequest(env, `user?select=user_id,nickname&user_id=${userIdsFilter}`)
+    : [];
+
+  const places = placeRows.map(mapPlace);
+  const placesByPositionId = new Map(places.map((place) => [place.positionId, place]));
+  const usersById = new Map(userRows.map((row) => [row.user_id, row]));
+  const stampRowsById = new Map((stampRows ?? []).map((row) => [String(row.stamp_id), row]));
+  const likedFeedIds = new Set((userFeedLikeRows ?? []).map((row) => String(row.feed_id)));
+
+  return (
+    mapReviewRows([reviewRow], commentRows ?? [], likeRows ?? [], usersById, placesByPositionId, stampRowsById, likedFeedIds)[0] ??
+    null
+  );
 }
 
 function sanitizeFileName(fileName) {
