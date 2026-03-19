@@ -11,6 +11,8 @@ interface ReviewListProps {
   onSubmitComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
   onRequestLogin: () => void;
   onOpenPlace?: (placeId: string) => void;
+  /** When provided, tapping the comment button opens a sheet instead of rendering inline comments. */
+  onOpenComments?: (reviewId: string) => void;
   emptyTitle: string;
   emptyBody: string;
 }
@@ -25,6 +27,7 @@ export function ReviewList({
   onSubmitComment,
   onRequestLogin,
   onOpenPlace,
+  onOpenComments,
   emptyTitle,
   emptyBody,
 }: ReviewListProps) {
@@ -75,10 +78,22 @@ export function ReviewList({
                 </span>
                 <span className="review-action-button__label">{likingReviewId === review.id ? '반영 중' : review.likeCount}</span>
               </button>
-              <span className="review-action-button review-action-button--static" aria-hidden="true">
-                <span className="review-action-button__icon">💬</span>
-                <span className="review-action-button__label">{review.comments.length}</span>
-              </span>
+              {onOpenComments ? (
+                <button
+                  type="button"
+                  className="review-action-button"
+                  onClick={() => onOpenComments(review.id)}
+                  aria-label={`댓글 ${review.comments.length}개`}
+                >
+                  <span className="review-action-button__icon">💬</span>
+                  <span className="review-action-button__label">{review.comments.length}</span>
+                </button>
+              ) : (
+                <span className="review-action-button review-action-button--static" aria-hidden="true">
+                  <span className="review-action-button__icon">💬</span>
+                  <span className="review-action-button__label">{review.comments.length}</span>
+                </span>
+              )}
             </div>
             {onOpenPlace && (
               <button type="button" className="review-link-button" onClick={() => onOpenPlace(review.placeId)}>
@@ -87,14 +102,16 @@ export function ReviewList({
             )}
           </div>
 
-          <CommentThread
-            comments={review.comments}
-            canWriteComment={canWriteComment}
-            submittingReviewId={submittingReviewId}
-            reviewId={review.id}
-            onSubmitComment={onSubmitComment}
-            onRequestLogin={onRequestLogin}
-          />
+          {!onOpenComments && (
+            <CommentThread
+              comments={review.comments}
+              canWriteComment={canWriteComment}
+              submittingReviewId={submittingReviewId}
+              reviewId={review.id}
+              onSubmitComment={onSubmitComment}
+              onRequestLogin={onRequestLogin}
+            />
+          )}
         </article>
       ))}
     </div>
