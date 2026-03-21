@@ -23,6 +23,7 @@ import {
   uploadReviewImage,
 } from './api/client';
 import { BottomNav } from './components/BottomNav';
+import { EventTab } from './components/EventTab';
 import { MapTabStage } from './components/MapTabStage';
 import {
   useAppRouteState,
@@ -59,7 +60,6 @@ import type {
 const STAMP_UNLOCK_RADIUS_METERS = 120;
 
 const FeedTab = lazy(() => import('./components/FeedTab').then((module) => ({ default: module.FeedTab })));
-const EventTab = lazy(() => import('./components/EventTab').then((module) => ({ default: module.EventTab })));
 const CourseTab = lazy(() => import('./components/CourseTab').then((module) => ({ default: module.CourseTab })));
 const MyPagePanel = lazy(() => import('./components/MyPagePanel').then((module) => ({ default: module.MyPagePanel })));
 
@@ -1315,9 +1315,7 @@ export default function App() {
             )}
 
             {activeTab === 'event' && (
-              <Suspense fallback={<TabPanelFallback />}>
-                <EventTab festivals={festivals} onOpenFestival={handleOpenFestivalWithReturn} />
-              </Suspense>
+              <EventTab festivals={festivals} onOpenFestival={handleOpenFestivalWithReturn} />
             )}
 
             {activeTab === 'course' && (
