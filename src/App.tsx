@@ -11,6 +11,7 @@ import {
   getMapBootstrap,
   getProviderLoginUrl,
   getReviews,
+  importPublicData,
   logout,
   toggleCommunityRouteLike,
   toggleReviewLike,
@@ -930,6 +931,35 @@ export default function App() {
     }
   }
 
+
+  async function handleRefreshAdminImport() {
+    if (!sessionUser?.isAdmin) {
+      return;
+    }
+
+    setAdminLoading(true);
+    try {
+      await importPublicData();
+      const [nextSummary, nextMap, nextFestivals] = await Promise.all([
+        refreshAdminSummary(true),
+        getMapBootstrap(),
+        getFestivals(),
+      ]);
+      if (nextSummary) {
+        setAdminSummary(nextSummary);
+      }
+      setPlaces(nextMap.places);
+      setStampState(nextMap.stamps);
+      setHasRealData(nextMap.hasRealData);
+      setFestivals(nextFestivals);
+      setNotice('행사 데이터를 다시 불러왔어요.');
+    } catch (error) {
+      setNotice(formatErrorMessage(error));
+    } finally {
+      setAdminLoading(false);
+    }
+  }
+
   async function handleUpdateProfile(nextNickname: string) {
     if (!nextNickname || nextNickname.length < 2) {
       setProfileError('?됰꽕?꾩? ??湲???댁긽?쇰줈 ?낅젰??二쇱꽭??');
@@ -1208,9 +1238,7 @@ export default function App() {
                 onOpenComment={(reviewId, commentId) => handleOpenCommentWithReturn(reviewId, commentId)}
                 onOpenReview={handleOpenReviewWithReturn}
                 onDeleteReview={handleDeleteReview}
-                onRefreshAdmin={async () => {
-                  await refreshAdminSummary(true);
-                }}
+                onRefreshAdmin={handleRefreshAdminImport}
                 onToggleAdminPlace={handleToggleAdminPlace}
               />
             )}

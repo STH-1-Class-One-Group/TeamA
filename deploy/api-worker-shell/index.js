@@ -387,6 +387,7 @@ async function readSessionUser(request, env) {
   }
   return {
     ...payload.user,
+    isAdmin: isAdminUser(env, payload.user.id),
     profileCompletedAt: payload.user.profileCompletedAt ?? null,
   };
 }
@@ -1322,6 +1323,30 @@ async function handleAdminPlaceVisibility(request, env, placeId) {
     isActive: Boolean(updatedRow.is_active),
     reviewCount: (reviewRows ?? []).length,
     updatedAt: formatDateTime(updatedRow.updated_at),
+  }, env, request);
+}
+
+async function handleAdminImportPublicData(request, env) {
+  const sessionUser = await readSessionUser(request, env);
+  if (!sessionUser || !sessionUser.isAdmin) {
+    return jsonResponse(403, { detail: '관리자만 공공데이터를 다시 불러올 수 있어요.' }, env, request);
+  }
+
+  let importedEvents = 0;
+  if (env.APP_PUBLIC_EVENT_SERVICE_KEY) {
+    const imported = await syncFestivalsFromSource(env);
+    importedEvents = imported.length;
+    festivalsCache = {
+      expiresAt: 0,
+      syncAt: Date.now(),
+      value: null,
+      pending: null,
+    };
+  }
+
+  return jsonResponse(200, {
+    importedPlaces: importedEvents,
+    importedCourses: 0,
   }, env, request);
 }
 
@@ -2509,6 +2534,15 @@ async function routeRequest(request, env) {
   }
   if (request.method === "GET" && url.pathname === "/api/banner/events") {
     return handleBannerEvents(request, env);
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/summary") {
+    return handleAdminSummary(request, env);
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/import/public-data") {
+    return handleAdminImportPublicData(request, env);
+  }
+  if (request.method === "PATCH" && adminPlaceMatch) {
+    return handleAdminPlaceVisibility(request, env, adminPlaceMatch[1]);
   }
 
   return proxyToOrigin(request, env);

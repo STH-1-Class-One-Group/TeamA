@@ -1,4 +1,4 @@
-import type { AdminSummaryResponse } from '../types';
+﻿import type { AdminSummaryResponse } from '../types';
 
 interface AdminPanelProps {
   summary: AdminSummaryResponse | null;
@@ -18,18 +18,18 @@ export function AdminPanel({ summary, busyPlaceId, isImporting, onRefreshImport,
       <div className="section-title-row section-title-row--tight">
         <div>
           <p className="eyebrow">ADMIN</p>
-          <h3>{'운영 요약'}</h3>
+          <h3>운영 요약</h3>
         </div>
         <button type="button" className="secondary-button" onClick={() => void onRefreshImport()} disabled={isImporting}>
-          {isImporting ? '갱신 중' : '다시 불러오기'}
+          {isImporting ? '불러오는 중' : '행사 다시 불러오기'}
         </button>
       </div>
 
       <div className="admin-metrics">
-        <article><strong>{summary.userCount}</strong><span>{'사용자'}</span></article>
-        <article><strong>{summary.placeCount}</strong><span>{'장소'}</span></article>
-        <article><strong>{summary.reviewCount}</strong><span>{'피드'}</span></article>
-        <article><strong>{summary.commentCount}</strong><span>{'댓글'}</span></article>
+        <article><strong>{summary.userCount}</strong><span>사용자</span></article>
+        <article><strong>{summary.placeCount}</strong><span>장소</span></article>
+        <article><strong>{summary.reviewCount}</strong><span>피드</span></article>
+        <article><strong>{summary.commentCount}</strong><span>댓글</span></article>
       </div>
 
       <div className="admin-place-list">
@@ -37,7 +37,7 @@ export function AdminPanel({ summary, busyPlaceId, isImporting, onRefreshImport,
           <article key={place.id} className="admin-place-item">
             <div className="admin-place-item__copy">
               <strong>{place.name}</strong>
-              <p>{place.district} / {'피드'} {place.reviewCount}{'개'} / {place.updatedAt}</p>
+              <p>{place.district} / 피드 {place.reviewCount}개 / {place.updatedAt}</p>
             </div>
             <button
               type="button"
