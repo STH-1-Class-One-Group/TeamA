@@ -7,12 +7,8 @@ import {
   deleteReview,
   createReview,
   createUserRoute,
-  getCommunityRoutes,
-  getCuratedCourses,
-  getAdminSummary,
   getFestivals,
   getMapBootstrap,
-  getMySummary,
   getProviderLoginUrl,
   getReviews,
   logout,
@@ -27,8 +23,16 @@ import { CourseTab } from './components/CourseTab';
 import { FeedTab } from './components/FeedTab';
 import { MapTabStage } from './components/MapTabStage';
 import { MyPagePanel } from './components/MyPagePanel';
-import { useAppRouteState, clearAuthQueryParams, getInitialNotice, getLoginReturnUrl, getInitialMapViewport, updateMapViewportInUrl } from './hooks/useAppRouteState';
+import {
+  useAppRouteState,
+  clearAuthQueryParams,
+  getInitialNotice,
+  getLoginReturnUrl,
+  getInitialMapViewport,
+  updateMapViewportInUrl,
+} from './hooks/useAppRouteState';
 import { useAppDataState } from './hooks/useAppDataState';
+import { useAppTabDataLoaders } from './hooks/useAppTabDataLoaders';
 import { getCurrentDevicePosition } from './lib/geolocation';
 import {
   calculateDistanceMeters,
@@ -39,21 +43,16 @@ import {
 } from './lib/visits';
 import type {
   ApiStatus,
-  AuthProvider,
-  BootstrapResponse,
   Category,
   CommunityRouteSort,
+  DrawerState,
   FestivalItem,
-  AdminSummaryResponse,
-  MyPageResponse,
   MyPageTabKey,
   Place,
   ReviewMood,
+  RoutePreview,
   SessionUser,
   Tab,
-  UserRoute,
-  DrawerState,
-  RoutePreview,
 } from './types';
 
 const STAMP_UNLOCK_RADIUS_METERS = 120;
@@ -210,72 +209,28 @@ export default function App() {
       : null;
   const canCreateReview = Boolean(sessionUser && selectedPlace && todayStamp);
   const placeNameById = useMemo(() => Object.fromEntries(places.map((place) => [place.id, place.name])), [places]);
-  async function fetchCommunityRoutes(sort: CommunityRouteSort, force = false) {
-    const cached = communityRoutesCacheRef.current[sort];
-    if (!force && cached) {
-      setCommunityRoutes(cached);
-      return cached;
-    }
-
-    const nextRoutes = await getCommunityRoutes(sort);
-    replaceCommunityRoutes(nextRoutes, sort);
-    return nextRoutes;
-  }
-
-  async function ensureFeedReviews(force = false) {
-    if (!force && feedLoadedRef.current) {
-      return;
-    }
-
-    const nextReviews = await getReviews();
-    setReviews(nextReviews);
-    feedLoadedRef.current = true;
-  }
-
-  async function ensureCuratedCourses(force = false) {
-    if (!force && coursesLoadedRef.current) {
-      return;
-    }
-
-    const response = await getCuratedCourses();
-    setCourses(response.courses);
-    coursesLoadedRef.current = true;
-  }
-
-  async function refreshAdminSummary(force = false) {
-    if (!sessionUser?.isAdmin) {
-      setAdminSummary(null);
-      return null;
-    }
-
-    if (!force && activeTab !== 'my' && adminSummary !== null) {
-      return adminSummary;
-    }
-
-    setAdminLoading(true);
-    try {
-      const nextSummary = await getAdminSummary();
-      setAdminSummary(nextSummary);
-      return nextSummary;
-    } finally {
-      setAdminLoading(false);
-    }
-  }
-
-  async function refreshMyPageForUser(user: SessionUser | null, force = false) {
-    if (!user) {
-      setMyPage(null);
-      return null;
-    }
-
-    if (!force && activeTab !== 'my' && myPage === null) {
-      return null;
-    }
-
-    const nextMyPage = await getMySummary();
-    setMyPage(nextMyPage);
-    return nextMyPage;
-  }
+  const {
+    fetchCommunityRoutes,
+    ensureFeedReviews,
+    ensureCuratedCourses,
+    refreshAdminSummary,
+    refreshMyPageForUser,
+  } = useAppTabDataLoaders({
+    activeTab,
+    adminSummary,
+    myPage,
+    sessionUser,
+    communityRoutesCacheRef,
+    feedLoadedRef,
+    coursesLoadedRef,
+    replaceCommunityRoutes,
+    setCommunityRoutes,
+    setReviews,
+    setCourses,
+    setAdminLoading,
+    setAdminSummary,
+    setMyPage,
+  });
 
   function handleOpenReviewComments(reviewId: string, commentId: string | null = null) {
     goToTab('feed');
