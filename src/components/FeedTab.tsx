@@ -16,6 +16,9 @@ interface FeedTabProps {
   activeCommentReviewId: string | null;
   highlightedCommentId: string | null;
   highlightedReviewId: string | null;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => Promise<void>;
   onToggleReviewLike: (reviewId: string) => Promise<void>;
   onCreateComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
   onUpdateComment: (reviewId: string, commentId: string, body: string) => Promise<void>;
@@ -40,6 +43,9 @@ export function FeedTab({
   activeCommentReviewId,
   highlightedCommentId,
   highlightedReviewId,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   onToggleReviewLike,
   onCreateComment,
   onUpdateComment,
@@ -98,6 +104,13 @@ export function FeedTab({
           emptyTitle={placeFilterId ? `${placeFilterName} 피드가 아직 없어요` : '아직 공개된 피드가 없어요'}
           emptyBody={placeFilterId ? '이 장소를 찍은 뒤 첫 피드를 남겨 보세요.' : '먼저 스탬프를 찍고 오늘의 분위기를 짧게 남겨 보세요.'}
         />
+        {hasMore && (
+          <div className="list-load-more-row">
+            <button type="button" className="secondary-button" onClick={() => void onLoadMore()} disabled={loadingMore}>
+              {loadingMore ? '???? ?' : '?? ? ????'}
+            </button>
+          </div>
+        )}
       </section>
       <FeedCommentSheet
         review={activeReview}

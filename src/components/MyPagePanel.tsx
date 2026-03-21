@@ -28,6 +28,9 @@ interface MyPagePanelProps {
   onOpenComment: (reviewId: string, commentId: string) => void;
   onOpenReview: (reviewId: string) => void;
   onDeleteReview: (reviewId: string) => Promise<void>;
+  commentsHasMore: boolean;
+  commentsLoadingMore: boolean;
+  onLoadMoreComments: (initial?: boolean) => Promise<void>;
   onRefreshAdmin: () => Promise<void>;
   onToggleAdminPlace: (placeId: string, nextValue: boolean) => Promise<void>;
 }
@@ -88,6 +91,9 @@ export function MyPagePanel({
   onOpenComment,
   onOpenReview,
   onDeleteReview,
+  commentsHasMore,
+  commentsLoadingMore,
+  onLoadMoreComments,
   onRefreshAdmin,
   onToggleAdminPlace,
 }: MyPagePanelProps) {

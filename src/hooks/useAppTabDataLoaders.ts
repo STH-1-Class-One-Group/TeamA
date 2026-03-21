@@ -1,5 +1,5 @@
 ﻿import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import { getAdminSummary, getCommunityRoutes, getCuratedCourses, getMySummary, getReviews } from '../api/client';
+import { getAdminSummary, getCommunityRoutes, getCuratedCourses, getMySummary, getReviewFeedPage } from '../api/client';
 import type {
   AdminSummaryResponse,
   CommunityRouteSort,
@@ -24,6 +24,8 @@ interface UseAppTabDataLoadersParams {
   replaceCommunityRoutes: (nextRoutes: UserRoute[], sort?: CommunityRouteSort) => void;
   setCommunityRoutes: Dispatch<SetStateAction<UserRoute[]>>;
   setReviews: Dispatch<SetStateAction<Review[]>>;
+  setFeedHasMore: Dispatch<SetStateAction<boolean>>;
+  setFeedNextCursor: Dispatch<SetStateAction<string | null>>;
   setCourses: Dispatch<SetStateAction<Course[]>>;
   setAdminLoading: Dispatch<SetStateAction<boolean>>;
   setAdminSummary: Dispatch<SetStateAction<AdminSummaryResponse | null>>;
@@ -42,6 +44,8 @@ export function useAppTabDataLoaders({
   replaceCommunityRoutes,
   setCommunityRoutes,
   setReviews,
+  setFeedHasMore,
+  setFeedNextCursor,
   setCourses,
   setAdminLoading,
   setAdminSummary,
@@ -65,8 +69,10 @@ export function useAppTabDataLoaders({
       return;
     }
 
-    const nextReviews = await getReviews();
-    setReviews(nextReviews);
+    const page = await getReviewFeedPage({ limit: 10 });
+    setReviews(page.items);
+    setFeedNextCursor(page.nextCursor);
+    setFeedHasMore(Boolean(page.nextCursor));
     feedLoadedRef.current = true;
   }
 

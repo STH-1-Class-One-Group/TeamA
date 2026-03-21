@@ -1,4 +1,4 @@
-﻿import { getClientConfig } from '../config';
+import { getClientConfig } from '../config';
 import { prepareReviewImageUpload } from '../lib/imageUpload';
 import type {
   AdminPlace,
@@ -12,6 +12,7 @@ import type {
   Comment,
   CommentCreateRequest,
   CommunityRouteSort,
+  MyCommentPageResponse,
   MyPageResponse,
   PlaceVisibilityRequest,
   ProfileUpdateRequest,
@@ -19,6 +20,7 @@ import type {
   PublicImportResponse,
   Review,
   ReviewCreateRequest,
+  ReviewFeedPageResponse,
   ReviewLikeResponse,
   StampClaimRequest,
   StampState,
@@ -282,6 +284,22 @@ export function getReviews(params?: { placeId?: string; userId?: string }) {
   return fetchJson<Review[]>(`/api/reviews${query ? `?${query}` : ''}`);
 }
 
+export function getReviewFeedPage(params?: { cursor?: string | null; limit?: number }) {
+  const search = new URLSearchParams();
+  if (params?.cursor) {
+    search.set('cursor', params.cursor);
+  }
+  if (params?.limit) {
+    search.set('limit', String(params.limit));
+  }
+  const query = search.toString();
+  return fetchJson<ReviewFeedPageResponse>(`/api/review-feed${query ? `?${query}` : ''}`);
+}
+
+export function getReviewDetail(reviewId: string) {
+  return fetchJson<Review>(`/api/reviews/${reviewId}`);
+}
+
 export async function createReview(payload: ReviewCreateRequest) {
   const response = await fetchJson<Review>('/api/reviews', {
     method: 'POST',
@@ -349,6 +367,18 @@ export async function uploadReviewImage(file: File) {
 
 export function getMySummary() {
   return fetchJson<MyPageResponse>('/api/my/summary');
+}
+
+export function getMyCommentsPage(params?: { cursor?: string | null; limit?: number }) {
+  const search = new URLSearchParams();
+  if (params?.cursor) {
+    search.set('cursor', params.cursor);
+  }
+  if (params?.limit) {
+    search.set('limit', String(params.limit));
+  }
+  const query = search.toString();
+  return fetchJson<MyCommentPageResponse>(`/api/my/comments${query ? `?${query}` : ''}`);
 }
 
 export async function claimStamp(payload: StampClaimRequest) {

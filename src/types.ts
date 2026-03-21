@@ -85,6 +85,11 @@ export interface Review {
   comments: Comment[];
 }
 
+export interface ReviewFeedPageResponse {
+  items: Review[];
+  nextCursor: string | null;
+}
+
 export interface StampLog {
   id: string;
   placeId: string;
@@ -234,6 +239,12 @@ export interface MyComment {
   createdAt: string;
   reviewBody: string;
 }
+
+export interface MyCommentPageResponse {
+  items: MyComment[];
+  nextCursor: string | null;
+}
+
 export interface MyStats {
   reviewCount: number;
   stampCount: number;

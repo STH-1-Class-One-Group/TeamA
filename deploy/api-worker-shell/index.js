@@ -117,6 +117,14 @@ function encodeFilterValue(value) {
   return encodeURIComponent(String(value));
 }
 
+function parseListLimit(url, defaultLimit = 12, maxLimit = 24) {
+  const raw = Number(url.searchParams.get('limit') ?? defaultLimit);
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return defaultLimit;
+  }
+  return Math.min(Math.floor(raw), maxLimit);
+}
+
 function uniqueValues(values) {
   return [...new Set((values ?? []).filter((value) => value !== null && value !== undefined && value !== ''))];
 }
@@ -1041,6 +1049,89 @@ async function loadReviewData(env, sessionUserId = null, filters = {}) {
   return mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, likedFeedIds);
 }
 
+async function loadReviewPageData(env, sessionUserId = null, options = {}) {
+  const { cursor = null, limit = 10 } = options;
+  const { placeRows } = await loadStaticBaseRows(env);
+  const places = placeRows.map(mapPlace);
+  const placesByPositionId = new Map(places.map((place) => [place.positionId, place]));
+  const reviewQuery = [
+    'select=feed_id,position_id,user_id,stamp_id,body,mood,badge,image_url,created_at',
+    'order=created_at.desc',
+    `limit=${limit + 1}`,
+  ];
+
+  if (cursor) {
+    reviewQuery.push(`created_at=lt.${encodeFilterValue(cursor)}`);
+  }
+
+  const feedRows = await supabaseRequest(env, `feed?${reviewQuery.join('&')}`);
+  const nextCursor = feedRows.length > limit ? String(feedRows[limit].created_at) : null;
+  const pageRows = feedRows.slice(0, limit);
+  const feedIdsFilter = buildInFilter(pageRows.map((row) => row.feed_id));
+  const reviewStampIdsFilter = buildInFilter(pageRows.map((row) => row.stamp_id).filter(Boolean));
+  const [commentRows, likeRows, reviewStampRows, userFeedLikeRows = []] = await Promise.all([
+    feedIdsFilter
+      ? supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&feed_id=${feedIdsFilter}&order=created_at.asc`)
+      : Promise.resolve([]),
+    feedIdsFilter
+      ? supabaseRequest(env, `feed_like?select=feed_id,user_id&feed_id=${feedIdsFilter}`)
+      : Promise.resolve([]),
+    reviewStampIdsFilter
+      ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&stamp_id=${reviewStampIdsFilter}`)
+      : Promise.resolve([]),
+    sessionUserId && feedIdsFilter
+      ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=${feedIdsFilter}`)
+      : Promise.resolve([]),
+  ]);
+
+  const userIdsFilter = buildInFilter([
+    ...pageRows.map((row) => row.user_id),
+    ...commentRows.map((row) => row.user_id),
+  ]);
+  const userRows = userIdsFilter
+    ? await supabaseRequest(env, `user?select=user_id,nickname&user_id=${userIdsFilter}`)
+    : [];
+
+  const usersById = new Map(userRows.map((row) => [row.user_id, row]));
+  const stampRowsById = new Map((reviewStampRows ?? []).map((row) => [String(row.stamp_id), row]));
+  const likedFeedIds = new Set((userFeedLikeRows ?? []).map((row) => String(row.feed_id)));
+  return {
+    items: mapReviewRows(pageRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, likedFeedIds),
+    nextCursor,
+  };
+}
+
+async function loadMyCommentPageData(env, userId, options = {}) {
+  const { cursor = null, limit = 10 } = options;
+  const query = [
+    'select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at',
+    `user_id=eq.${encodeFilterValue(userId)}`,
+    'order=created_at.desc',
+    `limit=${limit + 1}`,
+  ];
+  if (cursor) {
+    query.push(`created_at=lt.${encodeFilterValue(cursor)}`);
+  }
+
+  const commentRows = await supabaseRequest(env, `user_comment?${query.join('&')}`);
+  const nextCursor = commentRows.length > limit ? String(commentRows[limit].created_at) : null;
+  const pageRows = commentRows.slice(0, limit);
+  const feedIdsFilter = buildInFilter(pageRows.map((row) => row.feed_id));
+  if (!feedIdsFilter) {
+    return { items: [], nextCursor };
+  }
+
+  const [feedRows, { placeRows }] = await Promise.all([
+    supabaseRequest(env, `feed?select=feed_id,position_id,body&feed_id=${feedIdsFilter}`),
+    loadStaticBaseRows(env),
+  ]);
+  const placesByPositionId = new Map(placeRows.map((row) => [String(row.position_id), { id: row.slug, name: row.name }]));
+  return {
+    items: mapMyComments(pageRows, feedRows ?? [], placesByPositionId),
+    nextCursor,
+  };
+}
+
 async function handleHealth(request, env) {
   return jsonResponse(200, {
     status: 'ok',
@@ -1218,6 +1309,24 @@ async function handleReviews(request, env, url) {
     userId: url.searchParams.get('userId') ?? undefined,
   });
   return jsonResponse(200, reviews, env, request);
+}
+
+async function handleReviewFeed(request, env, url) {
+  const sessionUser = await readSessionUser(request, env);
+  const payload = await loadReviewPageData(env, sessionUser?.id ?? null, {
+    cursor: url.searchParams.get('cursor') ?? null,
+    limit: parseListLimit(url, 10, 20),
+  });
+  return jsonResponse(200, payload, env, request);
+}
+
+async function handleReviewDetail(request, env, reviewId) {
+  const sessionUser = await readSessionUser(request, env);
+  const review = await loadSingleReview(env, reviewId, sessionUser?.id ?? null);
+  if (!review) {
+    return jsonResponse(404, { detail: '???????? ??????.' }, env, request);
+  }
+  return jsonResponse(200, review, env, request);
 }
 
 async function handleCommunityRoutes(request, env, url) {
@@ -2482,6 +2591,9 @@ async function routeRequest(request, env) {
   if (request.method === "GET" && url.pathname === "/api/courses/curated") {
     return handleCuratedCourses(request, env);
   }
+  if (request.method === "GET" && url.pathname === "/api/review-feed") {
+    return handleReviewFeed(request, env, url);
+  }
   if (request.method === "GET" && url.pathname === "/api/reviews") {
     return handleReviews(request, env, url);
   }
@@ -2490,6 +2602,9 @@ async function routeRequest(request, env) {
   }
   if (request.method === "POST" && url.pathname === "/api/reviews") {
     return handleCreateReview(request, env);
+  }
+  if (request.method === "GET" && reviewDetailMatch) {
+    return handleReviewDetail(request, env, reviewDetailMatch[1]);
   }
   if (request.method === "GET" && reviewCommentMatch) {
     const sessionUser = await readSessionUser(request, env);
@@ -2528,6 +2643,9 @@ async function routeRequest(request, env) {
   }
   if (request.method === "GET" && url.pathname === "/api/my/summary") {
     return handleMySummary(request, env);
+  }
+  if (request.method === "GET" && url.pathname === "/api/my/comments") {
+    return handleMyComments(request, env, url);
   }
   if (request.method === "GET" && url.pathname === "/api/festivals") {
     return handleFestivals(request, env);
