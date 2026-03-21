@@ -2329,10 +2329,6 @@ async function handleToggleCommunityRouteLike(request, env, routeId) {
   if (!routeRow) {
     return jsonResponse(404, { detail: '경로를 찾지 못했어요.' }, env, request);
   }
-  if (routeRow.user_id === sessionResult.sessionUser.id) {
-    return jsonResponse(400, { detail: '내가 만든 경로에는 좋아요를 남길 수 없어요.' }, env, request);
-  }
-
   const existingRows = await supabaseRequest(
     env,
     `user_route_like?select=route_like_id&route_id=eq.${encodeFilterValue(routeId)}&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&limit=1`,

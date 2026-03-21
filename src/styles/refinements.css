@@ -1170,6 +1170,10 @@ body {
 .review-link-button,
 .review-card__place-link,
 .soft-tag--button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
   background: var(--role-button-bg) !important;
   border: 1px solid var(--role-button-border) !important;
   color: var(--role-button-text) !important;
@@ -1236,17 +1240,24 @@ body {
 
 .review-card--comment-log .review-card__quote-block,
 .review-card--comment-log .review-card__quote-block--muted {
-  padding: 0 !important;
+  display: grid !important;
+  gap: 6px !important;
+  padding: 2px 0 2px 14px !important;
   background: transparent !important;
   border: 0 !important;
+  border-left: 2px solid rgba(255, 177, 202, 0.38) !important;
   border-radius: 0 !important;
+}
+
+.review-card--comment-log .review-card__quote-block--muted {
+  border-left-color: rgba(181, 149, 195, 0.3) !important;
 }
 
 .review-card--comment-log .review-card__label {
   display: inline-flex !important;
   align-items: center !important;
   padding: 0 !important;
-  margin-bottom: 4px !important;
+  margin-bottom: 0 !important;
   background: transparent !important;
   border: 0 !important;
   color: rgba(216, 79, 134, 0.92) !important;
