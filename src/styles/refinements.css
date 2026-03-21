@@ -1283,3 +1283,14 @@ body {
     grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
   }
 }
+.provider-button.primary-button {
+  background: linear-gradient(180deg, #fff3f7, #ffe8f0) !important;
+  border: 1px solid rgba(255, 127, 168, 0.26) !important;
+  color: #b14978 !important;
+  box-shadow: 0 8px 20px rgba(255, 127, 168, 0.08) !important;
+}
+
+.provider-button.primary-button:hover {
+  background: linear-gradient(180deg, #fff7fa, #ffeef4) !important;
+  border-color: rgba(255, 93, 146, 0.34) !important;
+}
