@@ -392,6 +392,9 @@ async function readSessionUser(request, env) {
 }
 function buildRedirectUrl(baseUrl, params = {}) {
   const url = new URL(baseUrl);
+  if (url.hostname === 'api.data.go.kr' && url.protocol === 'https:') {
+    url.protocol = 'http:';
+  }
   for (const [key, value] of Object.entries(params)) {
     if (value) {
       url.searchParams.set(key, value);
@@ -1361,12 +1364,15 @@ async function handleMySummary(request, env) {
   }, env, request);
 }
 function getFestivalSourceUrl(env) {
-  const baseUrl = String(env.APP_PUBLIC_EVENT_SOURCE_URL || 'https://api.data.go.kr/openapi/tn_pubr_public_cltur_fstvl_api').trim();
+  const baseUrl = String(env.APP_PUBLIC_EVENT_SOURCE_URL || 'http://api.data.go.kr/openapi/tn_pubr_public_cltur_fstvl_api').trim();
   if (!baseUrl) {
     return null;
   }
 
   const url = new URL(baseUrl);
+  if (url.hostname === 'api.data.go.kr' && url.protocol === 'https:') {
+    url.protocol = 'http:';
+  }
   if (!url.searchParams.get('serviceKey') && env.APP_PUBLIC_EVENT_SERVICE_KEY) {
     url.searchParams.set('serviceKey', env.APP_PUBLIC_EVENT_SERVICE_KEY);
   }
@@ -1467,6 +1473,10 @@ function createFestivalExternalId(title, startDate, venueName, roadAddress) {
   const seed = `${title}|${startDate.toISOString()}|${venueName || ''}|${roadAddress || ''}`;
   const bytes = textEncoder.encode(seed);
   return `festival-${base64UrlEncode(bytes).slice(0, 22)}`;
+}
+
+function getFestivalWindowEnd(now) {
+  return new Date(now + 30 * 24 * 60 * 60 * 1000);
 }
 
 function isDaejeonFestival(payload) {
@@ -1647,14 +1657,17 @@ async function handleFestivals(request, env) {
       }
     }
 
-    const upcomingCutoff = now + 30 * 24 * 60 * 60 * 1000;
     const nowIso = new Date(now).toISOString();
-    const rows = await supabaseRequest(env, `public_event?select=public_event_id,title,venue_name,road_address,starts_at,ends_at,source_page_url,latitude,longitude&district=eq.${encodeFilterValue('대전')}&ends_at=gte.${encodeFilterValue(nowIso)}&order=starts_at.asc&limit=40`);
+    const windowEndIso = getFestivalWindowEnd(now).toISOString();
+    const rows = await supabaseRequest(
+      env,
+      `public_event?select=public_event_id,title,venue_name,road_address,starts_at,ends_at,source_page_url,latitude,longitude&district=eq.${encodeFilterValue('대전')}&ends_at=gte.${encodeFilterValue(nowIso)}&starts_at=lte.${encodeFilterValue(windowEndIso)}&order=starts_at.asc&limit=40`,
+    );
     const value = (rows || [])
       .filter((row) => {
         const startTime = new Date(row.starts_at).getTime();
         const endTime = new Date(row.ends_at).getTime();
-        return Number.isFinite(startTime) && Number.isFinite(endTime) && endTime >= now && startTime <= upcomingCutoff;
+        return Number.isFinite(startTime) && Number.isFinite(endTime) && endTime >= now && startTime <= getFestivalWindowEnd(now).getTime();
       })
       .slice(0, 10)
       .map((row) => ({
@@ -1672,7 +1685,7 @@ async function handleFestivals(request, env) {
 
     festivalsCache = {
       ...festivalsCache,
-      value,
+      value: value,
       expiresAt: Date.now() + FESTIVALS_CACHE_TTL_MS,
       pending: null,
     };
@@ -1681,27 +1694,35 @@ async function handleFestivals(request, env) {
 
   return jsonResponse(200, festivals, env, request);
 }
+
 async function handleBannerEvents(request, env) {
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const windowEndIso = getFestivalWindowEnd(now).toISOString();
   const [eventRows, sourceRows] = await Promise.all([
-    supabaseRequest(env, 'public_event?select=public_event_id,title,venue_name,district,starts_at,ends_at,summary,source_page_url&order=starts_at.asc&limit=4'),
+    supabaseRequest(
+      env,
+      `public_event?select=public_event_id,title,venue_name,district,starts_at,ends_at,summary,source_page_url&district=eq.${encodeFilterValue('대전')}&ends_at=gte.${encodeFilterValue(nowIso)}&starts_at=lte.${encodeFilterValue(windowEndIso)}&order=starts_at.asc&limit=4`,
+    ),
     supabaseRequest(env, 'public_data_source?select=name,last_imported_at&provider=eq.public-event&limit=1'),
   ]);
 
   const source = sourceRows[0] ?? null;
-  const now = Date.now();
-  const items = eventRows.map((row) => ({
-    id: String(row.public_event_id),
-    title: row.title,
-    venueName: row.venue_name ?? null,
-    district: row.district ?? '',
-    startDate: row.starts_at,
-    endDate: row.ends_at,
-    dateLabel: `${formatDate(row.starts_at)} - ${formatDate(row.ends_at)}`,
-    summary: row.summary ?? '',
-    sourcePageUrl: row.source_page_url ?? null,
-    linkedPlaceName: null,
-    isOngoing: new Date(row.starts_at).getTime() <= now && new Date(row.ends_at).getTime() >= now,
-  }));
+  const items = eventRows.length > 0
+    ? eventRows.map((row) => ({
+        id: String(row.public_event_id),
+        title: row.title,
+        venueName: row.venue_name ?? null,
+        district: row.district ?? '',
+        startDate: row.starts_at,
+        endDate: row.ends_at,
+        dateLabel: row.starts_at && row.ends_at ? `${formatDate(row.starts_at)} - ${formatDate(row.ends_at)}` : '일정 업데이트 전',
+        summary: row.summary ?? '',
+        sourcePageUrl: row.source_page_url ?? null,
+        linkedPlaceName: null,
+        isOngoing: new Date(row.starts_at).getTime() <= now && new Date(row.ends_at).getTime() >= now,
+      }))
+    : [];
 
   return jsonResponse(200, {
     sourceReady: items.length > 0,
@@ -2508,19 +2529,3 @@ export default {
     }
   },
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

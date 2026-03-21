@@ -1,4 +1,4 @@
-﻿import type { DrawerState, FestivalItem } from '../types';
+import type { DrawerState, FestivalItem } from '../types';
 
 interface FestivalDetailSheetProps {
   festival: FestivalItem | null;
@@ -22,6 +22,12 @@ export function FestivalDetailSheet({
   }
 
   const sheetClassName = `place-drawer place-drawer--${drawerState}`;
+  const hasSchedule = Boolean(festival.startDate || festival.endDate);
+  const periodLabel = hasSchedule
+    ? festival.startDate && festival.endDate
+      ? `${festival.startDate} ~ ${festival.endDate}`
+      : festival.startDate || festival.endDate
+    : '일정 업데이트 전';
 
   return (
     <section className={sheetClassName} aria-label="축제 상세 드로워">
@@ -47,9 +53,8 @@ export function FestivalDetailSheet({
         </div>
 
         <div className="place-drawer__badges">
-          <span className="counter-pill">{festival.isOngoing ? '진행 중' : '예정'}</span>
-          <span className="counter-pill">{festival.startDate}</span>
-          <span className="counter-pill">~ {festival.endDate}</span>
+          <span className="counter-pill">{festival.isOngoing ? '진행 중' : '행사 예정'}</span>
+          <span className="counter-pill">{periodLabel}</span>
         </div>
 
         <div className="sheet-card stack-gap">
@@ -63,9 +68,7 @@ export function FestivalDetailSheet({
           </div>
           <div>
             <strong>행사 기간</strong>
-            <p>
-              {festival.startDate} ~ {festival.endDate}
-            </p>
+            <p>{periodLabel}</p>
           </div>
         </div>
 

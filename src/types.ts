@@ -1,7 +1,7 @@
 import type { PlaceCategory, PlaceCategoryFilter } from './lib/categories';
 
 export type Category = PlaceCategoryFilter;
-export type Tab = 'map' | 'feed' | 'course' | 'my';
+export type Tab = 'map' | 'event' | 'feed' | 'course' | 'my';
 export type MyPageTabKey = 'stamps' | 'feeds' | 'comments' | 'routes';
 export type DrawerState = 'closed' | 'partial' | 'full';
 export type ReviewMood = '\uD63C\uC790\uC11C' | '\uCE5C\uAD6C\uB791' | '\uB370\uC774\uD2B8' | '\uC57C\uACBD \uB9DB\uC9D1';

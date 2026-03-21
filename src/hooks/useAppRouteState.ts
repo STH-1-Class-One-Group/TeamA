@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { DrawerState, Tab } from '../types';
 
 export type RouteState = {
@@ -8,7 +8,7 @@ export type RouteState = {
   drawerState: DrawerState;
 };
 
-const validTabs: Tab[] = ['map', 'feed', 'course', 'my'];
+const validTabs: Tab[] = ['map', 'event', 'feed', 'course', 'my'];
 
 export function getInitialRouteState(): RouteState {
   if (typeof window === 'undefined') {

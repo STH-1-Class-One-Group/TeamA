@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   claimStamp,
   createComment,
@@ -20,6 +20,7 @@ import {
 } from './api/client';
 import { BottomNav } from './components/BottomNav';
 import { CourseTab } from './components/CourseTab';
+import { EventTab } from './components/EventTab';
 import { FeedTab } from './components/FeedTab';
 import { MapTabStage } from './components/MapTabStage';
 import { MyPagePanel } from './components/MyPagePanel';
@@ -305,6 +306,24 @@ export default function App() {
     openPlace(placeId);
   }
 
+
+  function handleOpenFestivalWithReturn(festivalId: string) {
+    if (activeTab !== 'map') {
+      setReturnView({
+        tab: activeTab,
+        myPageTab,
+        activeCommentReviewId,
+        highlightedCommentId,
+        highlightedReviewId,
+        placeId: selectedPlaceId,
+        festivalId: selectedFestivalId,
+        drawerState,
+        feedPlaceFilterId,
+      });
+    }
+    setSelectedRoutePreview(null);
+    openFestival(festivalId);
+  }
   function handleOpenReviewWithReturn(reviewId: string | null) {
     if (activeTab !== 'feed') {
       setReturnView({
@@ -1124,6 +1143,8 @@ export default function App() {
               />
             )}
 
+            {activeTab === 'event' && <EventTab festivals={festivals} onOpenFestival={handleOpenFestivalWithReturn} />}
+
             {activeTab === 'course' && (
               <CourseTab
                 curatedCourses={courses}
@@ -1189,7 +1210,3 @@ export default function App() {
     </div>
   );
 }
-
-
-
-
