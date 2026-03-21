@@ -8,6 +8,7 @@ interface MyPagePanelProps {
   sessionUser: SessionUser | null;
   myPage: MyPageResponse | null;
   providers: AuthProvider[];
+  myPageError: string | null;
   activeTab: MyPageTabKey;
   isLoggingOut: boolean;
   profileSaving: boolean;
@@ -19,6 +20,7 @@ interface MyPagePanelProps {
   adminLoading: boolean;
   onChangeTab: (nextTab: MyPageTabKey) => void;
   onLogin: (provider: 'naver' | 'kakao') => void;
+  onRetry: () => Promise<void>;
   onLogout: () => Promise<void>;
   onSaveNickname: (nickname: string) => Promise<void>;
   onPublishRoute: (payload: { travelSessionId: string; title: string; description: string; mood: string }) => Promise<void>;
@@ -52,6 +54,7 @@ export function MyPagePanel({
   sessionUser,
   myPage,
   providers,
+  myPageError,
   activeTab,
   isLoggingOut,
   profileSaving,
@@ -63,6 +66,7 @@ export function MyPagePanel({
   adminLoading,
   onChangeTab,
   onLogin,
+  onRetry,
   onLogout,
   onSaveNickname,
   onPublishRoute,
@@ -157,6 +161,18 @@ export function MyPagePanel({
         </div>
       </header>
 
+      {!myPage && myPageError && (
+        <section className="sheet-card stack-gap">
+          <div>
+            <p className="eyebrow">MY PAGE</p>
+            <h3>기록을 아직 불러오지 못했어요</h3>
+            <p className="section-copy">{myPageError}</p>
+          </div>
+          <button type="button" className="primary-button route-submit-button" onClick={() => void onRetry()}>
+            다시 불러오기
+          </button>
+        </section>
+      )}
       {(showSettings || !sessionUser.profileCompletedAt) && (
         <section className="sheet-card stack-gap settings-card">
           <div className="settings-card__header">
@@ -457,6 +473,10 @@ export function MyPagePanel({
     </section>
   );
 }
+
+
+
+
 
 
 

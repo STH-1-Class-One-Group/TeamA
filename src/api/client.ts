@@ -95,6 +95,29 @@ export function invalidateApiCache(prefixes: string[] = []) {
   }
 }
 
+const WORKER_FALLBACK_BASE_URL = 'https://jamissue-api.yhh4433.workers.dev';
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let message = '요청을 처리하지 못했어요.';
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        message = payload.detail;
+      }
+    } catch {
+      message = response.statusText || message;
+    }
+    throw new ApiError(message, response.status);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const { apiBaseUrl } = getClientConfig();
   const headers = new Headers(init?.headers || undefined);
@@ -118,31 +141,27 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
     }
   }
 
-  const requestPromise = fetch(`${apiBaseUrl}${path}`, {
-    credentials: 'include',
-    cache: 'no-store',
-    ...init,
-    headers,
-  }).then(async (response) => {
-    if (!response.ok) {
-      let message = '?붿껌??泥섎━?섏? 紐삵뻽?댁슂.';
-      try {
-        const payload = (await response.json()) as { detail?: string };
-        if (payload.detail) {
-          message = payload.detail;
-        }
-      } catch {
-        message = response.statusText || message;
+  const fetchFromBase = async (baseUrl: string) => {
+    const response = await fetch(`${baseUrl}${path}`, {
+      credentials: 'include',
+      cache: 'no-store',
+      ...init,
+      headers,
+    });
+    return parseJsonResponse<T>(response);
+  };
+
+  const requestPromise = (async () => {
+    try {
+      return await fetchFromBase(apiBaseUrl);
+    } catch (error) {
+      const shouldFallback = apiBaseUrl !== WORKER_FALLBACK_BASE_URL && !(error instanceof ApiError);
+      if (!shouldFallback) {
+        throw error;
       }
-      throw new ApiError(message, response.status);
+      return fetchFromBase(WORKER_FALLBACK_BASE_URL);
     }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
-  });
+  })();
 
   if (canCache) {
     pendingCache.set(cacheKey, requestPromise as Promise<unknown>);
@@ -377,3 +396,4 @@ export function searchDiscovery(query: string) {
 export function getPlaceRecommendations(placeId: string) {
   return fetchJson<DiscoveryRecommendationsResponse>(`/api/discovery/recommendations?placeId=${encodeURIComponent(placeId)}`);
 }
+

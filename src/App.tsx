@@ -125,6 +125,7 @@ export default function App() {
   const [routeLikeUpdatingId, setRouteLikeUpdatingId] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [myPageError, setMyPageError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const {
@@ -252,6 +253,7 @@ export default function App() {
     setAdminLoading,
     setAdminSummary,
     setMyPage,
+    setMyPageError,
   });
 
   function handleOpenReviewComments(reviewId: string, commentId: string | null = null) {
@@ -364,6 +366,131 @@ export default function App() {
     handleOpenReviewComments(reviewId, commentId);
   }
 
+  useEffect(() => {
+    void loadApp(true);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'map' || mapLocationStatus !== 'idle') {
+      return;
+    }
+
+    void refreshCurrentPosition(false);
+  }, [activeTab, mapLocationStatus]);
+
+  useEffect(() => {
+    if (!notice) {
+      return;
+    }
+    const timeout = window.setTimeout(() => setNotice(null), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
+  useEffect(() => {
+    if (activeTab === 'my' && sessionUser && !myPage) {
+      void refreshMyPageForUser(sessionUser, true);
+    }
+    if (activeTab === 'my' && sessionUser?.isAdmin && !adminSummary) {
+      void refreshAdminSummary(true).catch((error) => {
+        setNotice(formatErrorMessage(error));
+      });
+    }
+  }, [activeTab, adminSummary, myPage, refreshAdminSummary, refreshMyPageForUser, sessionUser]);
+
+  useEffect(() => {
+    if (activeTab !== 'course') {
+      return;
+    }
+
+    void ensureCuratedCourses().catch((error) => {
+      setNotice(formatErrorMessage(error));
+    });
+
+    const cached = communityRoutesCacheRef.current[communityRouteSort];
+    if (cached) {
+      setCommunityRoutes(cached);
+      return;
+    }
+
+    void fetchCommunityRoutes(communityRouteSort, true).catch((error) => {
+      setNotice(formatErrorMessage(error));
+    });
+  }, [activeTab, communityRouteSort, communityRoutesCacheRef, ensureCuratedCourses, fetchCommunityRoutes, setCommunityRoutes]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (communityRoutesCacheRef.current[communityRouteSort]) {
+      return;
+    }
+
+    const run = () => {
+      void fetchCommunityRoutes(communityRouteSort, true).catch(() => {});
+    };
+
+    const timeout = window.setTimeout(run, 180);
+    return () => window.clearTimeout(timeout);
+  }, [communityRouteSort, communityRoutesCacheRef, fetchCommunityRoutes]);
+
+  useEffect(() => {
+    if (activeTab !== 'feed' && activeCommentReviewId === null) {
+      return;
+    }
+
+    void ensureFeedReviews().catch((error) => {
+      setNotice(formatErrorMessage(error));
+    });
+  }, [activeCommentReviewId, activeTab, ensureFeedReviews]);
+
+  useEffect(() => {
+    if (!selectedPlaceId) {
+      setSelectedPlaceReviews([]);
+      return;
+    }
+
+    const cachedReviews = placeReviewsCacheRef.current[selectedPlaceId];
+    if (cachedReviews) {
+      setSelectedPlaceReviews(cachedReviews);
+      return;
+    }
+
+    void getReviews({ placeId: selectedPlaceId })
+      .then((nextReviews) => {
+        placeReviewsCacheRef.current[selectedPlaceId] = nextReviews;
+        setSelectedPlaceReviews(nextReviews);
+      })
+      .catch((error) => {
+        setNotice(formatErrorMessage(error));
+      });
+  }, [placeReviewsCacheRef, selectedPlaceId, setSelectedPlaceReviews]);
+
+  useEffect(() => {
+    if (activeTab !== 'feed' && activeCommentReviewId !== null) {
+      setActiveCommentReviewId(null);
+      setHighlightedCommentId(null);
+    }
+  }, [activeCommentReviewId, activeTab]);
+
+  useEffect(() => {
+    if (!selectedPlaceId) {
+      return;
+    }
+
+    const isVisibleInCurrentCategory = filteredPlaces.some((place) => place.id === selectedPlaceId);
+    if (!isVisibleInCurrentCategory) {
+      commitRouteState(
+        {
+          tab: 'map',
+          placeId: null,
+          festivalId: null,
+          drawerState: 'closed',
+        },
+        'replace',
+      );
+    }
+  }, [commitRouteState, filteredPlaces, selectedPlaceId]);
   useEffect(() => {
     if (!selectedPlace) {
       setStampActionMessage('장소를 선택하면 오늘 방문 인증 가능 여부를 바로 확인할 수 있어요.');
@@ -1022,6 +1149,7 @@ export default function App() {
                 sessionUser={sessionUser}
                 myPage={myPage}
                 providers={providers}
+                myPageError={myPageError}
                 activeTab={myPageTab}
                 isLoggingOut={isLoggingOut}
                 profileSaving={profileSaving}
@@ -1033,6 +1161,7 @@ export default function App() {
                 adminLoading={adminLoading}
                 onChangeTab={setMyPageTab}
                 onLogin={startProviderLogin}
+                onRetry={async () => { if (sessionUser) { await refreshMyPageForUser(sessionUser, true); } }}
                 onLogout={handleLogout}
                 onSaveNickname={handleUpdateProfile}
                 onPublishRoute={handlePublishRoute}
@@ -1060,5 +1189,7 @@ export default function App() {
     </div>
   );
 }
+
+
 
 

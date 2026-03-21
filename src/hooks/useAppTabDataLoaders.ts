@@ -28,6 +28,7 @@ interface UseAppTabDataLoadersParams {
   setAdminLoading: Dispatch<SetStateAction<boolean>>;
   setAdminSummary: Dispatch<SetStateAction<AdminSummaryResponse | null>>;
   setMyPage: Dispatch<SetStateAction<MyPageResponse | null>>;
+  setMyPageError: Dispatch<SetStateAction<string | null>>;
 }
 
 export function useAppTabDataLoaders({
@@ -45,6 +46,7 @@ export function useAppTabDataLoaders({
   setAdminLoading,
   setAdminSummary,
   setMyPage,
+  setMyPageError,
 }: UseAppTabDataLoadersParams) {
   async function fetchCommunityRoutes(sort: CommunityRouteSort, force = false) {
     const cached = communityRoutesCacheRef.current[sort];
@@ -101,6 +103,7 @@ export function useAppTabDataLoaders({
   async function refreshMyPageForUser(user: SessionUser | null, force = false) {
     if (!user) {
       setMyPage(null);
+      setMyPageError(null);
       return null;
     }
 
@@ -108,9 +111,19 @@ export function useAppTabDataLoaders({
       return null;
     }
 
-    const nextMyPage = await getMySummary();
-    setMyPage(nextMyPage);
-    return nextMyPage;
+    try {
+      const nextMyPage = await getMySummary();
+      setMyPage(nextMyPage);
+      setMyPageError(null);
+      return nextMyPage;
+    } catch (error) {
+      setMyPage(null);
+      setMyPageError(error instanceof Error ? error.message : '마이페이지 정보를 불러오지 못했어요.');
+      if (activeTab !== 'my') {
+        return null;
+      }
+      throw error;
+    }
   }
 
   return {
