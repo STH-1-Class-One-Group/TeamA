@@ -1,4 +1,4 @@
-import { getClientConfig } from '../config';
+﻿import { getClientConfig } from '../config';
 import { prepareReviewImageUpload } from '../lib/imageUpload';
 import type {
   AdminPlace,
@@ -125,7 +125,7 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
     headers,
   }).then(async (response) => {
     if (!response.ok) {
-      let message = '요청을 처리하지 못했어요.';
+      let message = '?붿껌??泥섎━?섏? 紐삵뻽?댁슂.';
       try {
         const payload = (await response.json()) as { detail?: string };
         if (payload.detail) {
@@ -197,12 +197,33 @@ export function getBootstrap() {
   return fetchJson<BootstrapResponse>('/api/bootstrap');
 }
 
-export function getMapBootstrap() {
-  return fetchJson<MapBootstrapResponse>('/api/map-bootstrap');
+export async function getMapBootstrap() {
+  try {
+    return await fetchJson<MapBootstrapResponse>('/api/map-bootstrap');
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 501 || error.status >= 500)) {
+      const bootstrap = await getBootstrap();
+      return {
+        auth: bootstrap.auth,
+        places: bootstrap.places,
+        stamps: bootstrap.stamps,
+        hasRealData: bootstrap.hasRealData,
+      };
+    }
+    throw error;
+  }
 }
 
-export function getCuratedCourses() {
-  return fetchJson<CourseBootstrapResponse>('/api/courses/curated');
+export async function getCuratedCourses() {
+  try {
+    return await fetchJson<CourseBootstrapResponse>('/api/courses/curated');
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 501 || error.status >= 500)) {
+      const bootstrap = await getBootstrap();
+      return { courses: bootstrap.courses };
+    }
+    throw error;
+  }
 }
 
 export function getCommunityRoutes(sort: CommunityRouteSort = 'popular') {
