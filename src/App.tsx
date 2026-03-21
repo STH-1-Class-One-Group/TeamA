@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   claimStamp,
   createComment,
@@ -28,6 +28,7 @@ import { FeedTab } from './components/FeedTab';
 import { MapTabStage } from './components/MapTabStage';
 import { MyPagePanel } from './components/MyPagePanel';
 import { useAppRouteState, clearAuthQueryParams, getInitialNotice, getLoginReturnUrl, getInitialMapViewport, updateMapViewportInUrl } from './hooks/useAppRouteState';
+import { useAppDataState } from './hooks/useAppDataState';
 import { getCurrentDevicePosition } from './lib/geolocation';
 import {
   calculateDistanceMeters,
@@ -55,11 +56,6 @@ import type {
   RoutePreview,
 } from './types';
 
-const emptyProviders: AuthProvider[] = [
-  { key: 'naver', label: '네이버', isEnabled: false, loginUrl: null },
-  { key: 'kakao', label: '카카오', isEnabled: false, loginUrl: null },
-];
-
 const STAMP_UNLOCK_RADIUS_METERS = 120;
 
 function filterPlacesByCategory(places: Place[], category: Category) {
@@ -75,7 +71,7 @@ function formatErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return '요청을 처리하지 못했어요.';
+  return '??븐슙???嶺뚳퐣瑗???? 嶺뚮쪇沅?쭛??怨몃뭵.';
 }
 
 export default function App() {
@@ -96,31 +92,9 @@ export default function App() {
   const [initialMapViewport] = useState(getInitialMapViewport);
 
   const [myPageTab, setMyPageTab] = useState<MyPageTabKey>('stamps');
-  const [selectedRoutePreview, setSelectedRoutePreview] = useState<RoutePreview | null>(null);
   const [feedPlaceFilterId, setFeedPlaceFilterId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [notice, setNotice] = useState<string | null>(getInitialNotice);
-  const [bootstrapStatus, setBootstrapStatus] = useState<ApiStatus>('idle');
-  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
-  const [places, setPlaces] = useState<Place[]>([]);
-  const [festivals, setFestivals] = useState<FestivalItem[]>([]);
-  const [reviews, setReviews] = useState<BootstrapResponse['reviews']>([]);
-  const [selectedPlaceReviews, setSelectedPlaceReviews] = useState<BootstrapResponse['reviews']>([]);
-  const [courses, setCourses] = useState<BootstrapResponse['courses']>([]);
-  const [stampState, setStampState] = useState<BootstrapResponse['stamps']>({
-    collectedPlaceIds: [],
-    logs: [],
-    travelSessions: [],
-  });
-  const [hasRealData, setHasRealData] = useState(true);
-  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
-  const [providers, setProviders] = useState<AuthProvider[]>(emptyProviders);
-  const [communityRoutes, setCommunityRoutes] = useState<UserRoute[]>([]);
-  const [communityRouteSort, setCommunityRouteSort] = useState<CommunityRouteSort>('popular');
-  const [myPage, setMyPage] = useState<MyPageResponse | null>(null);
-  const [adminSummary, setAdminSummary] = useState<AdminSummaryResponse | null>(null);
-  const [adminBusyPlaceId, setAdminBusyPlaceId] = useState<string | null>(null);
-  const [adminLoading, setAdminLoading] = useState(false);
   const [currentPosition, setCurrentPosition] = useState<{ latitude: number; longitude: number } | null>(null);
   const [mapLocationStatus, setMapLocationStatus] = useState<ApiStatus>('idle');
   const [mapLocationMessage, setMapLocationMessage] = useState<string | null>(null);
@@ -146,17 +120,61 @@ export default function App() {
     feedPlaceFilterId: string | null;
   } | null>(null);
   const [stampActionStatus, setStampActionStatus] = useState<ApiStatus>('idle');
-  const [stampActionMessage, setStampActionMessage] = useState('장소를 선택하면 오늘 스탬프 가능 여부를 바로 알려드릴게요.');
+  const [stampActionMessage, setStampActionMessage] = useState('??????????? ??? ????????????????? ?????????.');
   const [routeSubmitting, setRouteSubmitting] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeLikeUpdatingId, setRouteLikeUpdatingId] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const communityRoutesCacheRef = useRef<Partial<Record<CommunityRouteSort, UserRoute[]>>>({});
-  const placeReviewsCacheRef = useRef<Record<string, BootstrapResponse['reviews']>>({});
-  const feedLoadedRef = useRef(false);
-  const coursesLoadedRef = useRef(false);
+
+  const {
+    bootstrapStatus,
+    setBootstrapStatus,
+    bootstrapError,
+    setBootstrapError,
+    places,
+    setPlaces,
+    festivals,
+    setFestivals,
+    reviews,
+    setReviews,
+    selectedPlaceReviews,
+    setSelectedPlaceReviews,
+    courses,
+    setCourses,
+    stampState,
+    setStampState,
+    hasRealData,
+    setHasRealData,
+    sessionUser,
+    setSessionUser,
+    providers,
+    setProviders,
+    communityRoutes,
+    setCommunityRoutes,
+    communityRouteSort,
+    setCommunityRouteSort,
+    myPage,
+    setMyPage,
+    adminSummary,
+    setAdminSummary,
+    adminBusyPlaceId,
+    setAdminBusyPlaceId,
+    adminLoading,
+    setAdminLoading,
+    selectedRoutePreview,
+    setSelectedRoutePreview,
+    communityRoutesCacheRef,
+    placeReviewsCacheRef,
+    feedLoadedRef,
+    coursesLoadedRef,
+    replaceCommunityRoutes,
+    patchCommunityRoutes,
+    patchReviewCollections,
+    upsertReviewCollections,
+    resetReviewCaches,
+  } = useAppDataState(selectedPlaceId);
 
   const filteredPlaces = useMemo(() => filterPlacesByCategory(places, activeCategory), [places, activeCategory]);
   const selectedPlace = useMemo(() => {
@@ -192,56 +210,23 @@ export default function App() {
       : null;
   const canCreateReview = Boolean(sessionUser && selectedPlace && todayStamp);
   const placeNameById = useMemo(() => Object.fromEntries(places.map((place) => [place.id, place.name])), [places]);
-  function replaceCommunityRoutes(nextRoutes: UserRoute[], sort: CommunityRouteSort = communityRouteSort) {
-    communityRoutesCacheRef.current[sort] = nextRoutes;
-    setCommunityRoutes(nextRoutes);
-  }
   async function fetchCommunityRoutes(sort: CommunityRouteSort, force = false) {
     const cached = communityRoutesCacheRef.current[sort];
     if (!force && cached) {
       setCommunityRoutes(cached);
       return cached;
     }
-    const nextRoutes = await getCommunityRoutes(sort);
-    communityRoutesCacheRef.current[sort] = nextRoutes;
-    setCommunityRoutes(nextRoutes);
-    return nextRoutes;
-  }
-  function patchCommunityRoutes(routeId: string, updater: (route: UserRoute) => UserRoute) {
-    const nextCache: Partial<Record<CommunityRouteSort, UserRoute[]>> = {};
-    for (const sortKey of Object.keys(communityRoutesCacheRef.current) as CommunityRouteSort[]) {
-      const routes = communityRoutesCacheRef.current[sortKey];
-      if (!routes) {
-        continue;
-      }
-      nextCache[sortKey] = routes.map((route) => (route.id === routeId ? updater(route) : route));
-    }
-    communityRoutesCacheRef.current = nextCache;
-    setCommunityRoutes((current) => current.map((route) => (route.id === routeId ? updater(route) : route)));
-  }
-  function patchReviewCollections(reviewId: string, updater: (review: BootstrapResponse['reviews'][number]) => BootstrapResponse['reviews'][number]) {
-    setReviews((current) => current.map((review) => (review.id === reviewId ? updater(review) : review)));
-    setSelectedPlaceReviews((current) => current.map((review) => (review.id === reviewId ? updater(review) : review)));
-    for (const placeId of Object.keys(placeReviewsCacheRef.current)) {
-      placeReviewsCacheRef.current[placeId] = placeReviewsCacheRef.current[placeId].map((review) =>
-        review.id === reviewId ? updater(review) : review,
-      );
-    }
-  }
 
-  function upsertReviewCollections(review: BootstrapResponse['reviews'][number]) {
-    setReviews((current) => [review, ...current.filter((currentReview) => currentReview.id !== review.id)]);
-    if (selectedPlaceId === review.placeId) {
-      setSelectedPlaceReviews((current) => [review, ...current.filter((currentReview) => currentReview.id !== review.id)]);
-    }
-    const cachedPlaceReviews = placeReviewsCacheRef.current[review.placeId] ?? [];
-    placeReviewsCacheRef.current[review.placeId] = [review, ...cachedPlaceReviews.filter((currentReview) => currentReview.id !== review.id)];
+    const nextRoutes = await getCommunityRoutes(sort);
+    replaceCommunityRoutes(nextRoutes, sort);
+    return nextRoutes;
   }
 
   async function ensureFeedReviews(force = false) {
     if (!force && feedLoadedRef.current) {
       return;
     }
+
     const nextReviews = await getReviews();
     setReviews(nextReviews);
     feedLoadedRef.current = true;
@@ -251,6 +236,7 @@ export default function App() {
     if (!force && coursesLoadedRef.current) {
       return;
     }
+
     const response = await getCuratedCourses();
     setCourses(response.courses);
     coursesLoadedRef.current = true;
@@ -261,9 +247,11 @@ export default function App() {
       setAdminSummary(null);
       return null;
     }
+
     if (!force && activeTab !== 'my' && adminSummary !== null) {
       return adminSummary;
     }
+
     setAdminLoading(true);
     try {
       const nextSummary = await getAdminSummary();
@@ -279,9 +267,11 @@ export default function App() {
       setMyPage(null);
       return null;
     }
+
     if (!force && activeTab !== 'my' && myPage === null) {
       return null;
     }
+
     const nextMyPage = await getMySummary();
     setMyPage(nextMyPage);
     return nextMyPage;
@@ -540,31 +530,31 @@ export default function App() {
 
   useEffect(() => {
     if (!selectedPlace) {
-      setStampActionMessage('장소를 선택하면 오늘 스탬프 가능 여부를 바로 알려드릴게요.');
+      setStampActionMessage('????섎ご???ルㅎ臾??濡?듆 ???노츓 ???꾪땿???띠럾?????????꾩룆?餓???????類싲뎅?롪퍓???');
       return;
     }
 
     if (!sessionUser) {
-      setStampActionMessage(`로그인하면 ${selectedPlace.name}에서 바로 현장 스탬프를 찍을 수 있어요.`);
+      setStampActionMessage(`?β돦裕??筌뤿굝由?춯?${selectedPlace.name}??????꾩룆?餓??熬곣뫗?????꾪땿?熬? 嶺뚣볦뵰???????곗꽑??`);
       return;
     }
 
     if (todayStamp) {
-      setStampActionMessage(`${todayStamp.visitLabel} 스탬프를 이미 찍었어요. 오늘 피드와 코스로 바로 이어갈 수 있어요.`);
+      setStampActionMessage(`${todayStamp.visitLabel} ???꾪땿?熬? ???? 嶺뚣볦뵰?됀??怨몃뭵. ???노츓 ??怨뺢덧?? ?袁⑤뾼??놁뿉??꾩룆?餓???怨룹꽑???????곗꽑??`);
       return;
     }
 
     if (typeof selectedPlaceDistanceMeters !== 'number') {
-      setStampActionMessage('현재 위치를 확인하면 스탬프 가능 여부를 바로 알려드릴게요.');
+      setStampActionMessage('?熬곣뫗???熬곣뫚????筌먦끉逾??濡?듆 ???꾪땿???띠럾?????????꾩룆?餓???????類싲뎅?롪퍓???');
       return;
     }
 
     if (selectedPlaceDistanceMeters <= STAMP_UNLOCK_RADIUS_METERS) {
-      setStampActionMessage(`현재 약 ${formatDistanceMeters(selectedPlaceDistanceMeters)} 거리예요. 지금 바로 스탬프를 찍을 수 있어요.`);
+      setStampActionMessage(`?熬곣뫗????${formatDistanceMeters(selectedPlaceDistanceMeters)} 濾곌쑨?????깅뭵. 嶺뚯솘????꾩룆?餓????꾪땿?熬? 嶺뚣볦뵰???????곗꽑??`);
       return;
     }
 
-    setStampActionMessage(`현재 약 ${formatDistanceMeters(selectedPlaceDistanceMeters)} 거리예요. ${STAMP_UNLOCK_RADIUS_METERS}m 안으로 들어오면 스탬프가 열려요.`);
+    setStampActionMessage(`?熬곣뫗????${formatDistanceMeters(selectedPlaceDistanceMeters)} 濾곌쑨?????깅뭵. ${STAMP_UNLOCK_RADIUS_METERS}m ???깅さ?????곗꽑???좊듆 ???꾪땿?熬? ??????`);
   }, [selectedPlace, selectedPlaceDistanceMeters, sessionUser, todayStamp]);
 
   async function loadApp(withLoading: boolean) {
@@ -587,10 +577,7 @@ export default function App() {
       setStampState(bootstrap.stamps);
       setHasRealData(bootstrap.hasRealData);
       setSessionUser(bootstrap.auth.user);
-      placeReviewsCacheRef.current = {};
-      feedLoadedRef.current = false;
-      coursesLoadedRef.current = false;
-      setSelectedPlaceReviews([]);
+      resetReviewCaches();
       setProviders(bootstrap.auth.providers);
       setSelectedPlaceId((current) => (current && bootstrap.places.some((place) => place.id === current) ? current : null));
       setSelectedFestivalId((current) => (current && festivalResult.some((festival) => festival.id === current) ? current : null));
@@ -606,7 +593,7 @@ export default function App() {
       setBootstrapStatus('ready');
       if (authState === 'naver-success' && bootstrap.auth.user?.profileCompletedAt === null) {
         goToTab('my');
-        setNotice('닉네임을 먼저 저장하면 바로 피드와 코스로 이어갈 수 있어요.');
+        setNotice('??怨뚰맟?熬곣뫗諭??誘る닔? ???繞③뇡?彛??꾩룆?餓???怨뺢덧?? ?袁⑤뾼??놁뿉???怨룹꽑???????곗꽑??');
       }
     } catch (error) {
       setBootstrapError(formatErrorMessage(error));
@@ -618,13 +605,13 @@ export default function App() {
 
   async function refreshCurrentPosition(shouldFocusMap: boolean) {
     setMapLocationStatus('loading');
-    setMapLocationMessage('현재 위치를 확인하고 있어요.');
+    setMapLocationMessage('?熬곣뫗???熬곣뫚????筌먦끉逾???겶????곗꽑??');
 
     try {
       const nextPosition = await getCurrentDevicePosition();
       setCurrentPosition({ latitude: nextPosition.latitude, longitude: nextPosition.longitude });
       setMapLocationStatus('ready');
-      setMapLocationMessage(`현재 위치를 다시 잡았어요. 예상 오차는 약 ${formatDistanceMeters(nextPosition.accuracyMeters)}예요.`);
+      setMapLocationMessage(`?熬곣뫗???熬곣뫚??????곕뻣 ???뗫┃??怨몃뭵. ????쭜 ???⑥빵????${formatDistanceMeters(nextPosition.accuracyMeters)}???깅뭵.`);
       if (shouldFocusMap) {
         setMapLocationFocusKey((current) => current + 1);
       }
@@ -642,7 +629,7 @@ export default function App() {
   async function handleClaimStamp(place: Place) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('로그인해야 현장 스탬프를 찍을 수 있어요.');
+      setNotice('?β돦裕??筌뤿굝????熬곣뫗?????꾪땿?熬? 嶺뚣볦뵰???????곗꽑??');
       return;
     }
 
@@ -656,7 +643,7 @@ export default function App() {
         longitude: nextPosition.longitude,
       });
       setStampState(nextStampState);
-      setNotice(`${place.name}에서 오늘 스탬프를 찍었어요.`);
+      setNotice(`${place.name}????????노츓 ???꾪땿?熬? 嶺뚣볦뵰?됀??怨몃뭵.`);
       commitRouteState(
         {
           tab: 'map',
@@ -696,7 +683,7 @@ export default function App() {
       });
       upsertReviewCollections(createdReview);
       await refreshMyPageForUser(sessionUser);
-      setNotice('피드를 남겼어요. 같은 여행 흐름으로 코스까지 이어갈 수 있어요.');
+      setNotice('??怨뺢덧????節딇렩??怨몃뭵. ?띠룇?? ??筌???????怨쀬Ŧ ?袁⑤뾼??놃떐?? ??怨룹꽑???????곗꽑??');
       commitRouteState(
         {
           tab: 'map',
@@ -716,7 +703,7 @@ export default function App() {
   async function handleCreateComment(reviewId: string, body: string, parentId?: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('댓글을 남기려면 먼저 로그인해 주세요.');
+      setNotice('?癰?????節뗢뵛???좊듆 ?誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
       return;
     }
 
@@ -738,7 +725,7 @@ export default function App() {
   async function handleUpdateComment(reviewId: string, commentId: string, body: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('댓글을 수정하려면 먼저 로그인해 주세요.');
+      setNotice('?癰?????瑜곸젧??濡?졎嶺??誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
       return;
     }
 
@@ -763,7 +750,7 @@ export default function App() {
   async function handleDeleteComment(reviewId: string, commentId: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('댓글을 삭제하려면 먼저 로그인해 주세요.');
+      setNotice('?癰????????濡?졎嶺??誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
       return;
     }
 
@@ -788,7 +775,7 @@ export default function App() {
   async function handleDeleteReview(reviewId: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('피드를 삭제하려면 먼저 로그인해 주세요.');
+      setNotice('??怨뺢덧???????濡?졎嶺??誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
       return;
     }
 
@@ -820,7 +807,7 @@ export default function App() {
       if (highlightedReviewId === reviewId) {
         setHighlightedReviewId(null);
       }
-      setNotice('피드를 삭제했어요.');
+      setNotice('??怨뺢덧????????곗꽑??');
       if (activeTab === 'my') {
         await refreshMyPageForUser(sessionUser, true);
       }
@@ -834,7 +821,7 @@ export default function App() {
   async function handleToggleReviewLike(reviewId: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('좋아요를 누르려면 먼저 로그인해 주세요.');
+      setNotice('??ル열???? ?熬곣뱿????좊듆 ?誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
       return;
     }
 
@@ -856,7 +843,7 @@ export default function App() {
   async function handleToggleRouteLike(routeId: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('좋아요를 누르려면 먼저 로그인해 주세요.');
+      setNotice('??ル열???? ?熬곣뱿????좊듆 ?誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
       return;
     }
     setRouteLikeUpdatingId(routeId);
@@ -877,7 +864,7 @@ export default function App() {
   async function handlePublishRoute(payload: { travelSessionId: string; title: string; description: string; mood: string }) {
     if (!sessionUser) {
       goToTab('my');
-      setRouteError('로그인한 뒤에만 여행 세션을 코스로 발행할 수 있어요.');
+      setRouteError('?β돦裕??筌뤿굝由????고뱺嶺???筌??筌뤾쑬????袁⑤뾼??놁뿉??꾩룇裕됵쭛???????곗꽑??');
       return;
     }
     setRouteSubmitting(true);
@@ -912,7 +899,7 @@ export default function App() {
           },
         };
       });
-      setNotice('여행 세션을 공개 코스로 발행했어요. 이제 다른 사용자도 이 경로를 볼 수 있어요.');
+      setNotice('??筌??筌뤾쑬?????ㅻ????袁⑤뾼??놁뿉??꾩룇裕됵쭛???곗꽑?? ??怨몄젷 ???섎???????利????롪퍔?δ빳?꾨ご????????곗꽑??');
       setMyPageTab('routes');
     } catch (error) {
       setRouteError(formatErrorMessage(error));
@@ -946,7 +933,7 @@ export default function App() {
 
   async function handleUpdateProfile(nextNickname: string) {
     if (!nextNickname || nextNickname.length < 2) {
-      setProfileError('닉네임은 두 글자 이상으로 입력해 주세요.');
+      setProfileError('??怨뚰맟?熬? ???リ섣?????怨대쭜??怨쀬Ŧ ???놁졑???낅슣?섋땻??');
       return;
     }
     setProfileSaving(true);
@@ -957,7 +944,7 @@ export default function App() {
       if (auth.user) {
         setMyPage((current) => (current && auth.user ? { ...current, user: auth.user } : current));
       }
-      setNotice('닉네임을 저장했어요. 이제 메인 흐름으로 바로 이어갈 수 있어요.');
+      setNotice('??怨뚰맟?熬곣뫗諭????繞⑨쭛??怨몃뭵. ??怨몄젷 嶺뚮∥?????????怨쀬Ŧ ?꾩룆?餓???怨룹꽑???????곗꽑??');
     } catch (error) {
       setProfileError(formatErrorMessage(error));
     } finally {
@@ -972,7 +959,7 @@ export default function App() {
       setSessionUser(auth.user);
       setProviders(auth.providers);
       setMyPage(null);
-      setNotice('로그아웃했어요.');
+      setNotice('?β돦裕??熬곣뫗????곗꽑??');
     } catch (error) {
       setNotice(formatErrorMessage(error));
     } finally {
@@ -1030,10 +1017,10 @@ export default function App() {
   }
 
   const reviewProofMessage = !sessionUser
-    ? '로그인한 뒤 스탬프를 찍어야 피드를 작성할 수 있어요.'
+    ? '?β돦裕??筌뤿굝由??????꾪땿?熬? 嶺뚣볦뵰?????怨뺢덧????얜?????????곗꽑??'
     : todayStamp
-      ? `${todayStamp.visitLabel} 스탬프가 있어요. 지금 이 장소 피드를 바로 남길 수 있어요.`
-      : '오늘 스탬프를 찍으면 피드 작성 버튼이 바로 열려요.';
+      ? `${todayStamp.visitLabel} ???꾪땿?熬? ???곗꽑?? 嶺뚯솘???????????怨뺢덧???꾩룆?餓???節뗭춸 ?????곗꽑??`
+      : '???노츓 ???꾪땿?熬? 嶺뚣볦뵰??얠춺???怨뺢덧 ??얜????뺢퀗?????꾩룆?餓???????';
 
   return (
     <div className="map-app-shell">
@@ -1110,7 +1097,7 @@ export default function App() {
         ) : (
           <div className="page-stage">
             {notice && <div className="floating-notice">{notice}</div>}
-            {bootstrapStatus === 'loading' && <section className="floating-status">화면을 준비하고 있어요.</section>}
+            {bootstrapStatus === 'loading' && <section className="floating-status">??븐뻼???繞벿뮻???들뇡??????곗꽑??</section>}
             {bootstrapStatus === 'error' && <section className="floating-status floating-status--error">{bootstrapError}</section>}
 
             {activeTab === 'feed' && (
@@ -1192,9 +1179,9 @@ export default function App() {
         )}
 
         {canNavigateBack && (
-          <button type="button" className="app-back-button" onClick={handleNavigateBack} aria-label="이전으로 돌아가기">
-            <span aria-hidden="true">←</span>
-            <span>이전</span>
+          <button type="button" className="app-back-button" onClick={handleNavigateBack} aria-label="\uC774\uC804\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30">
+            <span aria-hidden="true">&#8592;</span>
+            <span>\uC774\uC804</span>
           </button>
         )}
 
