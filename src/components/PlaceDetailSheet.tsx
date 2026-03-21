@@ -1,4 +1,4 @@
-﻿import { useRef } from 'react';
+import { useRef } from 'react';
 import { categoryInfo } from '../lib/categories';
 import { ReviewComposer } from './ReviewComposer';
 import type { ApiStatus, DrawerState, Place, Review, ReviewMood, StampLog } from '../types';
@@ -232,9 +232,6 @@ export function PlaceDetailSheet({
           <div className="sheet-card stack-gap place-drawer__preview-empty">
             <strong>아직 등록된 피드가 없어요.</strong>
             <p className="section-copy">오늘 방문 인증을 마친 뒤 첫 피드를 남겨 보세요.</p>
-            <button type="button" className="secondary-button primary-button--block" onClick={onOpenFeedReview}>
-              피드 보러가기
-            </button>
           </div>
         )}
       </div>
