@@ -409,12 +409,12 @@ export default function App() {
     if (activeTab === 'my' && sessionUser && !myPage) {
       void refreshMyPageForUser(sessionUser, true);
     }
-    if (activeTab === 'my' && sessionUser?.isAdmin && !adminSummary) {
+    if (activeTab === 'my' && myPageTab === 'admin' && sessionUser?.isAdmin && !adminSummary) {
       void refreshAdminSummary(true).catch((error) => {
         setNotice(formatErrorMessage(error));
       });
     }
-  }, [activeTab, adminSummary, myPage, refreshAdminSummary, refreshMyPageForUser, sessionUser]);
+  }, [activeTab, adminSummary, myPage, myPageTab, refreshAdminSummary, refreshMyPageForUser, sessionUser]);
 
   useEffect(() => {
     if (activeTab !== 'course') {

@@ -2422,6 +2422,7 @@ async function routeRequest(request, env) {
   const reviewLikeMatch = url.pathname.match(/^\/api\/reviews\/(\d+)\/like$/);
   const reviewDetailMatch = url.pathname.match(/^\/api\/reviews\/(\d+)$/);
   const communityRouteLikeMatch = url.pathname.match(/^\/api\/community-routes\/(\d+)\/like$/);
+  const adminPlaceMatch = url.pathname.match(/^\/api\/admin\/places\/([^/]+)$/);
 
   if (request.method === "OPTIONS") {
     return handlePreflight(env, request);
