@@ -7,7 +7,6 @@ import {
   deleteReview,
   createReview,
   createUserRoute,
-  getAuthSession,
   getFestivals,
   getMapBootstrap,
   getMyCommentsPage,
@@ -527,20 +526,16 @@ export default function App() {
     setBootstrapError(null);
 
     try {
-      const [bootstrap, festivalResult, authResponse] = await Promise.all([
+      const [bootstrap, festivalResult] = await Promise.all([
         getMapBootstrap(),
         getFestivals().catch(() => [] as FestivalItem[]),
-        getAuthSession().catch(() => null),
       ]);
-
-      const nextSessionUser = authResponse?.user ?? bootstrap.auth.user;
-      const nextProviders = authResponse?.providers?.length ? authResponse.providers : bootstrap.auth.providers;
 
       setPlaces(bootstrap.places);
       setFestivals(festivalResult);
       setStampState(bootstrap.stamps);
       setHasRealData(bootstrap.hasRealData);
-      setSessionUser(nextSessionUser);
+      setSessionUser(bootstrap.auth.user);
       resetReviewCaches();
       setFeedNextCursor(null);
       setFeedHasMore(false);
@@ -549,23 +544,20 @@ export default function App() {
       setMyCommentsHasMore(false);
       setMyCommentsLoadingMore(false);
       setMyCommentsLoadedOnce(false);
-      setProviders(nextProviders);
+      setProviders(bootstrap.auth.providers);
       setSelectedPlaceId((current) => (current && bootstrap.places.some((place) => place.id === current) ? current : null));
       setSelectedFestivalId((current) => (current && festivalResult.some((festival) => festival.id === current) ? current : null));
 
-      if (nextSessionUser) {
+      if (bootstrap.auth.user) {
         if (activeTab === 'my') {
-          try {
-            await refreshMyPageForUser(nextSessionUser, true);
-          } catch {
-          }
+          await refreshMyPageForUser(bootstrap.auth.user, true);
         }
       } else {
         setMyPage(null);
       }
 
       setBootstrapStatus('ready');
-      if (authState === 'naver-success' && nextSessionUser?.profileCompletedAt === null) {
+      if (authState === 'naver-success' && bootstrap.auth.user?.profileCompletedAt === null) {
         goToTab('my');
         setNotice('??곌퐬?袁⑹뱽 ?類λ릭筌???곕굡?? ?꾨뗄?ょ몴?揶쏆늿? ?④쑴??疫꿸퀡以??곗쨮 ?癒?염??살쓦野???곷선揶?????됰선??');
       }
