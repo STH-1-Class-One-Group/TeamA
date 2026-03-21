@@ -1,13 +1,13 @@
-const PROVIDERS = [
-  { key: 'naver', label: '네이버' },
-  { key: 'kakao', label: '카카오' },
+﻿const PROVIDERS = [
+  { key: 'naver', label: '?ㅼ씠踰? },
+  { key: 'kakao', label: '移댁뭅?? },
 ];
 
 const BADGE_BY_MOOD = {
-  설렘: '첫 방문',
-  친구랑: '친구 추천',
-  혼자서: '로컬 탐방',
-  야경픽: '야경 성공',
+  ?ㅻ젞: '泥?諛⑸Ц',
+  移쒓뎄?? '移쒓뎄 異붿쿇',
+  ?쇱옄?? '濡쒖뺄 ?먮갑',
+  ?쇨꼍?? '?쇨꼍 ?깃났',
 };
 
 const SESSION_COOKIE_NAME = 'jamissue_worker_session';
@@ -179,7 +179,7 @@ function toSeoulDateKey(value = null) {
 
 function formatVisitLabel(visitNumber) {
   const safeVisitNumber = Number.isFinite(Number(visitNumber)) && Number(visitNumber) > 0 ? Number(visitNumber) : 1;
-  return `${safeVisitNumber}번째 방문`;
+  return `${safeVisitNumber}踰덉㎏ 諛⑸Ц`;
 }
 
 function buildSessionDurationLabel(session) {
@@ -188,9 +188,9 @@ function buildSessionDurationLabel(session) {
   const diffMs = Math.max(0, endedAt.getTime() - startedAt.getTime());
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   if (diffDays <= 0) {
-    return `당일 코스 · 스탬프 ${session.stamp_count ?? 0}개`;
+    return `?뱀씪 肄붿뒪 쨌 ?ㅽ꺃??${session.stamp_count ?? 0}媛?;
   }
-  return `${diffDays}박 ${diffDays + 1}일 · 스탬프 ${session.stamp_count ?? 0}개`;
+  return `${diffDays}諛?${diffDays + 1}??쨌 ?ㅽ꺃??${session.stamp_count ?? 0}媛?;
 }
 
 function buildStampLogs(stampRows, placesByPositionId) {
@@ -202,7 +202,7 @@ function buildStampLogs(stampRows, placesByPositionId) {
       return {
         id: String(row.stamp_id),
         placeId: place?.id ?? String(row.position_id),
-        placeName: place?.name ?? "장소 정보 없음",
+        placeName: place?.name ?? "?μ냼 ?뺣낫 ?놁쓬",
         stampedAt: formatDateTime(row.created_at),
         stampedDate: formatDate(row.created_at),
         visitNumber: row.visit_ordinal ?? 1,
@@ -456,7 +456,7 @@ async function exchangeNaverCode(env, code, state) {
   });
   const payload = await response.json();
   if (!response.ok || payload.error || !payload.access_token) {
-    throw new Error(payload.error_description || payload.message || '네이버 토큰 교환에 실패했어요.');
+    throw new Error(payload.error_description || payload.message || '?ㅼ씠踰??좏겙 援먰솚???ㅽ뙣?덉뼱??');
   }
   return payload;
 }
@@ -470,7 +470,7 @@ async function fetchNaverProfile(accessToken) {
   });
   const payload = await response.json();
   if (!response.ok || payload.resultcode !== '00' || !payload.response) {
-    throw new Error(payload.message || '네이버 사용자 정보를 가져오지 못했어요.');
+    throw new Error(payload.message || '?ㅼ씠踰??ъ슜???뺣낫瑜?媛?몄삤吏 紐삵뻽?댁슂.');
   }
   return payload.response;
 }
@@ -508,13 +508,13 @@ async function findUserByNickname(env, nickname, excludeUserId = null) {
 async function ensureUniqueNickname(env, nickname, excludeUserId = null) {
   const normalized = String(nickname ?? '').trim();
   if (normalized.length < 2) {
-    const error = new Error('닉네임은 두 글자 이상으로 적어 주세요.');
+    const error = new Error('?됰꽕?꾩? ??湲???댁긽?쇰줈 ?곸뼱 二쇱꽭??');
     error.status = 400;
     throw error;
   }
   const existing = await findUserByNickname(env, normalized, excludeUserId);
   if (existing) {
-    const error = new Error('이미 사용 중인 닉네임이에요.');
+    const error = new Error('?대? ?ъ슜 以묒씤 ?됰꽕?꾩씠?먯슂.');
     error.status = 409;
     throw error;
   }
@@ -522,7 +522,7 @@ async function ensureUniqueNickname(env, nickname, excludeUserId = null) {
 }
 
 async function buildUniqueSocialNickname(env, nickname) {
-  const base = String(nickname ?? '').trim() || '이름 없음';
+  const base = String(nickname ?? '').trim() || '?대쫫 ?놁쓬';
   const existing = await findUserByNickname(env, base);
   if (!existing) {
     return base;
@@ -534,11 +534,11 @@ async function buildUniqueSocialNickname(env, nickname) {
       return candidate;
     }
   }
-  throw new Error('사용 가능한 닉네임을 만들 수 없어요.');
+  throw new Error('?ъ슜 媛?ν븳 ?됰꽕?꾩쓣 留뚮뱾 ???놁뼱??');
 }
 
 async function upsertNaverUser(env, profile) {
-  const fallbackNickname = profile.nickname || profile.name || '이름 없음';
+  const fallbackNickname = profile.nickname || profile.name || '?대쫫 ?놁쓬';
   const nowIso = new Date().toISOString();
   const existingIdentity = await findIdentity(env, 'naver', profile.id);
 
@@ -622,13 +622,13 @@ function getCategoryPalette(category, row) {
   const fallbackAccent = row.accent_color ?? '#FF6B9D';
   switch (category) {
     case 'restaurant':
-      return { jamColor: '#FF6B9D', accentColor: '#FFB3C6', heroLabel: 'Bakery Bite', summaryPrefix: '빵과 면, 국밥까지' };
+      return { jamColor: '#FF6B9D', accentColor: '#FFB3C6', heroLabel: 'Bakery Bite', summaryPrefix: '鍮듦낵 硫? 援?갈源뚯?' };
     case 'cafe':
-      return { jamColor: '#7CB9D1', accentColor: '#A8D5E2', heroLabel: 'Cafe Mood', summaryPrefix: '커피와 디저트' };
+      return { jamColor: '#7CB9D1', accentColor: '#A8D5E2', heroLabel: 'Cafe Mood', summaryPrefix: '而ㅽ뵾? ?붿??? };
     case 'culture':
-      return { jamColor: '#A8D5E2', accentColor: '#C9E4EA', heroLabel: 'Culture Spot', summaryPrefix: '전시와 문화 공간' };
+      return { jamColor: '#A8D5E2', accentColor: '#C9E4EA', heroLabel: 'Culture Spot', summaryPrefix: '?꾩떆? 臾명솕 怨듦컙' };
     case 'attraction':
-      return { jamColor: '#FFB3C6', accentColor: '#FFD4E0', heroLabel: 'City Spot', summaryPrefix: '대전 산책과 명소' };
+      return { jamColor: '#FFB3C6', accentColor: '#FFD4E0', heroLabel: 'City Spot', summaryPrefix: '????곗콉怨?紐낆냼' };
     default:
       return { jamColor: fallbackJam, accentColor: fallbackAccent, heroLabel: row.hero_label, summaryPrefix: '' };
   }
@@ -695,8 +695,8 @@ function buildCommentTree(commentRows, usersById) {
     const comment = {
       id: String(row.comment_id),
       userId: row.user_id,
-      author: usersById.get(row.user_id)?.nickname ?? '이름 없음',
-      body: row.is_deleted ? '삭제된 댓글입니다.' : row.body,
+      author: usersById.get(row.user_id)?.nickname ?? '?대쫫 ?놁쓬',
+      body: row.is_deleted ? '??젣???볤??낅땲??' : row.body,
       parentId: row.parent_id ? String(row.parent_id) : null,
       isDeleted: row.is_deleted,
       createdAt: formatDateTime(row.created_at),
@@ -731,7 +731,7 @@ function buildMyComments(commentRows, reviewsById) {
         reviewId: String(row.feed_id),
         placeId: review.placeId,
         placeName: review.placeName,
-        body: row.is_deleted ? '삭제된 댓글입니다.' : row.body,
+        body: row.is_deleted ? '??젣???볤??낅땲??' : row.body,
         isDeleted: row.is_deleted,
         parentId: row.parent_id ? String(row.parent_id) : null,
         createdAt: formatDateTime(row.created_at),
@@ -766,8 +766,8 @@ function mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPosit
       id: String(row.feed_id),
       userId: row.user_id,
       placeId: place?.id ?? String(row.position_id),
-      placeName: place?.name ?? "장소 정보 없음",
-      author: usersById.get(row.user_id)?.nickname ?? "이름 없음",
+      placeName: place?.name ?? "?μ냼 ?뺣낫 ?놁쓬",
+      author: usersById.get(row.user_id)?.nickname ?? "?대쫫 ?놁쓬",
       body: row.body,
       mood: row.mood,
       badge: row.badge,
@@ -829,7 +829,7 @@ function mapCommunityRoutes(routeRows, routePlaceRows, usersById, placesByPositi
     return {
       id: String(row.route_id),
       authorId: row.user_id,
-      author: usersById.get(row.user_id)?.nickname ?? "이름 없음",
+      author: usersById.get(row.user_id)?.nickname ?? "?대쫫 ?놁쓬",
       title: row.title,
       description: row.description,
       mood: row.mood,
@@ -1074,7 +1074,7 @@ async function handleUpdateProfile(request, env) {
   try {
     nickname = await ensureUniqueNickname(env, payload.nickname, sessionResult.sessionUser.id);
   } catch (error) {
-    return jsonResponse(error.status ?? 400, { detail: error.message ?? '닉네임을 저장할 수 없어요.' }, env, request);
+    return jsonResponse(error.status ?? 400, { detail: error.message ?? '?됰꽕?꾩쓣 ??ν븷 ???놁뼱??' }, env, request);
   }
 
   const nowIso = new Date().toISOString();
@@ -1109,7 +1109,7 @@ async function handleUpdateProfile(request, env) {
 }
 async function handleStartNaverLogin(request, env, url) {
   if (!naverConfigured(env)) {
-    return jsonResponse(503, { detail: '네이버 로그인 설정이 비어 있어요.' }, env, request);
+    return jsonResponse(503, { detail: '?ㅼ씠踰?濡쒓렇???ㅼ젙??鍮꾩뼱 ?덉뼱??' }, env, request);
   }
 
   const next = url.searchParams.get('next') || env.APP_FRONTEND_URL || 'https://jamissue.growgardens.app';
@@ -1226,7 +1226,7 @@ async function handleCommunityRoutes(request, env, url) {
 async function handleMyRoutes(request, env) {
   const sessionUser = await readSessionUser(request, env);
   if (!sessionUser) {
-    return jsonResponse(401, { detail: '로그인이 필요해요.' }, env, request);
+    return jsonResponse(401, { detail: '濡쒓렇?몄씠 ?꾩슂?댁슂.' }, env, request);
   }
   return jsonResponse(200, await loadCommunityRoutes(env, { ownerUserId: sessionUser.id, sessionUserId: sessionUser.id }), env, request);
 }
@@ -1240,8 +1240,8 @@ function mapMyComments(commentRows, feedRows, placesByPositionId) {
       id: String(row.comment_id),
       reviewId: String(row.feed_id),
       placeId: place?.id ?? String(feed?.position_id ?? ''),
-      placeName: place?.name ?? '장소 정보 없음',
-      body: row.is_deleted ? '삭제된 댓글입니다.' : row.body,
+      placeName: place?.name ?? '?μ냼 ?뺣낫 ?놁쓬',
+      body: row.is_deleted ? '??젣???볤??낅땲??' : row.body,
       isDeleted: row.is_deleted,
       parentId: row.parent_id ? String(row.parent_id) : null,
       createdAt: formatDateTime(row.created_at),
@@ -1325,7 +1325,7 @@ async function handleAdminPlaceVisibility(request, env, placeId) {
 async function handleMySummary(request, env) {
   const sessionUser = await readSessionUser(request, env);
   if (!sessionUser) {
-    return jsonResponse(401, { detail: "로그인이 필요해요." }, env, request);
+    return jsonResponse(401, { detail: "濡쒓렇?몄씠 ?꾩슂?댁슂." }, env, request);
   }
 
   const baseData = await loadBaseData(env, sessionUser.id);
@@ -1471,15 +1471,15 @@ function createFestivalExternalId(title, startDate, venueName, roadAddress) {
 
 function isDaejeonFestival(payload) {
   const haystack = [
-    readFestivalText(payload, ['축제명', 'fstvlNm', 'eventNm', 'eventTitle']),
-    readFestivalText(payload, ['개최장소', 'opar', 'venueName', 'fstvlCo']),
-    readFestivalText(payload, ['소재지도로명주소', '소재지 도로명주소', 'rdnmadr', 'roadAddress']),
-    readFestivalText(payload, ['소재지지번주소', 'lnmadr', 'address']),
+    readFestivalText(payload, ['異뺤젣紐?, 'fstvlNm', 'eventNm', 'eventTitle']),
+    readFestivalText(payload, ['媛쒖턀?μ냼', 'opar', 'venueName', 'fstvlCo']),
+    readFestivalText(payload, ['?뚯옱吏?꾨줈紐낆＜??, '?뚯옱吏 ?꾨줈紐낆＜??, 'rdnmadr', 'roadAddress']),
+    readFestivalText(payload, ['?뚯옱吏吏踰덉＜??, 'lnmadr', 'address']),
   ]
     .filter(Boolean)
     .join(' ');
 
-  return haystack.includes('대전');
+  return haystack.includes('???);
 }
 
 function normalizeFestival(payload) {
@@ -1487,14 +1487,14 @@ function normalizeFestival(payload) {
     return null;
   }
 
-  const title = readFestivalText(payload, ['축제명', 'fstvlNm', 'eventNm', 'eventTitle']);
-  const venueName = readFestivalText(payload, ['개최장소', 'opar', 'venueName', 'fstvlCo']);
-  const startDate = parseFestivalDate(readFestivalText(payload, ['축제시작일자', '축제 시작일자', 'fstvlStartDate', 'eventStartDate', 'startDate']));
-  const endDate = parseFestivalDate(readFestivalText(payload, ['축제종료일자', '축제 종료일자', 'fstvlEndDate', 'eventEndDate', 'endDate']), true);
-  const homepageUrl = readFestivalText(payload, ['홈페이지주소', '홈페이지 주소', 'homepageUrl', 'homepage']);
-  const roadAddress = readFestivalText(payload, ['소재지도로명주소', '소재지 도로명주소', 'rdnmadr', 'roadAddress']);
-  const latitude = readFestivalNumber(payload, ['위도', 'latitude', 'lat']);
-  const longitude = readFestivalNumber(payload, ['경도', 'longitude', 'lng']);
+  const title = readFestivalText(payload, ['異뺤젣紐?, 'fstvlNm', 'eventNm', 'eventTitle']);
+  const venueName = readFestivalText(payload, ['媛쒖턀?μ냼', 'opar', 'venueName', 'fstvlCo']);
+  const startDate = parseFestivalDate(readFestivalText(payload, ['異뺤젣?쒖옉?쇱옄', '異뺤젣 ?쒖옉?쇱옄', 'fstvlStartDate', 'eventStartDate', 'startDate']));
+  const endDate = parseFestivalDate(readFestivalText(payload, ['異뺤젣醫낅즺?쇱옄', '異뺤젣 醫낅즺?쇱옄', 'fstvlEndDate', 'eventEndDate', 'endDate']), true);
+  const homepageUrl = readFestivalText(payload, ['?덊럹?댁?二쇱냼', '?덊럹?댁? 二쇱냼', 'homepageUrl', 'homepage']);
+  const roadAddress = readFestivalText(payload, ['?뚯옱吏?꾨줈紐낆＜??, '?뚯옱吏 ?꾨줈紐낆＜??, 'rdnmadr', 'roadAddress']);
+  const latitude = readFestivalNumber(payload, ['?꾨룄', 'latitude', 'lat']);
+  const longitude = readFestivalNumber(payload, ['寃쎈룄', 'longitude', 'lng']);
 
   if (!title || !startDate || !endDate || latitude === null || longitude === null) {
     return null;
@@ -1506,17 +1506,17 @@ function normalizeFestival(payload) {
   }
 
   return {
-    externalId: readFestivalText(payload, ['축제일련번호', 'eventId', 'id']) || createFestivalExternalId(title, startDate, venueName, roadAddress),
+    externalId: readFestivalText(payload, ['異뺤젣?쇰젴踰덊샇', 'eventId', 'id']) || createFestivalExternalId(title, startDate, venueName, roadAddress),
     title,
     venueName,
-    district: '대전',
+    district: '???,
     roadAddress,
     startsAt: startDate.toISOString(),
     endsAt: endDate.toISOString(),
     homepageUrl,
     latitude,
     longitude,
-    summary: venueName ? `${venueName}에서 열리는 대전 축제예요.` : '대전에서 열리는 축제예요.',
+    summary: venueName ? `${venueName}?먯꽌 ?대━?????異뺤젣?덉슂.` : '??꾩뿉???대━??異뺤젣?덉슂.',
     rawPayload: payload,
   };
 }
@@ -1549,7 +1549,7 @@ async function syncFestivalsFromSource(env) {
 
   const response = await fetch(requestUrl, { headers: { Accept: 'application/json' } });
   if (!response.ok) {
-    throw new Error(`축제 API를 불러오지 못했어요. (${response.status})`);
+    throw new Error(`異뺤젣 API瑜?遺덈윭?ㅼ? 紐삵뻽?댁슂. (${response.status})`);
   }
 
   const payload = await response.json();
@@ -1649,7 +1649,7 @@ async function handleFestivals(request, env) {
 
     const upcomingCutoff = now + 30 * 24 * 60 * 60 * 1000;
     const nowIso = new Date(now).toISOString();
-    const rows = await supabaseRequest(env, `public_event?select=public_event_id,title,venue_name,road_address,starts_at,ends_at,source_page_url,latitude,longitude&district=eq.${encodeFilterValue('대전')}&ends_at=gte.${encodeFilterValue(nowIso)}&order=starts_at.asc&limit=40`);
+    const rows = await supabaseRequest(env, `public_event?select=public_event_id,title,venue_name,road_address,starts_at,ends_at,source_page_url,latitude,longitude&district=eq.${encodeFilterValue('???)}&ends_at=gte.${encodeFilterValue(nowIso)}&order=starts_at.asc&limit=40`);
     const value = (rows || [])
       .filter((row) => {
         const startTime = new Date(row.starts_at).getTime();
@@ -1731,21 +1731,21 @@ function calculateDistanceMeters(startLatitude, startLongitude, endLatitude, end
 }
 
 function buildNearPlaceMessage(placeName, distanceMeters, unlockRadius) {
-  return `${placeName}까지 ${formatDistanceMeters(distanceMeters)} 남았어요. 반경 ${unlockRadius}m 안에 들어오면 열려요.`;
+  return `${placeName}源뚯? ${formatDistanceMeters(distanceMeters)} ?⑥븯?댁슂. 諛섍꼍 ${unlockRadius}m ?덉뿉 ?ㅼ뼱?ㅻ㈃ ?대젮??`;
 }
 
 async function readJsonBody(request) {
   try {
     return await request.json();
   } catch {
-    throw new Error('요청 형식이 올바르지 않아요.');
+    throw new Error('?붿껌 ?뺤떇???щ컮瑜댁? ?딆븘??');
   }
 }
 
 async function requireSessionUser(request, env) {
   const sessionUser = await readSessionUser(request, env);
   if (!sessionUser) {
-    return { response: jsonResponse(401, { detail: '로그인이 필요해요.' }, env, request) };
+    return { response: jsonResponse(401, { detail: '濡쒓렇?몄씠 ?꾩슂?댁슂.' }, env, request) };
   }
   return { sessionUser };
 }
@@ -1815,12 +1815,12 @@ function buildPublicStorageUrl(env, objectPath) {
 
 async function uploadReviewFile(env, sessionUser, file) {
   if (!env.APP_SUPABASE_URL || !env.APP_SUPABASE_STORAGE_BUCKET) {
-    throw new Error('Supabase Storage 설정이 비어 있어요.');
+    throw new Error('Supabase Storage ?ㅼ젙??鍮꾩뼱 ?덉뼱??');
   }
 
   const storageKey = env.APP_SUPABASE_SERVICE_ROLE_KEY || getSupabaseKey(env);
   if (!storageKey) {
-    throw new Error('Supabase Storage 권한 키가 비어 있어요.');
+    throw new Error('Supabase Storage 沅뚰븳 ?ㅺ? 鍮꾩뼱 ?덉뼱??');
   }
 
   const safeFileName = sanitizeFileName(file.name);
@@ -1840,7 +1840,7 @@ async function uploadReviewFile(env, sessionUser, file) {
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`이미지 업로드에 실패했어요. (${response.status}) ${detail}`);
+    throw new Error(`?대?吏 ?낅줈?쒖뿉 ?ㅽ뙣?덉뼱?? (${response.status}) ${detail}`);
   }
 
   return {
@@ -1859,15 +1859,15 @@ async function handleReviewUpload(request, env) {
   const formData = await request.formData();
   const file = formData.get('file');
   if (!(file instanceof File)) {
-    return jsonResponse(400, { detail: '업로드할 이미지 파일이 필요해요.' }, env, request);
+    return jsonResponse(400, { detail: '?낅줈?쒗븷 ?대?吏 ?뚯씪???꾩슂?댁슂.' }, env, request);
   }
   if (!(file.type || '').startsWith('image/')) {
-    return jsonResponse(400, { detail: '이미지 파일만 업로드할 수 있어요.' }, env, request);
+    return jsonResponse(400, { detail: '?대?吏 ?뚯씪留??낅줈?쒗븷 ???덉뼱??' }, env, request);
   }
 
   const maxUploadSize = Number(env.APP_MAX_UPLOAD_SIZE_BYTES ?? '5242880');
   if (file.size > maxUploadSize) {
-    return jsonResponse(413, { detail: '이미지는 5MB 이하로 올려 주세요.' }, env, request);
+    return jsonResponse(413, { detail: '?대?吏??5MB ?댄븯濡??щ젮 二쇱꽭??' }, env, request);
   }
 
   const uploaded = await uploadReviewFile(env, sessionResult.sessionUser, file);
@@ -1884,31 +1884,42 @@ async function handleCreateReview(request, env) {
   const placeId = String(payload.placeId ?? "").trim();
   const stampId = String(payload.stampId ?? "").trim();
   const body = String(payload.body ?? "").trim();
-  const mood = String(payload.mood ?? "설렘").trim();
+  const mood = String(payload.mood ?? "?ㅻ젞").trim();
   const imageUrl = payload.imageUrl ? String(payload.imageUrl) : null;
 
   if (!placeId) {
-    return jsonResponse(400, { detail: "장소 정보가 필요해요." }, env, request);
+    return jsonResponse(400, { detail: "?μ냼 ?뺣낫媛 ?꾩슂?댁슂." }, env, request);
   }
   if (!stampId) {
-    return jsonResponse(400, { detail: "피드를 쓰려면 해당 방문 스탬프가 필요해요." }, env, request);
+    return jsonResponse(400, { detail: "?쇰뱶瑜??곕젮硫??대떦 諛⑸Ц ?ㅽ꺃?꾧? ?꾩슂?댁슂." }, env, request);
   }
   if (!body) {
-    return jsonResponse(400, { detail: "후기를 조금 더 적어 주세요." }, env, request);
+    return jsonResponse(400, { detail: "?꾧린瑜?議곌툑 ???곸뼱 二쇱꽭??" }, env, request);
   }
 
   const baseData = await loadBaseData(env, sessionResult.sessionUser.id);
   const place = baseData.places.find((item) => item.id === placeId);
   if (!place) {
-    return jsonResponse(404, { detail: "장소를 찾지 못했어요." }, env, request);
+    return jsonResponse(404, { detail: "?μ냼瑜?李얠? 紐삵뻽?댁슂." }, env, request);
   }
   const stampRows = await supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,visit_ordinal,stamp_date,created_at&stamp_id=eq.${encodeFilterValue(stampId)}&limit=1`);
   const stampRow = stampRows?.[0] ?? null;
   if (!stampRow) {
-    return jsonResponse(404, { detail: "방문 스탬프를 찾지 못했어요." }, env, request);
+    return jsonResponse(404, { detail: "諛⑸Ц ?ㅽ꺃?꾨? 李얠? 紐삵뻽?댁슂." }, env, request);
   }
   if (stampRow.user_id !== sessionResult.sessionUser.id || String(stampRow.position_id) !== String(place.positionId)) {
-    return jsonResponse(403, { detail: "해당 장소의 방문 스탬프가 확인되어야 피드를 쓸 수 있어요." }, env, request);
+    return jsonResponse(403, { detail: "??? ???????? ?????? ??????????????????????" }, env, request);
+  }
+
+  const existingStampFeedRows = await supabaseRequest(env, `feed?select=feed_id&stamp_id=eq.${encodeFilterValue(stampId)}&limit=1`);
+  if ((existingStampFeedRows ?? []).length > 0) {
+    return jsonResponse(409, { detail: "같은 방문 인증으로는 피드를 한 번만 남길 수 있어요." }, env, request);
+  }
+
+  const userFeedRows = await supabaseRequest(env, `feed?select=feed_id,created_at&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&order=created_at.desc&limit=20`);
+  const todayReview = (userFeedRows ?? []).find((row) => toSeoulDateKey(row.created_at) === toSeoulDateKey());
+  if (todayReview) {
+    return jsonResponse(409, { detail: "피드는 하루에 하나만 작성할 수 있어요." }, env, request);
   }
 
   const insertedRows = await supabaseRequest(env, "feed?select=feed_id", {
@@ -1919,7 +1930,7 @@ async function handleCreateReview(request, env) {
       stamp_id: Number(stampId),
       body,
       mood,
-      badge: BADGE_BY_MOOD[mood] ?? "현장 방문",
+      badge: BADGE_BY_MOOD[mood] ?? "?꾩옣 諛⑸Ц",
       image_url: imageUrl,
     }),
   });
@@ -1935,20 +1946,20 @@ async function handleCreateComment(request, env, reviewId) {
 
   const reviewRow = await readFeedRow(env, reviewId);
   if (!reviewRow) {
-    return jsonResponse(404, { detail: '후기를 찾지 못했어요.' }, env, request);
+    return jsonResponse(404, { detail: '?꾧린瑜?李얠? 紐삵뻽?댁슂.' }, env, request);
   }
 
   const payload = await readJsonBody(request);
   const body = String(payload.body ?? '').trim();
   let parentId = payload.parentId ? Number(payload.parentId) : null;
   if (!body) {
-    return jsonResponse(400, { detail: '댓글을 조금 더 적어 주세요.' }, env, request);
+    return jsonResponse(400, { detail: '?볤???議곌툑 ???곸뼱 二쇱꽭??' }, env, request);
   }
 
   if (parentId) {
     const parentComment = await readCommentRow(env, parentId);
     if (!parentComment || String(parentComment.feed_id) !== String(reviewId)) {
-      return jsonResponse(400, { detail: '같은 후기 안의 댓글에만 답글을 달 수 있어요.' }, env, request);
+      return jsonResponse(400, { detail: '媛숈? ?꾧린 ?덉쓽 ?볤??먮쭔 ?듦????????덉뼱??' }, env, request);
     }
     if (parentComment.parent_id) {
       parentId = Number(parentComment.parent_id);
@@ -1978,24 +1989,24 @@ async function handleUpdateComment(request, env, reviewId, commentId) {
 
   const reviewRow = await readFeedRow(env, reviewId);
   if (!reviewRow) {
-    return jsonResponse(404, { detail: '후기를 찾지 못했어요.' }, env, request);
+    return jsonResponse(404, { detail: '?꾧린瑜?李얠? 紐삵뻽?댁슂.' }, env, request);
   }
 
   const commentRow = await readCommentRow(env, commentId);
   if (!commentRow || String(commentRow.feed_id) !== String(reviewId)) {
-    return jsonResponse(404, { detail: '댓글을 찾지 못했어요.' }, env, request);
+    return jsonResponse(404, { detail: '?볤???李얠? 紐삵뻽?댁슂.' }, env, request);
   }
   if (commentRow.user_id !== sessionResult.sessionUser.id) {
-    return jsonResponse(403, { detail: '내 댓글만 수정할 수 있어요.' }, env, request);
+    return jsonResponse(403, { detail: '???볤?留??섏젙?????덉뼱??' }, env, request);
   }
   if (commentRow.is_deleted) {
-    return jsonResponse(400, { detail: '삭제된 댓글은 수정할 수 없어요.' }, env, request);
+    return jsonResponse(400, { detail: '??젣???볤?? ?섏젙?????놁뼱??' }, env, request);
   }
 
   const payload = await readJsonBody(request);
   const body = String(payload.body ?? '').trim();
   if (!body) {
-    return jsonResponse(400, { detail: '댓글을 조금 더 적어 주세요.' }, env, request);
+    return jsonResponse(400, { detail: '?볤???議곌툑 ???곸뼱 二쇱꽭??' }, env, request);
   }
 
   await supabaseRequest(env, `user_comment?comment_id=eq.${encodeFilterValue(commentId)}`, {
@@ -2018,15 +2029,15 @@ async function handleDeleteComment(request, env, reviewId, commentId) {
 
   const reviewRow = await readFeedRow(env, reviewId);
   if (!reviewRow) {
-    return jsonResponse(404, { detail: '후기를 찾지 못했어요.' }, env, request);
+    return jsonResponse(404, { detail: '?꾧린瑜?李얠? 紐삵뻽?댁슂.' }, env, request);
   }
 
   const commentRow = await readCommentRow(env, commentId);
   if (!commentRow || String(commentRow.feed_id) !== String(reviewId)) {
-    return jsonResponse(404, { detail: '댓글을 찾지 못했어요.' }, env, request);
+    return jsonResponse(404, { detail: '?볤???李얠? 紐삵뻽?댁슂.' }, env, request);
   }
   if (commentRow.user_id !== sessionResult.sessionUser.id) {
-    return jsonResponse(403, { detail: '내 댓글만 삭제할 수 있어요.' }, env, request);
+    return jsonResponse(403, { detail: '???볤?留???젣?????덉뼱??' }, env, request);
   }
 
   await supabaseRequest(env, `user_comment?comment_id=eq.${encodeFilterValue(commentId)}`, {
@@ -2050,10 +2061,10 @@ async function handleDeleteReview(request, env, reviewId) {
 
   const reviewRow = await readFeedRow(env, reviewId);
   if (!reviewRow) {
-    return jsonResponse(404, { detail: '후기를 찾지 못했어요.' }, env, request);
+    return jsonResponse(404, { detail: '?꾧린瑜?李얠? 紐삵뻽?댁슂.' }, env, request);
   }
   if (reviewRow.user_id !== sessionResult.sessionUser.id) {
-    return jsonResponse(403, { detail: '내가 쓴 피드만 삭제할 수 있어요.' }, env, request);
+    return jsonResponse(403, { detail: '?닿? ???쇰뱶留???젣?????덉뼱??' }, env, request);
   }
 
   await supabaseRequest(env, `feed?feed_id=eq.${encodeFilterValue(reviewId)}`, {
@@ -2072,7 +2083,7 @@ async function handleToggleReviewLike(request, env, reviewId) {
 
   const reviewRow = await readFeedRow(env, reviewId);
   if (!reviewRow) {
-    return jsonResponse(404, { detail: '후기를 찾지 못했어요.' }, env, request);
+    return jsonResponse(404, { detail: '?꾧린瑜?李얠? 紐삵뻽?댁슂.' }, env, request);
   }
 
   const existingRows = await supabaseRequest(
@@ -2115,13 +2126,13 @@ async function handleToggleStamp(request, env) {
   const latitude = Number(payload.latitude);
   const longitude = Number(payload.longitude);
   if (!placeId || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return jsonResponse(400, { detail: "장소와 현재 좌표가 필요해요." }, env, request);
+    return jsonResponse(400, { detail: "?μ냼? ?꾩옱 醫뚰몴媛 ?꾩슂?댁슂." }, env, request);
   }
 
   const baseData = await loadBaseData(env, sessionResult.sessionUser.id);
   const place = baseData.places.find((item) => item.id === placeId);
   if (!place) {
-    return jsonResponse(404, { detail: "장소를 찾지 못했어요." }, env, request);
+    return jsonResponse(404, { detail: "?μ냼瑜?李얠? 紐삵뻽?댁슂." }, env, request);
   }
 
   const distanceMeters = calculateDistanceMeters(latitude, longitude, place.latitude, place.longitude);
@@ -2236,23 +2247,23 @@ async function handleCreateUserRoute(request, env) {
   const isPublic = payload.isPublic !== false;
 
   if (!travelSessionId) {
-    return jsonResponse(400, { detail: "방향을 묶을 여행 세션이 필요해요." }, env, request);
+    return jsonResponse(400, { detail: "諛⑺뼢??臾띠쓣 ?ы뻾 ?몄뀡???꾩슂?댁슂." }, env, request);
   }
   if (!title) {
-    return jsonResponse(400, { detail: "경로 제목을 적어 주세요." }, env, request);
+    return jsonResponse(400, { detail: "寃쎈줈 ?쒕ぉ???곸뼱 二쇱꽭??" }, env, request);
   }
   if (!description) {
-    return jsonResponse(400, { detail: "한 줄 소개를 적어 주세요." }, env, request);
+    return jsonResponse(400, { detail: "??以??뚭컻瑜??곸뼱 二쇱꽭??" }, env, request);
   }
 
   const sessionRows = await supabaseRequest(env, `travel_session?select=travel_session_id,user_id&travel_session_id=eq.${encodeFilterValue(travelSessionId)}&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&limit=1`);
   if (!sessionRows?.[0]) {
-    return jsonResponse(404, { detail: "여행 세션을 찾지 못했어요." }, env, request);
+    return jsonResponse(404, { detail: "?ы뻾 ?몄뀡??李얠? 紐삵뻽?댁슂." }, env, request);
   }
 
   const existingRouteRows = await supabaseRequest(env, `user_route?select=route_id&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&travel_session_id=eq.${encodeFilterValue(travelSessionId)}&limit=1`);
   if (existingRouteRows?.[0]) {
-    return jsonResponse(409, { detail: "이미 발행한 여행 코스예요." }, env, request);
+    return jsonResponse(409, { detail: "?대? 諛쒗뻾???ы뻾 肄붿뒪?덉슂." }, env, request);
   }
 
   const sessionStampRows = await supabaseRequest(env, `user_stamp?select=position_id,created_at&travel_session_id=eq.${encodeFilterValue(travelSessionId)}&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&order=created_at.asc`);
@@ -2267,7 +2278,7 @@ async function handleCreateUserRoute(request, env) {
     orderedPositionIds.push(positionId);
   }
   if (orderedPositionIds.length < 2) {
-    return jsonResponse(400, { detail: "코스에는 최소 두 곳 이상의 스탬프 기록이 필요해요." }, env, request);
+    return jsonResponse(400, { detail: "肄붿뒪?먮뒗 理쒖냼 ??怨??댁긽???ㅽ꺃??湲곕줉???꾩슂?댁슂." }, env, request);
   }
 
   const routeRows = await supabaseRequest(env, "user_route?select=route_id", {
@@ -2306,10 +2317,10 @@ async function handleToggleCommunityRouteLike(request, env, routeId) {
 
   const routeRow = await readRouteRow(env, routeId);
   if (!routeRow) {
-    return jsonResponse(404, { detail: '경로를 찾지 못했어요.' }, env, request);
+    return jsonResponse(404, { detail: '寃쎈줈瑜?李얠? 紐삵뻽?댁슂.' }, env, request);
   }
   if (routeRow.user_id === sessionResult.sessionUser.id) {
-    return jsonResponse(400, { detail: '내가 만든 경로에는 좋아요를 남길 수 없어요.' }, env, request);
+    return jsonResponse(400, { detail: '?닿? 留뚮뱺 寃쎈줈?먮뒗 醫뗭븘?붾? ?④만 ???놁뼱??' }, env, request);
   }
 
   const existingRows = await supabaseRequest(
@@ -2374,7 +2385,7 @@ function buildProxyHeaders(request) {
 async function proxyToOrigin(request, env) {
   const upstreamUrl = resolveOriginUrl(request, env);
   if (!upstreamUrl) {
-    return jsonResponse(501, { detail: '이 기능은 아직 Worker 브랜치에서 직접 구현되지 않았어요.' }, env, request);
+    return jsonResponse(501, { detail: '??湲곕뒫? ?꾩쭅 Worker 釉뚮옖移섏뿉??吏곸젒 援ы쁽?섏? ?딆븯?댁슂.' }, env, request);
   }
 
   const init = {
@@ -2508,6 +2519,7 @@ export default {
     }
   },
 };
+
 
 
 

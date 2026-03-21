@@ -22,6 +22,36 @@ interface ReviewListProps {
   emptyBody: string;
 }
 
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="review-action-button__svg" aria-hidden="true">
+      <path
+        d="M12 21s-6.716-4.309-9.193-8.19C1.25 10.387 2.17 6.9 5.41 5.61c1.98-.788 4.183-.145 5.59 1.495 1.408-1.64 3.611-2.283 5.59-1.495 3.24 1.29 4.16 4.777 2.603 7.2C18.716 16.691 12 21 12 21Z"
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CommentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="review-action-button__svg" aria-hidden="true">
+      <path
+        d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 13.5v-7Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function ReviewList({
   reviews,
   canWriteComment,
@@ -121,7 +151,7 @@ export function ReviewList({
                 aria-pressed={review.likedByMe}
               >
                 <span className="review-action-button__icon" aria-hidden="true">
-                  {review.likedByMe ? '♥' : '♡'}
+                  <HeartIcon filled={review.likedByMe} />
                 </span>
                 <span className="review-action-button__label">{likingReviewId === review.id ? '반영 중' : review.likeCount}</span>
               </button>
@@ -132,12 +162,16 @@ export function ReviewList({
                   onClick={() => onOpenComments(review.id)}
                   aria-label={`댓글 ${review.comments.length}개`}
                 >
-                  <span className="review-action-button__icon">💬</span>
+                  <span className="review-action-button__icon" aria-hidden="true">
+                    <CommentIcon />
+                  </span>
                   <span className="review-action-button__label">{review.comments.length}</span>
                 </button>
               ) : (
                 <span className="review-action-button review-action-button--static" aria-hidden="true">
-                  <span className="review-action-button__icon">💬</span>
+                  <span className="review-action-button__icon">
+                    <CommentIcon />
+                  </span>
                   <span className="review-action-button__label">{review.comments.length}</span>
                 </span>
               )}

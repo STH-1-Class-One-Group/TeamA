@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import {
   claimStamp,
   createComment,
@@ -70,7 +70,7 @@ function formatErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return '??븐슙???嶺뚳퐣瑗???? 嶺뚮쪇沅?쭛??怨몃뭵.';
+  return '요청을 처리하는 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.';
 }
 
 export default function App() {
@@ -119,7 +119,7 @@ export default function App() {
     feedPlaceFilterId: string | null;
   } | null>(null);
   const [stampActionStatus, setStampActionStatus] = useState<ApiStatus>('idle');
-  const [stampActionMessage, setStampActionMessage] = useState('??????????? ??? ????????????????? ?????????.');
+  const [stampActionMessage, setStampActionMessage] = useState('장소를 선택하면 오늘 방문 인증 가능 여부를 바로 확인할 수 있어요.');
   const [routeSubmitting, setRouteSubmitting] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeLikeUpdatingId, setRouteLikeUpdatingId] = useState<string | null>(null);
@@ -207,7 +207,29 @@ export default function App() {
     selectedPlace && currentPosition
       ? calculateDistanceMeters(currentPosition.latitude, currentPosition.longitude, selectedPlace.latitude, selectedPlace.longitude)
       : null;
-  const canCreateReview = Boolean(sessionUser && selectedPlace && todayStamp);
+  const knownMyReviews = useMemo(() => {
+    if (!sessionUser) {
+      return [];
+    }
+
+    const reviewMap = new Map();
+    for (const review of [...reviews, ...selectedPlaceReviews, ...(myPage?.reviews ?? [])]) {
+      if (review.userId !== sessionUser.id) {
+        continue;
+      }
+      reviewMap.set(review.id, review);
+    }
+
+    return [...reviewMap.values()];
+  }, [myPage?.reviews, reviews, selectedPlaceReviews, sessionUser]);
+  const hasCreatedReviewToday = useMemo(() => {
+    if (!sessionUser || !todayStamp) {
+      return false;
+    }
+
+    return knownMyReviews.some((review) => review.stampId === todayStamp.id || review.visitedAt.startsWith(todayStamp.stampedDate));
+  }, [knownMyReviews, sessionUser, todayStamp]);
+  const canCreateReview = Boolean(sessionUser && selectedPlace && todayStamp && !hasCreatedReviewToday);
   const placeNameById = useMemo(() => Object.fromEntries(places.map((place) => [place.id, place.name])), [places]);
   const {
     fetchCommunityRoutes,
@@ -343,173 +365,32 @@ export default function App() {
   }
 
   useEffect(() => {
-    void loadApp(true);
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== 'map' || mapLocationStatus !== 'idle') {
-      return;
-    }
-
-    void refreshCurrentPosition(false);
-  }, [activeTab, mapLocationStatus]);
-
-  useEffect(() => {
-    if (!notice) {
-      return;
-    }
-    const timeout = window.setTimeout(() => setNotice(null), 3200);
-    return () => window.clearTimeout(timeout);
-  }, [notice]);
-  useEffect(() => {
-    if (activeTab === 'my' && sessionUser && !myPage) {
-      void refreshMyPageForUser(sessionUser, true);
-    }
-    if (activeTab === 'my' && sessionUser?.isAdmin && !adminSummary) {
-      void refreshAdminSummary(true).catch((error) => {
-        setNotice(formatErrorMessage(error));
-      });
-    }
-  }, [activeTab, adminSummary, myPage, sessionUser]);
-
-  useEffect(() => {
-    if (activeTab !== 'course') {
-      return;
-    }
-
-    void ensureCuratedCourses().catch((error) => {
-      setNotice(formatErrorMessage(error));
-    });
-
-    const cached = communityRoutesCacheRef.current[communityRouteSort];
-    if (cached) {
-      setCommunityRoutes(cached);
-      return;
-    }
-
-    void fetchCommunityRoutes(communityRouteSort, true).catch((error) => {
-      setNotice(formatErrorMessage(error));
-    });
-  }, [activeTab, communityRouteSort]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (communityRoutesCacheRef.current[communityRouteSort]) {
-      return;
-    }
-
-    const run = () => {
-      void fetchCommunityRoutes(communityRouteSort, true).catch(() => {});
-    };
-
-    const timeout = window.setTimeout(run, 180);
-    return () => window.clearTimeout(timeout);
-  }, [communityRouteSort]);
-
-  useEffect(() => {
-    if (activeTab !== 'feed' && activeCommentReviewId === null) {
-      return;
-    }
-
-    void ensureFeedReviews().catch((error) => {
-      setNotice(formatErrorMessage(error));
-    });
-  }, [activeCommentReviewId, activeTab]);
-
-  useEffect(() => {
-    if (!selectedPlaceId) {
-      setSelectedPlaceReviews([]);
-      return;
-    }
-
-    const cachedReviews = placeReviewsCacheRef.current[selectedPlaceId];
-    if (cachedReviews) {
-      setSelectedPlaceReviews(cachedReviews);
-      return;
-    }
-
-    void getReviews({ placeId: selectedPlaceId })
-      .then((nextReviews) => {
-        placeReviewsCacheRef.current[selectedPlaceId] = nextReviews;
-        setSelectedPlaceReviews(nextReviews);
-      })
-      .catch((error) => {
-        setNotice(formatErrorMessage(error));
-      });
-  }, [selectedPlaceId]);
-
-  useEffect(() => {
-    if (activeTab !== 'feed' && activeCommentReviewId !== null) {
-      setActiveCommentReviewId(null);
-      setHighlightedCommentId(null);
-    }
-  }, [activeCommentReviewId, activeTab]);
-
-  function handleBottomNavChange(nextTab: Tab) {
-    setReturnView(null);
-    if (nextTab !== 'map') {
-      setSelectedRoutePreview(null);
-    }
-    if (nextTab !== 'feed') {
-      setActiveCommentReviewId(null);
-      setHighlightedCommentId(null);
-      setHighlightedReviewId(null);
-    }
-    if (nextTab === 'feed') {
-      setFeedPlaceFilterId(null);
-    }
-    goToTab(nextTab);
-  }
-
-  useEffect(() => {
-    if (!selectedPlaceId) {
-      return;
-    }
-
-    const isVisibleInCurrentCategory = filteredPlaces.some((place) => place.id === selectedPlaceId);
-    if (!isVisibleInCurrentCategory) {
-      commitRouteState(
-        {
-          tab: 'map',
-          placeId: null,
-          festivalId: null,
-          drawerState: 'closed',
-        },
-        'replace',
-      );
-    }
-  }, [commitRouteState, filteredPlaces, selectedPlaceId]);
-
-  useEffect(() => {
     if (!selectedPlace) {
-      setStampActionMessage('????섎ご???ルㅎ臾??濡?듆 ???노츓 ???꾪땿???띠럾?????????꾩룆?餓???????類싲뎅?롪퍓???');
+      setStampActionMessage('장소를 선택하면 오늘 방문 인증 가능 여부를 바로 확인할 수 있어요.');
       return;
     }
 
     if (!sessionUser) {
-      setStampActionMessage(`?β돦裕??筌뤿굝由?춯?${selectedPlace.name}??????꾩룆?餓??熬곣뫗?????꾪땿?熬? 嶺뚣볦뵰???????곗꽑??`);
+      setStampActionMessage(`${selectedPlace.name}에서 인증하려면 먼저 로그인해 주세요.`);
       return;
     }
 
     if (todayStamp) {
-      setStampActionMessage(`${todayStamp.visitLabel} ???꾪땿?熬? ???? 嶺뚣볦뵰?됀??怨몃뭵. ???노츓 ??怨뺢덧?? ?袁⑤뾼??놁뿉??꾩룆?餓???怨룹꽑???????곗꽑??`);
+      setStampActionMessage(`${todayStamp.visitLabel} 오늘 방문 인증을 이미 마쳤어요.`);
       return;
     }
 
     if (typeof selectedPlaceDistanceMeters !== 'number') {
-      setStampActionMessage('?熬곣뫗???熬곣뫚????筌먦끉逾??濡?듆 ???꾪땿???띠럾?????????꾩룆?餓???????類싲뎅?롪퍓???');
+      setStampActionMessage('현재 위치를 확인하면 오늘 방문 인증 가능 여부를 바로 안내해 드릴게요.');
       return;
     }
 
     if (selectedPlaceDistanceMeters <= STAMP_UNLOCK_RADIUS_METERS) {
-      setStampActionMessage(`?熬곣뫗????${formatDistanceMeters(selectedPlaceDistanceMeters)} 濾곌쑨?????깅뭵. 嶺뚯솘????꾩룆?餓????꾪땿?熬? 嶺뚣볦뵰???????곗꽑??`);
+      setStampActionMessage(`현장 반경 ${formatDistanceMeters(selectedPlaceDistanceMeters)} 안이에요. 지금 바로 오늘 방문 인증을 진행할 수 있어요.`);
       return;
     }
 
-    setStampActionMessage(`?熬곣뫗????${formatDistanceMeters(selectedPlaceDistanceMeters)} 濾곌쑨?????깅뭵. ${STAMP_UNLOCK_RADIUS_METERS}m ???깅さ?????곗꽑???좊듆 ???꾪땿?熬? ??????`);
+    setStampActionMessage(`현장까지 ${formatDistanceMeters(selectedPlaceDistanceMeters)} 남았어요. ${STAMP_UNLOCK_RADIUS_METERS}m 안으로 들어오면 오늘 방문 인증을 할 수 있어요.`);
   }, [selectedPlace, selectedPlaceDistanceMeters, sessionUser, todayStamp]);
 
   async function loadApp(withLoading: boolean) {
@@ -548,7 +429,7 @@ export default function App() {
       setBootstrapStatus('ready');
       if (authState === 'naver-success' && bootstrap.auth.user?.profileCompletedAt === null) {
         goToTab('my');
-        setNotice('??怨뚰맟?熬곣뫗諭??誘る닔? ???繞③뇡?彛??꾩룆?餓???怨뺢덧?? ?袁⑤뾼??놁뿉???怨룹꽑???????곗꽑??');
+        setNotice('닉네임을 정하면 피드와 코스를 같은 계정 기록으로 자연스럽게 이어갈 수 있어요.');
       }
     } catch (error) {
       setBootstrapError(formatErrorMessage(error));
@@ -560,13 +441,13 @@ export default function App() {
 
   async function refreshCurrentPosition(shouldFocusMap: boolean) {
     setMapLocationStatus('loading');
-    setMapLocationMessage('?熬곣뫗???熬곣뫚????筌먦끉逾???겶????곗꽑??');
+    setMapLocationMessage('현재 위치를 확인하고 있어요.');
 
     try {
       const nextPosition = await getCurrentDevicePosition();
       setCurrentPosition({ latitude: nextPosition.latitude, longitude: nextPosition.longitude });
       setMapLocationStatus('ready');
-      setMapLocationMessage(`?熬곣뫗???熬곣뫚??????곕뻣 ???뗫┃??怨몃뭵. ????쭜 ???⑥빵????${formatDistanceMeters(nextPosition.accuracyMeters)}???깅뭵.`);
+      setMapLocationMessage(`현재 위치를 확인했어요. 위치 오차는 약 ${formatDistanceMeters(nextPosition.accuracyMeters)}예요.`);
       if (shouldFocusMap) {
         setMapLocationFocusKey((current) => current + 1);
       }
@@ -584,7 +465,7 @@ export default function App() {
   async function handleClaimStamp(place: Place) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('?β돦裕??筌뤿굝????熬곣뫗?????꾪땿?熬? 嶺뚣볦뵰???????곗꽑??');
+      setNotice('로그인하면 현장 방문 인증을 하고 피드와 코스를 이어서 쓸 수 있어요.');
       return;
     }
 
@@ -598,7 +479,7 @@ export default function App() {
         longitude: nextPosition.longitude,
       });
       setStampState(nextStampState);
-      setNotice(`${place.name}????????노츓 ???꾪땿?熬? 嶺뚣볦뵰?됀??怨몃뭵.`);
+      setNotice(`${place.name}에서 오늘 방문 인증을 완료했어요.`);
       commitRouteState(
         {
           tab: 'map',
@@ -638,7 +519,7 @@ export default function App() {
       });
       upsertReviewCollections(createdReview);
       await refreshMyPageForUser(sessionUser);
-      setNotice('??怨뺢덧????節딇렩??怨몃뭵. ?띠룇?? ??筌???????怨쀬Ŧ ?袁⑤뾼??놃떐?? ??怨룹꽑???????곗꽑??');
+      setNotice('피드를 남겼어요. 같은 날에는 한 개의 피드만 작성할 수 있어요.');
       commitRouteState(
         {
           tab: 'map',
@@ -658,7 +539,7 @@ export default function App() {
   async function handleCreateComment(reviewId: string, body: string, parentId?: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('?癰?????節뗢뵛???좊듆 ?誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
+      setNotice('댓글을 남기려면 먼저 로그인해 주세요.');
       return;
     }
 
@@ -680,7 +561,7 @@ export default function App() {
   async function handleUpdateComment(reviewId: string, commentId: string, body: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('?癰?????瑜곸젧??濡?졎嶺??誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
+      setNotice('댓글을 수정하려면 먼저 로그인해 주세요.');
       return;
     }
 
@@ -705,7 +586,7 @@ export default function App() {
   async function handleDeleteComment(reviewId: string, commentId: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('?癰????????濡?졎嶺??誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
+      setNotice('댓글을 삭제하려면 먼저 로그인해 주세요.');
       return;
     }
 
@@ -730,7 +611,7 @@ export default function App() {
   async function handleDeleteReview(reviewId: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('??怨뺢덧???????濡?졎嶺??誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
+      setNotice('피드를 삭제하려면 먼저 로그인해 주세요.');
       return;
     }
 
@@ -762,7 +643,7 @@ export default function App() {
       if (highlightedReviewId === reviewId) {
         setHighlightedReviewId(null);
       }
-      setNotice('??怨뺢덧????????곗꽑??');
+      setNotice('피드를 삭제했어요.');
       if (activeTab === 'my') {
         await refreshMyPageForUser(sessionUser, true);
       }
@@ -776,7 +657,7 @@ export default function App() {
   async function handleToggleReviewLike(reviewId: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('??ル열???? ?熬곣뱿????좊듆 ?誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
+      setNotice('좋아요를 누르려면 먼저 로그인해 주세요.');
       return;
     }
 
@@ -798,7 +679,7 @@ export default function App() {
   async function handleToggleRouteLike(routeId: string) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('??ル열???? ?熬곣뱿????좊듆 ?誘る닔? ?β돦裕??筌뤿굝???낅슣?섋땻??');
+      setNotice('좋아요를 누르려면 먼저 로그인해 주세요.');
       return;
     }
     setRouteLikeUpdatingId(routeId);
@@ -819,7 +700,7 @@ export default function App() {
   async function handlePublishRoute(payload: { travelSessionId: string; title: string; description: string; mood: string }) {
     if (!sessionUser) {
       goToTab('my');
-      setRouteError('?β돦裕??筌뤿굝由????고뱺嶺???筌??筌뤾쑬????袁⑤뾼??놁뿉??꾩룇裕됵쭛???????곗꽑??');
+      setRouteError('로그인하면 여행 세션을 공개 코스로 발행할 수 있어요.');
       return;
     }
     setRouteSubmitting(true);
@@ -854,7 +735,7 @@ export default function App() {
           },
         };
       });
-      setNotice('??筌??筌뤾쑬?????ㅻ????袁⑤뾼??놁뿉??꾩룇裕됵쭛???곗꽑?? ??怨몄젷 ???섎???????利????롪퍔?δ빳?꾨ご????????곗꽑??');
+      setNotice('코스를 발행했어요. 이제 다른 사용자가 최신순과 좋아요순으로 볼 수 있어요.');
       setMyPageTab('routes');
     } catch (error) {
       setRouteError(formatErrorMessage(error));
@@ -888,7 +769,7 @@ export default function App() {
 
   async function handleUpdateProfile(nextNickname: string) {
     if (!nextNickname || nextNickname.length < 2) {
-      setProfileError('??怨뚰맟?熬? ???リ섣?????怨대쭜??怨쀬Ŧ ???놁졑???낅슣?섋땻??');
+      setProfileError('닉네임은 두 글자 이상으로 입력해 주세요.');
       return;
     }
     setProfileSaving(true);
@@ -899,7 +780,7 @@ export default function App() {
       if (auth.user) {
         setMyPage((current) => (current && auth.user ? { ...current, user: auth.user } : current));
       }
-      setNotice('??怨뚰맟?熬곣뫗諭????繞⑨쭛??怨몃뭵. ??怨몄젷 嶺뚮∥?????????怨쀬Ŧ ?꾩룆?餓???怨룹꽑???????곗꽑??');
+      setNotice('닉네임을 저장했어요. 이제 이 이름으로 피드와 코스가 표시돼요.');
     } catch (error) {
       setProfileError(formatErrorMessage(error));
     } finally {
@@ -914,7 +795,7 @@ export default function App() {
       setSessionUser(auth.user);
       setProviders(auth.providers);
       setMyPage(null);
-      setNotice('?β돦裕??熬곣뫗????곗꽑??');
+      setNotice('로그아웃했어요.');
     } catch (error) {
       setNotice(formatErrorMessage(error));
     } finally {
@@ -971,11 +852,46 @@ export default function App() {
     goToTab('map', 'replace');
   }
 
+  function handleBottomNavChange(nextTab: Tab) {
+    setSelectedRoutePreview(null);
+    handleCloseReviewComments();
+
+    if (nextTab !== 'feed') {
+      setFeedPlaceFilterId(null);
+      setHighlightedReviewId(null);
+    }
+
+    if (nextTab === 'map') {
+      commitRouteState(
+        {
+          tab: 'map',
+          placeId: selectedPlaceId,
+          festivalId: selectedFestivalId,
+          drawerState,
+        },
+        'replace',
+      );
+      return;
+    }
+
+    commitRouteState(
+      {
+        tab: nextTab,
+        placeId: null,
+        festivalId: null,
+        drawerState: 'closed',
+      },
+      'push',
+    );
+  }
+
   const reviewProofMessage = !sessionUser
-    ? '?β돦裕??筌뤿굝由??????꾪땿?熬? 嶺뚣볦뵰?????怨뺢덧????얜?????????곗꽑??'
-    : todayStamp
-      ? `${todayStamp.visitLabel} ???꾪땿?熬? ???곗꽑?? 嶺뚯솘???????????怨뺢덧???꾩룆?餓???節뗭춸 ?????곗꽑??`
-      : '???노츓 ???꾪땿?熬? 嶺뚣볦뵰??얠춺???怨뺢덧 ??얜????뺢퀗?????꾩룆?餓???????';
+    ? '로그인하면 오늘 방문 인증 뒤에만 피드를 남길 수 있어요.'
+    : hasCreatedReviewToday
+      ? '오늘은 이미 피드를 작성했어요. 피드는 하루에 하나만 남길 수 있어요.'
+      : todayStamp
+        ? `${todayStamp.visitLabel} 방문 인증이 완료됐어요. 오늘 피드 한 개를 작성할 수 있어요.`
+        : '오늘 방문 인증을 먼저 마쳐야 피드를 작성할 수 있어요.';
 
   return (
     <div className="map-app-shell">
@@ -1052,7 +968,7 @@ export default function App() {
         ) : (
           <div className="page-stage">
             {notice && <div className="floating-notice">{notice}</div>}
-            {bootstrapStatus === 'loading' && <section className="floating-status">??븐뻼???繞벿뮻???들뇡??????곗꽑??</section>}
+            {bootstrapStatus === 'loading' && <section className="floating-status">불러오는 중이에요.</section>}
             {bootstrapStatus === 'error' && <section className="floating-status floating-status--error">{bootstrapError}</section>}
 
             {activeTab === 'feed' && (
@@ -1134,9 +1050,8 @@ export default function App() {
         )}
 
         {canNavigateBack && (
-          <button type="button" className="app-back-button" onClick={handleNavigateBack} aria-label="\uC774\uC804\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30">
-            <span aria-hidden="true">&#8592;</span>
-            <span>\uC774\uC804</span>
+          <button type="button" className="app-back-button" onClick={handleNavigateBack} aria-label="이전 화면으로 돌아가기">
+            <span aria-hidden="true">{'\u2190'}</span>
           </button>
         )}
 
@@ -1145,4 +1060,5 @@ export default function App() {
     </div>
   );
 }
+
 

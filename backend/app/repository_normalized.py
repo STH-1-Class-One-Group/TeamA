@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from math import asin, cos, radians, sin, sqrt
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -690,10 +690,19 @@ def create_review(db: Session, payload: ReviewCreate, user_id: str, nickname: st
 
     existing_feed = db.scalars(select(Feed).where(Feed.stamp_id == stamp.stamp_id)).first()
     if existing_feed:
-        raise ValueError("媛숈? 諛⑸Ц ?ㅽ꺃?꾨줈???꾧린 ?섎굹留??④만 ???덉뼱??")
+        raise ValueError("같은 방문 인증으로는 피드를 한 번만 남길 수 있어요.")
+
+    now = utcnow_naive()
+    today = to_seoul_date(now)
+    day_start = datetime.combine(today, time.min)
+    day_end = day_start + timedelta(days=1)
+    existing_daily_feed = db.scalars(
+        select(Feed.feed_id).where(Feed.user_id == user_id, Feed.created_at >= day_start, Feed.created_at < day_end)
+    ).first()
+    if existing_daily_feed:
+        raise ValueError("피드는 하루에 하나만 작성할 수 있어요.")
 
     user = get_or_create_user(db, user_id, nickname)
-    now = utcnow_naive()
     feed = Feed(
         position_id=place.position_id,
         user_id=user.user_id,
@@ -1049,6 +1058,8 @@ def load_public_bundle(settings: Settings) -> dict:
 
 def import_public_bundle(db: Session, settings: Settings) -> PublicImportResponse:
     return sync_public_bundle(db, settings)
+
+
 
 
 

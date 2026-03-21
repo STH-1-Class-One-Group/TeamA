@@ -304,7 +304,7 @@ export function MyPagePanel({
                     <div className="review-card__top review-card__top--feed">
                       <div className="review-card__title-block review-card__title-block--feed">
                         <p className="eyebrow">{review.mood}</p>
-                        <strong className="review-card__title">{review.placeName}</strong>
+                        <button type="button" className="review-card__place-anchor" onClick={() => onOpenPlace(review.placeId)}><strong className="review-card__title">{review.placeName}</strong></button>
                         <p className="review-card__author-line">{review.visitLabel} · {review.visitedAt}</p>
                       </div>
                     </div>
@@ -315,15 +315,8 @@ export function MyPagePanel({
                     </div>
                     <p className="review-card__body">{review.body}</p>
                     <div className="review-card__actions review-card__actions--my-feed">
-                      <button type="button" className="review-card__place-link" onClick={() => onOpenReview(review.id)}>
-                        내 피드 보기
-                      </button>
-                      <button type="button" className="review-link-button" onClick={() => onOpenPlace(review.placeId)}>
-                        이 장소 보기
-                      </button>
-                      <button type="button" className="review-card__place-link review-card__place-link--danger" onClick={() => void onDeleteReview(review.id)}>
-                        피드 삭제
-                      </button>
+                      <button type="button" className="review-card__place-link" onClick={() => onOpenReview(review.id)}>내 피드 보기</button>
+                      <button type="button" className="review-card__place-link review-card__place-link--danger" onClick={() => void onDeleteReview(review.id)}>삭제</button>
                     </div>
                   </article>
                 ))}
@@ -464,6 +457,8 @@ export function MyPagePanel({
     </section>
   );
 }
+
+
 
 
 

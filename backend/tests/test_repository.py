@@ -83,6 +83,34 @@ def test_review_comment_and_my_page_flow(tmp_path: Path):
     assert my_page.stamp_logs[0].place_id == 'hanbat-forest'
 
 
+def test_review_is_limited_to_one_per_day(tmp_path: Path):
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    first_stamp_state = claim_stamp_for(session, 'user-1', 'hanbat-forest')
+    create_review(
+        session,
+        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(first_stamp_state, 'hanbat-forest'), body='?? ? ????.', mood='??', imageUrl=None),
+        'user-1',
+        '??',
+    )
+
+    second_stamp_state = claim_stamp_for(session, 'user-1', 'expo-bridge')
+
+    blocked = False
+    try:
+        create_review(
+            session,
+            ReviewCreate(placeId='expo-bridge', stampId=stamp_id_for_place(second_stamp_state, 'expo-bridge'), body='?? ? ?? ????.', mood='???', imageUrl=None),
+            'user-1',
+            '??',
+        )
+    except ValueError:
+        blocked = True
+
+    assert blocked is True
+
+
 def test_stamp_requires_real_distance_and_same_day_dedup(tmp_path: Path):
     session = build_session(tmp_path)
     load_seed_data(session)

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+﻿import { useRef } from 'react';
 import { categoryInfo } from '../lib/categories';
 import { ReviewComposer } from './ReviewComposer';
 import type { ApiStatus, DrawerState, Place, Review, ReviewMood, StampLog } from '../types';
@@ -124,7 +124,7 @@ export function PlaceDetailSheet({
             <p className="place-drawer__summary">{place.summary}</p>
           </div>
           <button type="button" className="place-drawer__close" onClick={onClose} aria-label="닫기">
-            ×
+            {'\u00D7'}
           </button>
         </div>
 
@@ -145,13 +145,13 @@ export function PlaceDetailSheet({
 
         <div className="sheet-card place-drawer__proof-card">
           <div className="place-drawer__proof-copy">
-            <strong>현장 스탬프</strong>
+            <strong>오늘 방문 인증</strong>
             <p>{stampActionMessage}</p>
           </div>
           <div className="place-drawer__proof-action">
             {!loggedIn ? (
               <>
-                <span className="place-drawer__proof-kicker">피드와 코스 시작</span>
+                <span className="place-drawer__proof-kicker">피드와 코스 해금</span>
                 <button type="button" className="primary-button place-drawer__proof-button" onClick={onRequestLogin}>
                   로그인하고 시작
                 </button>
@@ -164,10 +164,10 @@ export function PlaceDetailSheet({
                 disabled={!canClaimStamp || stampActionStatus === 'loading'}
               >
                 {todayStamp
-                  ? `${todayStamp.visitLabel} 완료`
+                  ? '오늘 인증 완료'
                   : stampActionStatus === 'loading'
                     ? '확인 중'
-                    : '오늘 스탬프 찍기'}
+                    : '오늘 인증하기'}
               </button>
             )}
           </div>
@@ -211,7 +211,7 @@ export function PlaceDetailSheet({
         <div className="section-title-row section-title-row--tight">
           <div>
             <p className="eyebrow">PLACE FEED</p>
-            <h3>이 장소의 피드</h3>
+            <h3>이 장소 피드</h3>
           </div>
           <button type="button" className="secondary-button place-drawer__feed-button" onClick={onOpenFeedReview}>
             피드에서 보기
@@ -235,10 +235,10 @@ export function PlaceDetailSheet({
           </div>
         ) : (
           <div className="sheet-card stack-gap place-drawer__preview-empty">
-            <strong>아직 등록된 피드가 없어요</strong>
-            <p className="section-copy">현장 스탬프를 찍은 뒤 첫 피드를 남겨 보세요.</p>
+            <strong>아직 등록된 피드가 없어요.</strong>
+            <p className="section-copy">오늘 방문 인증을 마친 뒤 첫 피드를 남겨 보세요.</p>
             <button type="button" className="secondary-button primary-button--block" onClick={onOpenFeedReview}>
-              피드 탭 열기
+              피드 보러가기
             </button>
           </div>
         )}

@@ -1,4 +1,4 @@
-/* 2026-03-18 prototype reset */
+﻿/* 2026-03-18 prototype reset */
 .phone-shell--map {
   display: block !important;
 }
@@ -708,20 +708,19 @@ input.visually-hidden[type='file'] {
   z-index: 160 !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 8px !important;
-  min-height: 42px !important;
-  padding: 0 14px !important;
+  justify-content: center !important;
+  width: 46px !important;
+  height: 46px !important;
+  padding: 0 !important;
   border-radius: 999px !important;
   border: 1px solid rgba(255, 127, 168, 0.22) !important;
   background: rgba(255, 249, 252, 0.96) !important;
   box-shadow: 0 10px 20px rgba(74, 44, 63, 0.08) !important;
   color: var(--ink) !important;
-  font-size: 13px !important;
-  font-weight: 700 !important;
 }
 
 .app-back-button span:first-child {
-  font-size: 15px !important;
+  font-size: 18px !important;
   line-height: 1 !important;
 }
 
@@ -884,7 +883,7 @@ body {
 }
 
 .review-card__actions--my-feed {
-  justify-content: space-between !important;
+  justify-content: flex-start !important;
   gap: 10px !important;
   flex-wrap: wrap !important;
 }
@@ -898,7 +897,12 @@ body {
 }
 
 .place-drawer__proof-action {
-  justify-items: end !important;
+  justify-items: stretch !important;
+}
+
+.place-drawer__proof-card {
+  align-items: stretch !important;
+  grid-template-columns: 1fr !important;
 }
 
 .place-drawer__proof-kicker {
@@ -999,3 +1003,32 @@ body {
 .review-card__actions--course {
   margin-top: 12px;
 }
+
+
+.place-drawer__proof-card {
+  align-items: stretch !important;
+  flex-direction: column !important;
+}
+
+.place-drawer__proof-action {
+  width: 100% !important;
+  justify-items: stretch !important;
+}
+
+.place-drawer__proof-button {
+  width: 100% !important;
+  min-height: 48px !important;
+  border-radius: 18px !important;
+}
+
+.review-action-button__svg {
+  width: 15px !important;
+  height: 15px !important;
+  stroke-width: 2px !important;
+}
+
+.review-card__actions--my-feed .review-card__place-link--danger {
+  margin-left: auto !important;
+}
+
+
