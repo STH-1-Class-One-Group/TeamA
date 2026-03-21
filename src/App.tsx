@@ -78,8 +78,11 @@ function formatErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message;
   }
-  return '요청을 처리하지 못했어요. 잠시 뒤에 다시 시도해 주세요.';
+  return '\uC694\uCCAD\uC744 \uCC98\uB9AC\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694. \uC7A0\uC2DC \uB4A4\uC5D0 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.';
+}
 
+function reportBackgroundError(error: unknown) {
+  console.error(error);
 }
 
 function TabPanelFallback() {
@@ -432,7 +435,7 @@ export default function App() {
       setFeedNextCursor(page.nextCursor);
       setFeedHasMore(Boolean(page.nextCursor));
     } catch (error) {
-      setNotice(formatErrorMessage(error));
+      reportBackgroundError(error);
     } finally {
       setFeedLoadingMore(false);
     }
@@ -465,7 +468,7 @@ export default function App() {
       setMyCommentsNextCursor(page.nextCursor);
       setMyCommentsHasMore(Boolean(page.nextCursor));
     } catch (error) {
-      setNotice(formatErrorMessage(error));
+      reportBackgroundError(error);
     } finally {
       setMyCommentsLoadingMore(false);
     }
@@ -524,22 +527,22 @@ export default function App() {
 
   useEffect(() => {
     if (activeTab === 'feed') {
-      void ensureFeedReviews().catch((error) => setNotice(formatErrorMessage(error)));
+      void ensureFeedReviews().catch(reportBackgroundError);
       return;
     }
 
     if (activeTab === 'course') {
-      void ensureCuratedCourses().catch((error) => setNotice(formatErrorMessage(error)));
-      void fetchCommunityRoutes(communityRouteSort).catch((error) => setNotice(formatErrorMessage(error)));
+      void ensureCuratedCourses().catch(reportBackgroundError);
+      void fetchCommunityRoutes(communityRouteSort).catch(reportBackgroundError);
       return;
     }
 
     if (activeTab === 'my') {
       if (sessionUser && myPage === null) {
-        void refreshMyPageForUser(sessionUser, true).catch((error) => setNotice(formatErrorMessage(error)));
+        void refreshMyPageForUser(sessionUser, true).catch(reportBackgroundError);
       }
       if (sessionUser?.isAdmin && myPageTab === 'admin' && adminSummary === null) {
-        void refreshAdminSummary().catch((error) => setNotice(formatErrorMessage(error)));
+        void refreshAdminSummary().catch(reportBackgroundError);
       }
       if (sessionUser && myPage && myPageTab === 'comments' && !myCommentsLoadedOnce) {
         void loadMoreMyComments(true);
@@ -577,7 +580,7 @@ export default function App() {
         placeReviewsCacheRef.current[selectedPlaceId] = nextReviews;
         setSelectedPlaceReviews(nextReviews);
       })
-      .catch((error) => setNotice(formatErrorMessage(error)));
+      .catch(reportBackgroundError);
   }, [activeTab, selectedPlaceId]);
 
   async function loadApp(withLoading: boolean) {
@@ -1219,9 +1222,6 @@ export default function App() {
           />
         ) : (
           <div className="page-stage">
-            {notice && <div className="floating-notice">{notice}</div>}
-            {bootstrapStatus === 'loading' && <section className="floating-status">데이터를 불러오고 있어요.</section>}
-            {bootstrapStatus === 'loading' && <section className="floating-status">데이터를 불러오고 있어요.</section>}
 
             {activeTab === 'feed' && (
               <FeedTab
@@ -1267,7 +1267,7 @@ export default function App() {
                 onChangeSort={(sort) => {
                   setCommunityRouteSort(sort);
                   void fetchCommunityRoutes(sort)
-                    .catch((error) => setNotice(formatErrorMessage(error)));
+                    .catch(reportBackgroundError);
                 }}
                 onToggleLike={handleToggleRouteLike}
                 onOpenPlace={handleOpenPlaceWithReturn}
