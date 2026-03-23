@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  getReviews,
-} from './api/client';
+import { useState } from 'react';
+import { getReviews } from './api/client';
 import { BottomNav } from './components/BottomNav';
 import { CourseTab } from './components/CourseTab';
 import { EventTab } from './components/EventTab';
@@ -9,67 +7,24 @@ import { FeedTab } from './components/FeedTab';
 import { FloatingBackButton } from './components/FloatingBackButton';
 import { MapTabStage } from './components/MapTabStage';
 import { MyPagePanel } from './components/MyPagePanel';
-import {
-  useAppRouteState,
-  clearAuthQueryParams,
-  getInitialNotice,
-  getLoginReturnUrl,
-  getInitialMapViewport,
-  updateMapViewportInUrl,
-} from './hooks/useAppRouteState';
+import { useAppRouteState, getInitialMapViewport, updateMapViewportInUrl } from './hooks/useAppRouteState';
 import { useAppDataState } from './hooks/useAppDataState';
 import { useAppTabDataLoaders } from './hooks/useAppTabDataLoaders';
 import { useAppMutationActions } from './hooks/useAppMutationActions';
 import { useAppBootstrapActions } from './hooks/useAppBootstrapActions';
-import { useAppNavigationActions } from './hooks/useAppNavigationActions';
 import { useAppPaginationActions } from './hooks/useAppPaginationActions';
+import { useAppNavigationActions } from './hooks/useAppNavigationActions';
+import { useAppDerivedState } from './hooks/useAppDerivedState';
 import { useAppUIStore } from './store/app-ui-store';
 import { useAppRuntimeStore } from './store/app-runtime-store';
-import {
-  calculateDistanceMeters,
-  formatDistanceMeters,
-  getLatestPlaceStamp,
-  getPlaceVisitCount,
-  getTodayStampLog,
-} from './lib/visits';
-import type {
-  ApiStatus,
-  Category,
-  CommunityRouteSort,
-  Place,
-  RoutePreview,
-  Tab,
-} from './types';
+import { formatDistanceMeters } from './lib/visits';
 
 const STAMP_UNLOCK_RADIUS_METERS = 120;
 
 
 
-function filterPlacesByCategory(places: Place[], category: Category) {
-  if (category === 'all') {
-    return places;
-  }
-
-  return places.filter((place) => place.category === category);
-}
-
-function formatErrorMessage(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return '\uC694\uCCAD\uC744 \uCC98\uB9AC\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694. \uC7A0\uC2DC \uB4A4\uC5D0 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.';
-}
-
 function reportBackgroundError(error: unknown) {
   console.error(error);
-}
-
-function TabPanelFallback() {
-  return (
-    <section className="page-panel page-panel--scrollable page-panel--loading">
-      <div className="page-panel__loading-copy">Loading...</div>
-    </section>
-  );
 }
 
 export default function App() {
@@ -206,62 +161,34 @@ export default function App() {
     resetReviewCaches,
   } = useAppDataState(selectedPlaceId);
 
-  const filteredPlaces = useMemo(() => filterPlacesByCategory(places, activeCategory), [places, activeCategory]);
-  const selectedPlace = useMemo(() => {
-    if (!selectedPlaceId) {
-      return null;
-    }
+  const {
+    filteredPlaces,
+    selectedPlace,
+    routePreviewPlaces,
+    selectedFestival,
+    todayStamp,
+    latestStamp,
+    visitCount,
+    selectedPlaceDistanceMeters,
+    hasCreatedReviewToday,
+    canCreateReview,
+    placeNameById,
+    reviewProofMessage,
+  } = useAppDerivedState({
+    places,
+    festivals,
+    activeCategory,
+    selectedPlaceId,
+    selectedFestivalId,
+    selectedRoutePreview,
+    stampState,
+    currentPosition,
+    sessionUser,
+    reviews,
+    selectedPlaceReviews,
+    myPageReviews: myPage?.reviews ?? [],
+  });
 
-    return places.find((place) => place.id === selectedPlaceId) ?? null;
-  }, [places, selectedPlaceId]);
-  const routePreviewPlaces = useMemo(() => {
-    if (!selectedRoutePreview) {
-      return [];
-    }
-
-    return selectedRoutePreview.placeIds
-      .map((placeId) => places.find((place) => place.id === placeId) ?? null)
-      .filter(Boolean) as Place[];
-  }, [places, selectedRoutePreview]);
-
-  const selectedFestival = useMemo(() => {
-    if (!selectedFestivalId) {
-      return null;
-    }
-
-    return festivals.find((festival) => festival.id === selectedFestivalId) ?? null;
-  }, [festivals, selectedFestivalId]);
-  const todayStamp = selectedPlace ? getTodayStampLog(stampState.logs, selectedPlace.id) : null;
-  const latestStamp = selectedPlace ? getLatestPlaceStamp(stampState.logs, selectedPlace.id) : null;
-  const visitCount = selectedPlace ? getPlaceVisitCount(stampState.logs, selectedPlace.id) : 0;
-  const selectedPlaceDistanceMeters =
-    selectedPlace && currentPosition
-      ? calculateDistanceMeters(currentPosition.latitude, currentPosition.longitude, selectedPlace.latitude, selectedPlace.longitude)
-      : null;
-  const knownMyReviews = useMemo(() => {
-    if (!sessionUser) {
-      return [];
-    }
-
-    const reviewMap = new Map<string, (typeof reviews)[number]>();
-    for (const review of [...reviews, ...selectedPlaceReviews, ...(myPage?.reviews ?? [])]) {
-      if (review.userId !== sessionUser.id) {
-        continue;
-      }
-      reviewMap.set(review.id, review);
-    }
-
-    return [...reviewMap.values()];
-  }, [myPage?.reviews, reviews, selectedPlaceReviews, sessionUser]);
-  const hasCreatedReviewToday = useMemo(() => {
-    if (!sessionUser || !todayStamp) {
-      return false;
-    }
-
-    return knownMyReviews.some((review) => review.stampId === todayStamp.id || review.visitedAt.startsWith(todayStamp.stampedDate));
-  }, [knownMyReviews, sessionUser, todayStamp]);
-  const canCreateReview = Boolean(sessionUser && selectedPlace && todayStamp && !hasCreatedReviewToday);
-  const placeNameById = useMemo(() => Object.fromEntries(places.map((place) => [place.id, place.name])), [places]);
   const {
     fetchCommunityRoutes,
     ensureFeedReviews,
@@ -454,14 +381,6 @@ export default function App() {
     setProviders,
     setIsLoggingOut,
   });
-
-  const reviewProofMessage = !sessionUser
-    ? '\uB85C\uADF8\uC778\uD558\uBA74 \uC624\uB298 \uBC29\uBB38 \uC778\uC99D \uB4A4\uC5D0\uB9CC \uD53C\uB4DC\uB97C \uB0A8\uAE38 \uC218 \uC788\uC5B4\uC694.'
-    : hasCreatedReviewToday
-      ? '\uC624\uB298\uC740 \uC774\uBBF8 \uC774 \uC7A5\uC18C \uD53C\uB4DC\uB97C \uC791\uC131\uD588\uC5B4\uC694. \uD53C\uB4DC\uB294 \uD558\uB8E8\uC5D0 \uD558\uB098\uB9CC \uB0A8\uAE38 \uC218 \uC788\uC5B4\uC694.'
-      : todayStamp
-        ? `${todayStamp.visitLabel} \uBC29\uBB38 \uC2A4\uD0EC\uD504\uAC00 \uD655\uC778\uB410\uC5B4\uC694. \uC624\uB298 \uD53C\uB4DC \uD55C \uAC1C\uB97C \uC791\uC131\uD560 \uC218 \uC788\uC5B4\uC694.`
-        : '\uC624\uB298 \uBC29\uBB38 \uC2A4\uD0EC\uD504\uB97C \uBA3C\uC800 \uCC0D\uC73C\uBA74 \uD53C\uB4DC\uB97C \uC791\uC131\uD560 \uC218 \uC788\uC5B4\uC694.';
 
   return (
     <div className="map-app-shell">
