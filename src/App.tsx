@@ -41,6 +41,7 @@ import {
 import { useAppDataState } from './hooks/useAppDataState';
 import { useAppTabDataLoaders } from './hooks/useAppTabDataLoaders';
 import { useAppUIStore } from './store/app-ui-store';
+import { useAppRuntimeStore } from './store/app-runtime-store';
 import { getCurrentDevicePosition } from './lib/geolocation';
 import {
   calculateDistanceMeters,
@@ -115,17 +116,28 @@ export default function App() {
   const setFeedPlaceFilterId = useAppUIStore((state) => state.setFeedPlaceFilterId);
   const activeCategory = useAppUIStore((state) => state.activeCategory);
   const setActiveCategory = useAppUIStore((state) => state.setActiveCategory);
-  const [notice, setNotice] = useState<string | null>(getInitialNotice);
-  const [currentPosition, setCurrentPosition] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [mapLocationStatus, setMapLocationStatus] = useState<ApiStatus>('idle');
-  const [mapLocationMessage, setMapLocationMessage] = useState<string | null>(null);
-  const [mapLocationFocusKey, setMapLocationFocusKey] = useState(0);
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
-  const [reviewError, setReviewError] = useState<string | null>(null);
-  const [reviewLikeUpdatingId, setReviewLikeUpdatingId] = useState<string | null>(null);
-  const [commentSubmittingReviewId, setCommentSubmittingReviewId] = useState<string | null>(null);
-  const [commentMutatingId, setCommentMutatingId] = useState<string | null>(null);
-  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
+  const notice = useAppRuntimeStore((state) => state.notice);
+  const setNotice = useAppRuntimeStore((state) => state.setNotice);
+  const currentPosition = useAppRuntimeStore((state) => state.currentPosition);
+  const setCurrentPosition = useAppRuntimeStore((state) => state.setCurrentPosition);
+  const mapLocationStatus = useAppRuntimeStore((state) => state.mapLocationStatus);
+  const setMapLocationStatus = useAppRuntimeStore((state) => state.setMapLocationStatus);
+  const mapLocationMessage = useAppRuntimeStore((state) => state.mapLocationMessage);
+  const setMapLocationMessage = useAppRuntimeStore((state) => state.setMapLocationMessage);
+  const mapLocationFocusKey = useAppRuntimeStore((state) => state.mapLocationFocusKey);
+  const setMapLocationFocusKey = useAppRuntimeStore((state) => state.setMapLocationFocusKey);
+  const reviewSubmitting = useAppRuntimeStore((state) => state.reviewSubmitting);
+  const setReviewSubmitting = useAppRuntimeStore((state) => state.setReviewSubmitting);
+  const reviewError = useAppRuntimeStore((state) => state.reviewError);
+  const setReviewError = useAppRuntimeStore((state) => state.setReviewError);
+  const reviewLikeUpdatingId = useAppRuntimeStore((state) => state.reviewLikeUpdatingId);
+  const setReviewLikeUpdatingId = useAppRuntimeStore((state) => state.setReviewLikeUpdatingId);
+  const commentSubmittingReviewId = useAppRuntimeStore((state) => state.commentSubmittingReviewId);
+  const setCommentSubmittingReviewId = useAppRuntimeStore((state) => state.setCommentSubmittingReviewId);
+  const commentMutatingId = useAppRuntimeStore((state) => state.commentMutatingId);
+  const setCommentMutatingId = useAppRuntimeStore((state) => state.setCommentMutatingId);
+  const deletingReviewId = useAppRuntimeStore((state) => state.deletingReviewId);
+  const setDeletingReviewId = useAppRuntimeStore((state) => state.setDeletingReviewId);
   const activeCommentReviewId = useAppUIStore((state) => state.activeCommentReviewId);
   const setActiveCommentReviewId = useAppUIStore((state) => state.setActiveCommentReviewId);
   const highlightedCommentId = useAppUIStore((state) => state.highlightedCommentId);
@@ -134,22 +146,38 @@ export default function App() {
   const setHighlightedReviewId = useAppUIStore((state) => state.setHighlightedReviewId);
   const returnView = useAppUIStore((state) => state.returnView);
   const setReturnView = useAppUIStore((state) => state.setReturnView);
-  const [stampActionStatus, setStampActionStatus] = useState<ApiStatus>('idle');
-  const [stampActionMessage, setStampActionMessage] = useState('장소를 선택하면 오늘 스탬프 가능 여부를 바로 확인할 수 있어요.');
-  const [routeSubmitting, setRouteSubmitting] = useState(false);
-  const [routeError, setRouteError] = useState<string | null>(null);
-  const [routeLikeUpdatingId, setRouteLikeUpdatingId] = useState<string | null>(null);
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [myPageError, setMyPageError] = useState<string | null>(null);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [feedNextCursor, setFeedNextCursor] = useState<string | null>(null);
-  const [feedHasMore, setFeedHasMore] = useState(false);
-  const [feedLoadingMore, setFeedLoadingMore] = useState(false);
-  const [myCommentsNextCursor, setMyCommentsNextCursor] = useState<string | null>(null);
-  const [myCommentsHasMore, setMyCommentsHasMore] = useState(false);
-  const [myCommentsLoadingMore, setMyCommentsLoadingMore] = useState(false);
-  const [myCommentsLoadedOnce, setMyCommentsLoadedOnce] = useState(false);
+  const stampActionStatus = useAppRuntimeStore((state) => state.stampActionStatus);
+  const setStampActionStatus = useAppRuntimeStore((state) => state.setStampActionStatus);
+  const stampActionMessage = useAppRuntimeStore((state) => state.stampActionMessage);
+  const setStampActionMessage = useAppRuntimeStore((state) => state.setStampActionMessage);
+  const routeSubmitting = useAppRuntimeStore((state) => state.routeSubmitting);
+  const setRouteSubmitting = useAppRuntimeStore((state) => state.setRouteSubmitting);
+  const routeError = useAppRuntimeStore((state) => state.routeError);
+  const setRouteError = useAppRuntimeStore((state) => state.setRouteError);
+  const routeLikeUpdatingId = useAppRuntimeStore((state) => state.routeLikeUpdatingId);
+  const setRouteLikeUpdatingId = useAppRuntimeStore((state) => state.setRouteLikeUpdatingId);
+  const profileSaving = useAppRuntimeStore((state) => state.profileSaving);
+  const setProfileSaving = useAppRuntimeStore((state) => state.setProfileSaving);
+  const profileError = useAppRuntimeStore((state) => state.profileError);
+  const setProfileError = useAppRuntimeStore((state) => state.setProfileError);
+  const myPageError = useAppRuntimeStore((state) => state.myPageError);
+  const setMyPageError = useAppRuntimeStore((state) => state.setMyPageError);
+  const isLoggingOut = useAppRuntimeStore((state) => state.isLoggingOut);
+  const setIsLoggingOut = useAppRuntimeStore((state) => state.setIsLoggingOut);
+  const feedNextCursor = useAppRuntimeStore((state) => state.feedNextCursor);
+  const setFeedNextCursor = useAppRuntimeStore((state) => state.setFeedNextCursor);
+  const feedHasMore = useAppRuntimeStore((state) => state.feedHasMore);
+  const setFeedHasMore = useAppRuntimeStore((state) => state.setFeedHasMore);
+  const feedLoadingMore = useAppRuntimeStore((state) => state.feedLoadingMore);
+  const setFeedLoadingMore = useAppRuntimeStore((state) => state.setFeedLoadingMore);
+  const myCommentsNextCursor = useAppRuntimeStore((state) => state.myCommentsNextCursor);
+  const setMyCommentsNextCursor = useAppRuntimeStore((state) => state.setMyCommentsNextCursor);
+  const myCommentsHasMore = useAppRuntimeStore((state) => state.myCommentsHasMore);
+  const setMyCommentsHasMore = useAppRuntimeStore((state) => state.setMyCommentsHasMore);
+  const myCommentsLoadingMore = useAppRuntimeStore((state) => state.myCommentsLoadingMore);
+  const setMyCommentsLoadingMore = useAppRuntimeStore((state) => state.setMyCommentsLoadingMore);
+  const myCommentsLoadedOnce = useAppRuntimeStore((state) => state.myCommentsLoadedOnce);
+  const setMyCommentsLoadedOnce = useAppRuntimeStore((state) => state.setMyCommentsLoadedOnce);
 
   const {
     bootstrapStatus,
@@ -487,6 +515,12 @@ export default function App() {
     await ensureReviewLoadedById(reviewId);
     handleOpenReviewComments(reviewId, commentId);
   }
+
+  useEffect(() => {
+    if (notice === null) {
+      setNotice(getInitialNotice());
+    }
+  }, [notice, setNotice]);
 
   useEffect(() => {
     if (!selectedPlace) {
