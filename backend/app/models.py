@@ -50,6 +50,7 @@ class PlaceOut(ApiModel):
     jam_color: str = Field(alias='jamColor')
     accent_color: str = Field(alias='accentColor')
     image_url: str | None = Field(default=None, alias='imageUrl')
+    image_storage_path: str | None = Field(default=None, alias='imageStoragePath')
     latitude: float
     longitude: float
     summary: str

@@ -91,6 +91,7 @@ class MapPlace(Base):
     summary: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    image_storage_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     vibe_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     visit_time: Mapped[str] = mapped_column(String(50), nullable=False)
     route_hint: Mapped[str] = mapped_column(String(255), nullable=False)
