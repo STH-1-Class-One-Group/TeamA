@@ -1,17 +1,37 @@
 import { useRef, useState } from 'react';
 import type {
   AdminSummaryResponse,
+  AuthProvider,
   BootstrapResponse,
   CommunityRouteSort,
+  FestivalItem,
   MyPageResponse,
   RoutePreview,
+  SessionUser,
   UserRoute,
 } from '../types';
 
+const emptyProviders: AuthProvider[] = [
+  { key: 'naver', label: '\uB124\uC774\uBC84', isEnabled: false, loginUrl: null },
+  { key: 'kakao', label: '\uCE74\uCE74\uC624', isEnabled: false, loginUrl: null },
+];
+
 export function useAppDataState(selectedPlaceId: string | null) {
+  const [bootstrapStatus, setBootstrapStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [places, setPlaces] = useState<BootstrapResponse['places']>([]);
+  const [festivals, setFestivals] = useState<FestivalItem[]>([]);
   const [reviews, setReviews] = useState<BootstrapResponse['reviews']>([]);
   const [selectedPlaceReviews, setSelectedPlaceReviews] = useState<BootstrapResponse['reviews']>([]);
   const [courses, setCourses] = useState<BootstrapResponse['courses']>([]);
+  const [stampState, setStampState] = useState<BootstrapResponse['stamps']>({
+    collectedPlaceIds: [],
+    logs: [],
+    travelSessions: [],
+  });
+  const [hasRealData, setHasRealData] = useState(true);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [providers, setProviders] = useState<AuthProvider[]>(emptyProviders);
   const [communityRoutes, setCommunityRoutes] = useState<UserRoute[]>([]);
   const [communityRouteSort, setCommunityRouteSort] = useState<CommunityRouteSort>('popular');
   const [myPage, setMyPage] = useState<MyPageResponse | null>(null);
@@ -70,12 +90,28 @@ export function useAppDataState(selectedPlaceId: string | null) {
   }
 
   return {
+    bootstrapStatus,
+    setBootstrapStatus,
+    bootstrapError,
+    setBootstrapError,
+    places,
+    setPlaces,
+    festivals,
+    setFestivals,
     reviews,
     setReviews,
     selectedPlaceReviews,
     setSelectedPlaceReviews,
     courses,
     setCourses,
+    stampState,
+    setStampState,
+    hasRealData,
+    setHasRealData,
+    sessionUser,
+    setSessionUser,
+    providers,
+    setProviders,
     communityRoutes,
     setCommunityRoutes,
     communityRouteSort,

@@ -16,13 +16,13 @@ import {
   getReviewFeedPage,
   getReviews,
   importPublicData,
+  logout,
   toggleCommunityRouteLike,
   toggleReviewLike,
   updatePlaceVisibility,
+  updateProfile,
   uploadReviewImage,
 } from './api/client';
-import { useAuthStore } from './store/useAuthStore';
-import { useMapStore } from './store/useMapStore';
 import { BottomNav } from './components/BottomNav';
 import { CourseTab } from './components/CourseTab';
 import { EventTab } from './components/EventTab';
@@ -143,7 +143,10 @@ export default function App() {
   const [routeSubmitting, setRouteSubmitting] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeLikeUpdatingId, setRouteLikeUpdatingId] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [myPageError, setMyPageError] = useState<string | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [feedNextCursor, setFeedNextCursor] = useState<string | null>(null);
   const [feedHasMore, setFeedHasMore] = useState(false);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
@@ -153,39 +156,28 @@ export default function App() {
   const [myCommentsLoadedOnce, setMyCommentsLoadedOnce] = useState(false);
 
   const {
-    sessionUser,
-    setSessionUser,
-    providers,
-    setProviders,
-    isLoggingOut,
-    profileSaving,
-    profileError,
-    setProfileError,
-    logout: logoutAction,
-    updateProfile: updateProfileAction,
-  } = useAuthStore();
-
-  const {
     bootstrapStatus,
+    setBootstrapStatus,
     bootstrapError,
+    setBootstrapError,
     places,
     setPlaces,
     festivals,
     setFestivals,
-    stampState,
-    setStampState,
-    hasRealData,
-    setHasRealData,
-    loadBootstrap,
-  } = useMapStore();
-
-  const {
     reviews,
     setReviews,
     selectedPlaceReviews,
     setSelectedPlaceReviews,
     courses,
     setCourses,
+    stampState,
+    setStampState,
+    hasRealData,
+    setHasRealData,
+    sessionUser,
+    setSessionUser,
+    providers,
+    setProviders,
     communityRoutes,
     setCommunityRoutes,
     communityRouteSort,
@@ -530,7 +522,7 @@ export default function App() {
   }, [selectedPlace, selectedPlaceDistanceMeters, sessionUser, todayStamp]);
 
   useEffect(() => {
-    void loadApp();
+    void loadApp(true);
   }, []);
 
   useEffect(() => {
@@ -591,14 +583,26 @@ export default function App() {
       .catch(reportBackgroundError);
   }, [activeTab, selectedPlaceId]);
 
-  async function loadApp() {
+  async function loadApp(withLoading: boolean) {
     const authParams = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search);
     const authState = authParams?.get('auth');
 
-    try {
-      const result = await loadBootstrap();
+    if (withLoading) {
+      setBootstrapStatus('loading');
+    }
+    setBootstrapError(null);
 
-      setSessionUser(result.auth.user);
+    try {
+      const [bootstrap, festivalResult] = await Promise.all([
+        getMapBootstrap(),
+        getFestivals().catch(() => [] as FestivalItem[]),
+      ]);
+
+      setPlaces(bootstrap.places);
+      setFestivals(festivalResult);
+      setStampState(bootstrap.stamps);
+      setHasRealData(bootstrap.hasRealData);
+      setSessionUser(bootstrap.auth.user);
       resetReviewCaches();
       setFeedNextCursor(null);
       setFeedHasMore(false);
@@ -607,24 +611,26 @@ export default function App() {
       setMyCommentsHasMore(false);
       setMyCommentsLoadingMore(false);
       setMyCommentsLoadedOnce(false);
-      setProviders(result.auth.providers);
-      setSelectedPlaceId((current) => (current && result.places.some((place) => place.id === current) ? current : null));
-      setSelectedFestivalId((current) => (current && result.festivals.some((festival) => festival.id === current) ? current : null));
+      setProviders(bootstrap.auth.providers);
+      setSelectedPlaceId((current) => (current && bootstrap.places.some((place) => place.id === current) ? current : null));
+      setSelectedFestivalId((current) => (current && festivalResult.some((festival) => festival.id === current) ? current : null));
 
-      if (result.auth.user) {
+      if (bootstrap.auth.user) {
         if (activeTab === 'my') {
-          await refreshMyPageForUser(result.auth.user, true);
+          await refreshMyPageForUser(bootstrap.auth.user, true);
         }
       } else {
         setMyPage(null);
       }
 
-      if (authState === 'naver-success' && result.auth.user?.profileCompletedAt === null) {
+      setBootstrapStatus('ready');
+      if (authState === 'naver-success' && bootstrap.auth.user?.profileCompletedAt === null) {
         goToTab('my');
         setNotice('닉네임을 먼저 정하면 같은 계정으로 스탬프와 피드를 이어서 남길 수 있어요.');
       }
     } catch (error) {
-      // bootstrapStatus and bootstrapError are already set by loadBootstrap
+      setBootstrapError(formatErrorMessage(error));
+      setBootstrapStatus('error');
     } finally {
       clearAuthQueryParams();
     }
@@ -1008,24 +1014,38 @@ export default function App() {
   }
 
   async function handleUpdateProfile(nextNickname: string) {
+    if (!nextNickname || nextNickname.length < 2) {
+      setProfileError('닉네임은 두 글자 이상으로 입력해 주세요.');
+      return;
+    }
+    setProfileSaving(true);
+    setProfileError(null);
     try {
-      const { notice, user } = await updateProfileAction(nextNickname);
-      if (user) {
-        setMyPage((current) => (current ? { ...current, user } : current));
+      const auth = await updateProfile({ nickname: nextNickname });
+      setSessionUser(auth.user);
+      if (auth.user) {
+        setMyPage((current) => (current && auth.user ? { ...current, user: auth.user } : current));
       }
-      setNotice(notice);
-    } catch {
-      // profileError is already set by the store action
+      setNotice('닉네임을 저장했어요. 이제 같은 계정으로 기록을 이어볼 수 있어요.');
+    } catch (error) {
+      setProfileError(formatErrorMessage(error));
+    } finally {
+      setProfileSaving(false);
     }
   }
 
   async function handleLogout() {
+    setIsLoggingOut(true);
     try {
-      const notice = await logoutAction();
+      const auth = await logout();
+      setSessionUser(auth.user);
+      setProviders(auth.providers);
       setMyPage(null);
-      setNotice(notice);
+      setNotice('로그아웃했어요.');
     } catch (error) {
       setNotice(formatErrorMessage(error));
+    } finally {
+      setIsLoggingOut(false);
     }
   }
 
