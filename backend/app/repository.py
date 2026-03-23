@@ -802,14 +802,19 @@ def toggle_stamp(
     if not place:
         raise ValueError("장소를 찾을 수 없어요.")
 
-    existing = db.scalars(
-        select(UserStamp).where(UserStamp.user_id == user_id, UserStamp.position_id == place.position_id)
+    today = to_seoul_date()
+    existing_today = db.scalars(
+        select(UserStamp).where(
+            UserStamp.user_id == user_id,
+            UserStamp.position_id == place.position_id,
+            UserStamp.stamp_date == today,
+        )
     ).first()
-    if existing:
-        return get_stamps(db, user_id)
+    if existing_today:
+        raise ValueError("이미 오늘 스탬프를 획득했습니다.")
 
     ensure_stamp_can_be_collected(place, latitude, longitude, radius_meters)
-    db.add(UserStamp(user_id=user_id, position_id=place.position_id, created_at=utcnow_naive()))
+    db.add(UserStamp(user_id=user_id, position_id=place.position_id, stamp_date=today, created_at=utcnow_naive()))
     db.commit()
     return get_stamps(db, user_id)
 
