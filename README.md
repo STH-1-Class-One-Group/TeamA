@@ -313,3 +313,4 @@ cd D:/Code305/JamIssue/backend
 - [docs/community-routes.md](/D:/Code305/JamIssue/docs/community-routes.md)
 - [docs/account-identity-schema.md](/D:/Code305/JamIssue/docs/account-identity-schema.md)
 - [docs/growgardens-deploy-runbook.md](/D:/Code305/JamIssue/docs/growgardens-deploy-runbook.md)
+- [docs/data-operations-runbook.md](/D:/Code305/JamIssue/docs/data-operations-runbook.md)
