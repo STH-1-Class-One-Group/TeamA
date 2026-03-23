@@ -73,6 +73,24 @@ from .services.auth_service import (
     get_redirect_target,
     update_profile_session_payload,
 )
+from .services.page_service import (
+    read_bootstrap_service,
+    read_courses_service,
+    read_my_page_service,
+    read_place_service,
+    read_places_service,
+    read_reviews_service,
+    read_stamps_service,
+    toggle_stamp_service,
+)
+from .services.review_service import (
+    create_comment_service,
+    create_review_service,
+    delete_comment_service,
+    delete_review_service,
+    read_review_comments_service,
+    toggle_review_like_service,
+)
 from .services.upload_service import upload_review_image_service
 from .user_routes_normalized import (
     create_user_route,
@@ -323,7 +341,7 @@ def bootstrap(
     db: Session = Depends(get_db),
     session_user: SessionUser | None = Depends(get_session_user),
 ) -> BootstrapResponse:
-    return get_bootstrap(db, session_user.id if session_user else None)
+    return read_bootstrap_service(db, session_user)
 
 
 @app.get("/api/places", response_model=list[PlaceOut], tags=["places"])
@@ -331,7 +349,7 @@ def read_places(
     category: CategoryFilter = Query(default="all"),
     db: Session = Depends(get_db),
 ) -> list[PlaceOut]:
-    return list_places(db, category)
+    return read_places_service(db, category)
 
 
 @app.get("/api/places/{place_id}", response_model=PlaceOut, tags=["places"])
@@ -347,7 +365,7 @@ def read_courses(
     mood: CourseMood | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> list[CourseOut]:
-    return list_courses(db, mood)
+    return read_courses_service(db, mood)
 
 
 @app.get("/api/community-routes", response_model=list[UserRouteOut], tags=["community-routes"])
@@ -417,7 +435,7 @@ def read_reviews(
     db: Session = Depends(get_db),
     session_user: SessionUser | None = Depends(get_session_user),
 ) -> list[ReviewOut]:
-    return list_reviews(db, place_id=place_id, user_id=user_id, current_user_id=session_user.id if session_user else None)
+    return read_reviews_service(db, place_id, user_id, session_user)
 
 
 @app.post("/api/reviews", response_model=ReviewOut, status_code=status.HTTP_201_CREATED, tags=["reviews"])
@@ -548,7 +566,7 @@ def read_stamps(
     db: Session = Depends(get_db),
     session_user: SessionUser | None = Depends(get_session_user),
 ) -> StampState:
-    return get_stamps(db, session_user.id if session_user else None)
+    return read_stamps_service(db, session_user)
 
 
 @app.post("/api/stamps/toggle", response_model=StampState, tags=["stamps"])
