@@ -1,8 +1,8 @@
 import type { PlaceCategory, PlaceCategoryFilter } from './lib/categories';
 
 export type Category = PlaceCategoryFilter;
-export type Tab = 'map' | 'feed' | 'course' | 'my';
-export type MyPageTabKey = 'stamps' | 'feeds' | 'comments' | 'routes';
+export type Tab = 'map' | 'event' | 'feed' | 'course' | 'my';
+export type MyPageTabKey = 'stamps' | 'feeds' | 'comments' | 'routes' | 'admin';
 export type DrawerState = 'closed' | 'partial' | 'full';
 export type ReviewMood = '\uD63C\uC790\uC11C' | '\uCE5C\uAD6C\uB791' | '\uB370\uC774\uD2B8' | '\uC57C\uACBD \uB9DB\uC9D1';
 export type CourseMood = '\uC804\uCCB4' | '\uB370\uC774\uD2B8' | '\uC0AC\uC9C4' | '\uD790\uB9C1' | '\uBE44 \uC624\uB294 \uB0A0';
@@ -85,6 +85,11 @@ export interface Review {
   comments: Comment[];
 }
 
+export interface ReviewFeedPageResponse {
+  items: Review[];
+  nextCursor: string | null;
+}
+
 export interface StampLog {
   id: string;
   placeId: string;
@@ -94,6 +99,7 @@ export interface StampLog {
   visitNumber: number;
   visitLabel: string;
   travelSessionId: string | null;
+  travelSessionStampCount: number;
   isToday: boolean;
 }
 
@@ -124,6 +130,15 @@ export interface Course {
   note: string;
   color: string;
   placeIds: string[];
+}
+
+export interface RoutePreview {
+  id: string;
+  title: string;
+  subtitle: string;
+  mood: string;
+  placeIds: string[];
+  placeNames: string[];
 }
 
 export interface UserRoute {
@@ -225,6 +240,12 @@ export interface MyComment {
   createdAt: string;
   reviewBody: string;
 }
+
+export interface MyCommentPageResponse {
+  items: MyComment[];
+  nextCursor: string | null;
+}
+
 export interface MyStats {
   reviewCount: number;
   stampCount: number;
@@ -256,6 +277,7 @@ export interface AdminPlace {
   district: string;
   category: PlaceCategory;
   isActive: boolean;
+  isManualOverride: boolean;
   reviewCount: number;
   updatedAt: string;
 }
@@ -271,7 +293,8 @@ export interface AdminSummaryResponse {
 }
 
 export interface PlaceVisibilityRequest {
-  isActive: boolean;
+  isActive?: boolean;
+  isManualOverride?: boolean;
 }
 
 export interface UploadResponse {
@@ -298,4 +321,20 @@ export interface RoadmapBannerMilestone {
   title: string;
   body: string;
   deliverable: string;
+}
+export interface DiscoverySearchResponse {
+  query: string;
+  places: Place[];
+  routes: UserRoute[];
+}
+
+export interface PlaceRecommendation {
+  place: Place;
+  score: number;
+  reason: string;
+}
+
+export interface DiscoveryRecommendationsResponse {
+  placeId: string;
+  items: PlaceRecommendation[];
 }

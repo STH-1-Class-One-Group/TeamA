@@ -10,6 +10,7 @@ import type {
   FestivalItem,
   Place,
   ReviewMood,
+  RoutePreview,
   SessionUser,
 } from '../types';
 
@@ -30,6 +31,8 @@ interface MapTabStageProps {
   drawerState: DrawerState;
   sessionUser: SessionUser | null;
   selectedPlaceReviews: BootstrapResponse['reviews'];
+  routePreview: RoutePreview | null;
+  routePreviewPlaces: Place[];
   visitCount: number;
   latestStamp: BootstrapResponse['stamps']['logs'][number] | null;
   todayStamp: BootstrapResponse['stamps']['logs'][number] | null;
@@ -38,9 +41,10 @@ interface MapTabStageProps {
   reviewProofMessage: string;
   reviewError: string | null;
   reviewSubmitting: boolean;
-  reviewLikeUpdatingId: string | null;
-  commentSubmittingReviewId: string | null;
   canCreateReview: boolean;
+  hasCreatedReviewToday: boolean;
+  onOpenFeedReview: () => void;
+  onClearRoutePreview: () => void;
   initialMapCenter?: { lat: number; lng: number };
   initialMapZoom?: number;
   onOpenPlace: (placeId: string) => void;
@@ -53,8 +57,6 @@ interface MapTabStageProps {
   onRequestLogin: () => void;
   onClaimStamp: (place: Place) => Promise<void>;
   onCreateReview: (payload: { stampId: string; body: string; mood: ReviewMood; file: File | null }) => Promise<void>;
-  onToggleReviewLike: (reviewId: string) => Promise<void>;
-  onCreateComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
   onLocateCurrentPosition: () => void;
   onMapViewportChange: (lat: number, lng: number, zoom: number) => void;
 }
@@ -76,6 +78,8 @@ export function MapTabStage({
   drawerState,
   sessionUser,
   selectedPlaceReviews,
+  routePreview,
+  routePreviewPlaces,
   visitCount,
   latestStamp,
   todayStamp,
@@ -84,9 +88,10 @@ export function MapTabStage({
   reviewProofMessage,
   reviewError,
   reviewSubmitting,
-  reviewLikeUpdatingId,
-  commentSubmittingReviewId,
   canCreateReview,
+  hasCreatedReviewToday,
+  onOpenFeedReview,
+  onClearRoutePreview,
   initialMapCenter,
   initialMapZoom,
   onOpenPlace,
@@ -99,8 +104,6 @@ export function MapTabStage({
   onRequestLogin,
   onClaimStamp,
   onCreateReview,
-  onToggleReviewLike,
-  onCreateComment,
   onLocateCurrentPosition,
   onMapViewportChange,
 }: MapTabStageProps) {
@@ -121,7 +124,6 @@ export function MapTabStage({
           {categoryItems.map((item) => {
             const isActive = item.key === activeCategory;
             const info = item.key === 'all' ? null : categoryInfo[item.key];
-
             return (
               <button
                 key={item.key}
@@ -138,7 +140,7 @@ export function MapTabStage({
                     : undefined
                 }
               >
-                {info ? `${info.icon} ${item.label}` : item.label}
+                {info ? String(info.icon) + ' ' + item.label : item.label}
               </button>
             );
           })}
@@ -146,7 +148,7 @@ export function MapTabStage({
       </div>
 
       {notice && <div className="floating-notice">{notice}</div>}
-      {bootstrapStatus === 'loading' && <section className="floating-status">대전 장소와 축제를 불러오고 있어요.</section>}
+      {bootstrapStatus === 'loading' && <section className="floating-status">대전 지도를 불러오고 있어요.</section>}
       {bootstrapStatus === 'error' && <section className="floating-status floating-status--error">{bootstrapError}</section>}
 
       <NaverMap
@@ -164,15 +166,43 @@ export function MapTabStage({
         initialCenter={initialMapCenter}
         initialZoom={initialMapZoom}
         onViewportChange={onMapViewportChange}
+        routePreviewPlaces={routePreviewPlaces}
         height="100%"
       />
+
+      {!selectedPlace && !selectedFestival && routePreview && (
+        <section className="map-route-preview-card">
+          <div className="map-route-preview-card__top">
+            <div>
+              <p className="eyebrow">ROUTE PREVIEW</p>
+              <h3>{routePreview.title}</h3>
+              <p className="section-copy">{routePreview.subtitle}</p>
+            </div>
+            <button type="button" className="map-route-preview-card__close" onClick={onClearRoutePreview} aria-label="경로 미리보기 닫기">
+              <span aria-hidden="true">{'\u00D7'}</span>
+            </button>
+          </div>
+          <div className="course-card__places community-route-places map-route-preview-card__places">
+            {routePreview.placeNames.map((placeName, index) => (
+              <span key={routePreview.id + '-' + placeName + '-' + index} className="soft-tag">
+                {index + 1}. {placeName}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
 
       {!selectedPlace && !selectedFestival && (
         <section className="map-drawer-teaser">
           <span className="map-drawer-teaser__handle" aria-hidden="true" />
-          <div>
-            <strong>아래 시트에서 상세를 확인해요</strong>
-            <p>지도 마커를 누르면 장소 정보, 현장 스탬프, 축제 안내가 아래에서 바로 열립니다.</p>
+          <div className="map-drawer-teaser__peek" aria-hidden="true">
+            <div className="map-drawer-teaser__line" />
+            <div className="map-drawer-teaser__line map-drawer-teaser__line--short" />
+            <div className="map-drawer-teaser__chips">
+              <span className="map-drawer-teaser__chip" />
+              <span className="map-drawer-teaser__chip" />
+              <span className="map-drawer-teaser__chip map-drawer-teaser__chip--wide" />
+            </div>
           </div>
         </section>
       )}
@@ -186,22 +216,20 @@ export function MapTabStage({
         visitCount={visitCount}
         latestStamp={latestStamp}
         todayStamp={todayStamp}
+        hasCreatedReviewToday={hasCreatedReviewToday}
         stampActionStatus={stampActionStatus}
         stampActionMessage={stampActionMessage}
         reviewProofMessage={reviewProofMessage}
         reviewError={reviewError}
         reviewSubmitting={reviewSubmitting}
-        reviewLikeUpdatingId={reviewLikeUpdatingId}
-        commentSubmittingReviewId={commentSubmittingReviewId}
         canCreateReview={canCreateReview}
+        onOpenFeedReview={onOpenFeedReview}
         onClose={onCloseDrawer}
         onExpand={onExpandPlaceDrawer}
         onCollapse={onCollapsePlaceDrawer}
         onRequestLogin={onRequestLogin}
         onClaimStamp={onClaimStamp}
         onCreateReview={onCreateReview}
-        onToggleReviewLike={onToggleReviewLike}
-        onCreateComment={onCreateComment}
       />
 
       <FestivalDetailSheet

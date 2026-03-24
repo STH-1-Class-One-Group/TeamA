@@ -6,10 +6,16 @@ interface FeedCommentSheetProps {
   review: Review | null;
   isOpen: boolean;
   canWriteComment: boolean;
+  currentUserId?: string | null;
   submittingReviewId: string | null;
+  mutatingCommentId: string | null;
+  deletingReviewId: string | null;
   highlightedCommentId: string | null;
   onClose: () => void;
   onSubmitComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
+  onUpdateComment: (reviewId: string, commentId: string, body: string) => Promise<void>;
+  onDeleteComment: (reviewId: string, commentId: string) => Promise<void>;
+  onDeleteReview: (reviewId: string) => Promise<void>;
   onRequestLogin: () => void;
 }
 
@@ -17,10 +23,16 @@ export function FeedCommentSheet({
   review,
   isOpen,
   canWriteComment,
+  currentUserId = null,
   submittingReviewId,
+  mutatingCommentId,
+  deletingReviewId,
   highlightedCommentId,
   onClose,
   onSubmitComment,
+  onUpdateComment,
+  onDeleteComment,
+  onDeleteReview,
   onRequestLogin,
 }: FeedCommentSheetProps) {
   const dragStartYRef = useRef<number | null>(null);
@@ -40,7 +52,9 @@ export function FeedCommentSheet({
     }
   }
 
+
   const sheetClassName = `feed-comment-sheet${isOpen ? ' feed-comment-sheet--open' : ' feed-comment-sheet--closed'}`;
+  const isMine = review ? review.userId === currentUserId : false;
 
   return (
     <section className={sheetClassName} aria-label="댓글 시트" aria-hidden={!isOpen}>
@@ -65,9 +79,21 @@ export function FeedCommentSheet({
                   {review.author} · {review.visitLabel} · {review.visitedAt}
                 </p>
               </div>
-              <button type="button" className="feed-comment-sheet__close" onClick={onClose} aria-label="닫기">
-                ×
-              </button>
+              <div className="feed-comment-sheet__header-actions">
+                {isMine && (
+                  <button
+                    type="button"
+                    className="secondary-button feed-comment-sheet__delete"
+                    onClick={() => void onDeleteReview(review.id)}
+                    disabled={deletingReviewId === review.id}
+                  >
+                    {deletingReviewId === review.id ? '삭제 중' : '피드 삭제'}
+                  </button>
+                )}
+                <button type="button" className="feed-comment-sheet__close" onClick={onClose} aria-label="닫기">
+                  ×
+                </button>
+              </div>
             </div>
 
             <p className="feed-comment-sheet__body">{review.body}</p>
@@ -77,10 +103,14 @@ export function FeedCommentSheet({
             <CommentThread
               comments={review.comments}
               canWriteComment={canWriteComment}
+              currentUserId={currentUserId}
               submittingReviewId={submittingReviewId}
+              mutatingCommentId={mutatingCommentId}
               highlightedCommentId={highlightedCommentId}
               reviewId={review.id}
               onSubmitComment={onSubmitComment}
+              onUpdateComment={onUpdateComment}
+              onDeleteComment={onDeleteComment}
               onRequestLogin={onRequestLogin}
             />
           </>

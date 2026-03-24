@@ -1,26 +1,42 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useScrollRestoration } from '../hooks/useScrollRestoration';
+import { useAutoLoadMore } from '../hooks/useAutoLoadMore';
 import { ProviderButtons } from './ProviderButtons';
-import type { AuthProvider, CourseMood, MyPageResponse, MyPageTabKey, SessionUser, TravelSession } from '../types';
+import type { AdminSummaryResponse, AuthProvider, CourseMood, MyPageResponse, MyPageTabKey, SessionUser, TravelSession } from '../types';
 
 interface MyPagePanelProps {
   sessionUser: SessionUser | null;
   myPage: MyPageResponse | null;
   providers: AuthProvider[];
+  myPageError: string | null;
   activeTab: MyPageTabKey;
   isLoggingOut: boolean;
   profileSaving: boolean;
   profileError: string | null;
   routeSubmitting: boolean;
   routeError: string | null;
+  adminSummary: AdminSummaryResponse | null;
+  adminBusyPlaceId: string | null;
+  adminLoading: boolean;
   onChangeTab: (nextTab: MyPageTabKey) => void;
   onLogin: (provider: 'naver' | 'kakao') => void;
+  onRetry: () => Promise<void>;
   onLogout: () => Promise<void>;
   onSaveNickname: (nickname: string) => Promise<void>;
   onPublishRoute: (payload: { travelSessionId: string; title: string; description: string; mood: string }) => Promise<void>;
   onOpenPlace: (placeId: string) => void;
   onOpenComment: (reviewId: string, commentId: string) => void;
+  onOpenReview: (reviewId: string) => void;
+  onDeleteReview: (reviewId: string) => Promise<void>;
+  commentsHasMore: boolean;
+  commentsLoadingMore: boolean;
+  onLoadMoreComments: (initial?: boolean) => Promise<void>;
+  onRefreshAdmin: () => Promise<void>;
+  onToggleAdminPlace: (placeId: string, nextValue: boolean) => Promise<void>;
+  onToggleAdminManualOverride: (placeId: string, nextValue: boolean) => Promise<void>;
 }
+
+const AdminPanel = lazy(() => import('./AdminPanel').then((module) => ({ default: module.AdminPanel })));
 
 const routeMoodOptions: CourseMood[] = ['데이트', '사진', '힐링', '비 오는 날'];
 
@@ -30,6 +46,20 @@ interface DraftState {
   mood: string;
 }
 
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="review-action-button__svg" aria-hidden="true">
+      <path
+        d="M12 21s-6.716-4.309-9.193-8.19C1.25 10.387 2.17 6.9 5.41 5.61c1.98-.788 4.183-.145 5.59 1.495 1.408-1.64 3.611-2.283 5.59-1.495 3.24 1.29 4.16 4.777 2.603 7.2C18.716 16.691 12 21 12 21Z"
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 function buildDefaultDraft(session: TravelSession): DraftState {
   const firstPlaceName = session.placeNames[0] ?? '하루 코스';
   const lastPlaceName = session.placeNames[session.placeNames.length - 1] ?? firstPlaceName;
@@ -44,25 +74,44 @@ export function MyPagePanel({
   sessionUser,
   myPage,
   providers,
+  myPageError,
   activeTab,
   isLoggingOut,
   profileSaving,
   profileError,
   routeSubmitting,
   routeError,
+  adminSummary,
+  adminBusyPlaceId,
+  adminLoading,
   onChangeTab,
   onLogin,
+  onRetry,
   onLogout,
   onSaveNickname,
   onPublishRoute,
   onOpenPlace,
   onOpenComment,
+  onOpenReview,
+  onDeleteReview,
+  commentsHasMore,
+  commentsLoadingMore,
+  onLoadMoreComments,
+  onRefreshAdmin,
+  onToggleAdminPlace,
+  onToggleAdminManualOverride,
 }: MyPagePanelProps) {
   const [nickname, setNickname] = useState(sessionUser?.nickname ?? '');
   const [showVisitedDetail, setShowVisitedDetail] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
   const scrollRef = useScrollRestoration<HTMLElement>(`my:${activeTab}`);
+  const commentsLoadMoreRef = useAutoLoadMore({
+    enabled: activeTab === 'comments' && commentsHasMore,
+    loading: commentsLoadingMore,
+    onLoadMore: () => onLoadMoreComments(),
+    rootRef: scrollRef,
+  });
 
   useEffect(() => {
     setNickname(sessionUser?.nickname ?? '');
@@ -142,6 +191,18 @@ export function MyPagePanel({
         </div>
       </header>
 
+      {!myPage && myPageError && (
+        <section className="sheet-card stack-gap">
+          <div>
+            <p className="eyebrow">MY PAGE</p>
+            <h3>기록을 아직 불러오지 못했어요</h3>
+            <p className="section-copy">{myPageError}</p>
+          </div>
+          <button type="button" className="primary-button route-submit-button" onClick={() => void onRetry()}>
+            다시 불러오기
+          </button>
+        </section>
+      )}
       {(showSettings || !sessionUser.profileCompletedAt) && (
         <section className="sheet-card stack-gap settings-card">
           <div className="settings-card__header">
@@ -227,40 +288,58 @@ export function MyPagePanel({
           </section>
 
           <section className="sheet-card stack-gap">
-            <div className="chip-row compact-gap my-page-primary-tabs">
+            <div className={sessionUser.isAdmin ? 'chip-row compact-gap my-page-primary-tabs my-page-primary-tabs--admin' : 'chip-row compact-gap my-page-primary-tabs'}>
               <button type="button" className={activeTab === 'stamps' ? 'chip is-active' : 'chip'} onClick={() => onChangeTab('stamps')}>
-                얻은 스탬프
+                {'\uC2A4\uD0EC\uD504'}
               </button>
               <button type="button" className={activeTab === 'feeds' ? 'chip is-active' : 'chip'} onClick={() => onChangeTab('feeds')}>
-                내가 쓴 피드
+                {'\uD53C\uB4DC'}
               </button>
               <button type="button" className={activeTab === 'comments' ? 'chip is-active' : 'chip'} onClick={() => onChangeTab('comments')}>
-                내가 쓴 댓글
+                {'\uB313\uAE00'}
               </button>
               <button type="button" className={activeTab === 'routes' ? 'chip is-active' : 'chip'} onClick={() => onChangeTab('routes')}>
-                생성한 코스
+                {'\uCF54\uC2A4'}
               </button>
+              {sessionUser.isAdmin && (
+                <button type="button" className={activeTab === 'admin' ? 'chip is-active' : 'chip'} onClick={() => onChangeTab('admin')}>
+                  {'\uAD00\uB9AC'}
+                </button>
+              )}
             </div>
 
             {activeTab === 'stamps' && (
               <div className="review-stack">
+                {unpublishedSessions.length > 0 && (
+                  <article className="sheet-card stack-gap">
+                    <div className="section-title-row section-title-row--tight">
+                      <div>
+                        <p className="eyebrow">READY TO PUBLISH</p>
+                        <h3>{'\uCF54\uC2A4\uB85C \uBC1C\uD589\uD560 \uC218 \uC788\uB294 \uC5EC\uC815\uC774 \uC788\uC5B4\uC694'}</h3>
+                      </div>
+                      <span className="counter-pill">{unpublishedSessions.length}{'\uAC1C'}</span>
+                    </div>
+                    <p className="section-copy">{'\u0032\u0034\uC2DC\uAC04 \uC548\uC5D0 \uC774\uC5B4\uC9C4 \uC2A4\uD0EC\uD504 \uAE30\uB85D\uC744 \uACF5\uAC1C \uCF54\uC2A4\uB85C \uBC1C\uD589\uD574 \uBCF4\uC138\uC694.'}</p>
+                    <button type="button" className="primary-button route-submit-button" onClick={() => onChangeTab('routes')}>
+                      {'\uCF54\uC2A4 \uBC1C\uD589\uD558\uB7EC \uAC00\uAE30'}
+                    </button>
+                  </article>
+                )}
                 {myPage.stampLogs.map((stampLog) => (
                   <article key={stampLog.id} className="review-card review-card--stamp-log">
-                    <div className="review-card__top">
-                      <div>
-                        <strong>{stampLog.placeName}</strong>
-                        <p>{stampLog.isToday ? '오늘 찍은 스탬프' : '방문 스탬프 기록'}</p>
+                    <div className="review-card__top review-card__top--feed review-card__top--stamp-log">
+                      <div className="review-card__title-block review-card__title-block--feed">
+                        <p className="eyebrow">STAMP LOG</p>
+                        <strong className="review-card__title">{stampLog.placeName}</strong>
+                        <p className="review-card__author-line">{'\uD68D\uB4DD / '}{stampLog.stampedAt}</p>
                       </div>
-                      <span className="counter-pill">{stampLog.visitLabel}</span>
+                      <button type="button" className="review-link-button review-link-button--inline" onClick={() => onOpenPlace(stampLog.placeId)}>{'\uC774 \uC7A5\uC18C \uBCF4\uAE30'}</button>
                     </div>
-                    <div className="chip-row compact-gap review-card__meta-wrap">
-                      <span className="soft-tag">획득 {stampLog.stampedAt}</span>
-                      {stampLog.isToday && <span className="soft-tag is-complete">오늘</span>}
-                      {stampLog.travelSessionId && <span className="soft-tag">여행 세션 연결</span>}
+                    <div className="review-card__tag-row">
+                      <span className="review-card__visit-pill">{stampLog.visitLabel}</span>
+                      {stampLog.isToday && <span className="soft-tag is-complete">{'\uC624\uB298'}</span>}
+                      {stampLog.travelSessionId && stampLog.travelSessionStampCount >= 2 && <span className="soft-tag">{'\uC5EC\uD589 \uC138\uC158 \uC5F0\uACB0'}</span>}
                     </div>
-                    <button type="button" className="text-button review-card__place-link" onClick={() => onOpenPlace(stampLog.placeId)}>
-                      장소 열기
-                    </button>
                   </article>
                 ))}
                 {myPage.stampLogs.length === 0 && <p className="empty-copy">아직 찍은 스탬프가 없어요.</p>}
@@ -270,18 +349,24 @@ export function MyPagePanel({
             {activeTab === 'feeds' && (
               <div className="review-stack">
                 {myPage.reviews.map((review) => (
-                  <article key={review.id} className="review-card">
-                    <div className="review-card__top">
-                      <div>
-                        <strong>{review.placeName}</strong>
-                        <p>{review.visitLabel} · {review.visitedAt}</p>
+                  <article key={review.id} className="review-card review-card--my-feed">
+                    <div className="review-card__top review-card__top--feed">
+                      <div className="review-card__title-block review-card__title-block--feed">
+                        <p className="eyebrow">{review.mood}</p>
+                        <button type="button" className="review-card__place-anchor" onClick={() => onOpenPlace(review.placeId)}><strong className="review-card__title">{review.placeName}</strong></button>
+                        <p className="review-card__author-line">{review.visitLabel} · {review.visitedAt}</p>
                       </div>
-                      <span className="mood-pill">{review.mood}</span>
+                    </div>
+                    <div className="review-card__tag-row">
+                      <span className="review-card__visit-pill">{review.visitLabel}</span>
+                      {review.travelSessionId && <span className="soft-tag">연속 여행 기록</span>}
+                      <span className="soft-tag">{review.badge}</span>
                     </div>
                     <p className="review-card__body">{review.body}</p>
-                    <button type="button" className="text-button review-card__place-link" onClick={() => onOpenPlace(review.placeId)}>
-                      장소 열기
-                    </button>
+                    <div className="review-card__actions review-card__actions--my-feed">
+                      <button type="button" className="review-card__place-link" onClick={() => onOpenReview(review.id)}>내 피드 보기</button>
+                      <button type="button" className="review-card__place-link review-card__place-link--danger" onClick={() => void onDeleteReview(review.id)}>삭제</button>
+                    </div>
                   </article>
                 ))}
                 {myPage.reviews.length === 0 && <p className="empty-copy">아직 작성한 피드가 없어요.</p>}
@@ -384,12 +469,18 @@ export function MyPagePanel({
                 <div className="review-stack">
                   {myPage.routes.map((route) => (
                     <article key={route.id} className="community-route-card community-route-card--my">
-                      <div className="community-route-card__header">
-                        <div>
-                          <p className="eyebrow">PUBLISHED</p>
+                      <div className="community-route-card__header community-route-card__header--feedlike">
+                        <div className="community-route-card__title-block">
+                          <div className="community-route-card__tag-row">
+                            <span className="soft-tag">발행 완료</span>
+                          </div>
                           <h4>{route.title}</h4>
+                          <p className="community-route-meta community-route-meta--inline">{route.createdAt}</p>
                         </div>
-                        <span className="counter-pill">좋아요 {route.likeCount}</span>
+                        <span className="review-action-button review-action-button--static community-like-button" aria-hidden="true">
+                          <span className="review-action-button__icon"><HeartIcon filled={true} /></span>
+                          <span className="review-action-button__label">{route.likeCount}</span>
+                        </span>
                       </div>
                       <p>{route.description}</p>
                       <div className="course-card__places community-route-places">
@@ -405,12 +496,35 @@ export function MyPagePanel({
                 </div>
               </div>
             )}
+            {activeTab === 'admin' && sessionUser.isAdmin && (
+              <AdminPanel
+                summary={adminSummary}
+                busyPlaceId={adminBusyPlaceId}
+                isImporting={adminLoading}
+                onRefreshImport={onRefreshAdmin}
+                onTogglePlace={onToggleAdminPlace}
+                onToggleManualOverride={onToggleAdminManualOverride}
+              />
+            )}
           </section>
         </>
       )}
     </section>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

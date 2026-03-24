@@ -1,12 +1,9 @@
-﻿"""Normalized repository for JamIssue domain flows."""
+"""Normalized repository for JamIssue domain flows."""
 
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime, timedelta
-from math import asin, cos, radians, sin, sqrt
-from uuid import uuid4
-from zoneinfo import ZoneInfo
+from datetime import datetime, time, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -52,199 +49,25 @@ from .models import (
 from .naver_oauth import NaverProfile
 from .public_data import import_public_bundle as sync_public_bundle
 from .public_data import load_public_bundle as load_public_bundle_payload
-
-KST = ZoneInfo("Asia/Seoul")
-LEGACY_PROVIDERS = ("demo", "seed")
-BADGE_BY_MOOD = {
-    "설렘": "첫 방문",
-    "친구랑": "친구 추천",
-    "혼자서": "로컬 탐방",
-    "야경 맛집": "야경 성공",
-}
-
-def utcnow_naive() -> datetime:
-    return datetime.now(KST).replace(tzinfo=None)
-
-
-def to_seoul_date(value: datetime | None = None) -> date:
-    if value is None:
-        return datetime.now(KST).date()
-    if value.tzinfo is None:
-        return value.date()
-    return value.astimezone(KST).date()
-
-
-def generate_user_id() -> str:
-    return f"user-{uuid4().hex[:20]}"
-
-
-def format_datetime(value: datetime | None) -> str:
-    if not value:
-        return ""
-    return value.strftime("%m. %d. %H:%M")
-
-
-def format_date(value: date | datetime | None) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, datetime):
-        return to_seoul_date(value).isoformat()
-    return value.isoformat()
-
-
-def format_visit_label(visit_number: int | None) -> str:
-    safe_visit_number = visit_number if visit_number and visit_number > 0 else 1
-    return f"{safe_visit_number}번째 방문"
-
-
-def build_session_duration_label(session: TravelSession) -> str:
-    diff = max(session.ended_at - session.started_at, timedelta())
-    diff_days = diff.days
-    if diff_days <= 0:
-        return f"당일 코스 · 스탬프 {session.stamp_count}개"
-    return f"{diff_days}박 {diff_days + 1}일 · 스탬프 {session.stamp_count}개"
-
-
-def calculate_distance_meters(
-    start_latitude: float,
-    start_longitude: float,
-    end_latitude: float,
-    end_longitude: float,
-) -> float:
-    earth_radius_meters = 6_371_000
-    latitude_delta = radians(end_latitude - start_latitude)
-    longitude_delta = radians(end_longitude - start_longitude)
-    start_latitude_radians = radians(start_latitude)
-    end_latitude_radians = radians(end_latitude)
-    haversine = (
-        sin(latitude_delta / 2) ** 2
-        + cos(start_latitude_radians) * cos(end_latitude_radians) * sin(longitude_delta / 2) ** 2
-    )
-    return earth_radius_meters * (2 * asin(sqrt(haversine)))
-
-
-def ensure_stamp_can_be_collected(
-    place: MapPlace,
-    current_latitude: float,
-    current_longitude: float,
-    radius_meters: int,
-) -> None:
-    distance_meters = calculate_distance_meters(
-        current_latitude,
-        current_longitude,
-        place.latitude,
-        place.longitude,
-    )
-    if distance_meters > radius_meters:
-        raise PermissionError(
-            f"{place.name} ?꾩옣 諛섍꼍 {radius_meters}m ?덉뿉 ?꾩갑?댁빞 ?ㅽ꺃?꾨? 諛쏆쓣 ???덉뼱?? ?꾩옱 ??{round(distance_meters)}m ?⑥뼱???덉뼱??"
-        )
-
-
-def parse_review_id(review_id: str) -> int:
-    try:
-        return int(review_id)
-    except ValueError as error:
-        raise ValueError("?꾧린 ID ?뺤떇???щ컮瑜댁? ?딆븘??") from error
-
-
-def parse_comment_id(comment_id: str) -> int:
-    try:
-        return int(comment_id)
-    except ValueError as error:
-        raise ValueError("?볤? ID ?뺤떇???щ컮瑜댁? ?딆븘??") from error
-
-
-def parse_stamp_id(stamp_id: str) -> int:
-    try:
-        return int(stamp_id)
-    except ValueError as error:
-        raise ValueError("?ㅽ꺃??ID ?뺤떇???щ컮瑜댁? ?딆븘??") from error
-
-
-def to_place_out(place: MapPlace) -> PlaceOut:
-    return PlaceOut(
-        id=place.slug,
-        positionId=str(place.position_id),
-        name=place.name,
-        district=place.district,
-        category=place.category,
-        jamColor=place.jam_color,
-        accentColor=place.accent_color,
-        imageUrl=place.image_url,
-        latitude=place.latitude,
-        longitude=place.longitude,
-        summary=place.summary,
-        description=place.description,
-        vibeTags=list(place.vibe_tags or []),
-        visitTime=place.visit_time,
-        routeHint=place.route_hint,
-        stampReward=place.stamp_reward,
-        heroLabel=place.hero_label,
-    )
-
-
-def to_session_user(
-    user: User,
-    is_admin: bool,
-    profile_image: str | None = None,
-    provider: str | None = None,
-) -> SessionUser:
-    return SessionUser(
-        id=user.user_id,
-        nickname=user.nickname,
-        email=user.email,
-        provider=provider or user.provider,
-        profileImage=profile_image,
-        isAdmin=is_admin,
-        profileCompletedAt=user.profile_completed_at.isoformat() if user.profile_completed_at else None,
-    )
-
-
-def to_admin_place_out(place: MapPlace, review_count: int) -> AdminPlaceOut:
-    return AdminPlaceOut(
-        id=place.slug,
-        name=place.name,
-        district=place.district,
-        category=place.category,
-        isActive=place.is_active,
-        reviewCount=review_count,
-        updatedAt=format_datetime(place.updated_at),
-    )
-
-
-def build_comment_tree(comments: list[UserComment]) -> list[CommentOut]:
-    ordered_comments = sorted(comments, key=lambda item: (item.created_at, item.comment_id))
-    comment_rows_by_id = {comment.comment_id: comment for comment in ordered_comments}
-    nodes: dict[int, CommentOut] = {}
-    roots: list[CommentOut] = []
-
-    for comment in ordered_comments:
-        nodes[comment.comment_id] = CommentOut(
-            id=str(comment.comment_id),
-            userId=comment.user_id,
-            author=comment.user.nickname if comment.user else "이름 없음",
-            body="삭제된 댓글입니다." if comment.is_deleted else comment.body,
-            parentId=str(comment.parent_id) if comment.parent_id else None,
-            isDeleted=comment.is_deleted,
-            createdAt=format_datetime(comment.created_at),
-            replies=[],
-        )
-
-    for comment in ordered_comments:
-        node = nodes[comment.comment_id]
-        parent = comment_rows_by_id.get(comment.parent_id) if comment.parent_id else None
-        root_parent_id = None
-        if parent:
-            root_parent_id = parent.parent_id or parent.comment_id
-
-        if root_parent_id and root_parent_id in nodes:
-            nodes[root_parent_id].replies.append(node)
-        else:
-            roots.append(node)
-
-    return roots
-
+from .repository_support import (
+    BADGE_BY_MOOD,
+    LEGACY_PROVIDERS,
+    build_comment_tree,
+    build_session_duration_label,
+    ensure_stamp_can_be_collected,
+    format_date,
+    format_datetime,
+    format_visit_label,
+    generate_user_id,
+    parse_comment_id,
+    parse_review_id,
+    parse_stamp_id,
+    to_admin_place_out,
+    to_place_out,
+    to_seoul_date,
+    to_session_user,
+    utcnow_naive,
+)
 
 def get_or_create_user(
     db: Session,
@@ -296,21 +119,21 @@ def _nickname_exists(db: Session, nickname: str, *, exclude_user_id: str | None 
 def ensure_unique_nickname(db: Session, nickname: str, *, exclude_user_id: str | None = None) -> str:
     normalized = nickname.strip()
     if len(normalized) < 2:
-        raise ValueError("?됰꽕?꾩? ??湲???댁긽?쇰줈 ?곸뼱 二쇱꽭??")
+        raise ValueError("닉네임은 두 글자 이상으로 적어 주세요.")
     if _nickname_exists(db, normalized, exclude_user_id=exclude_user_id):
         raise ValueError("이미 사용 중인 닉네임이에요.")
     return normalized
 
 
 def build_unique_social_nickname(db: Session, nickname: str, *, exclude_user_id: str | None = None) -> str:
-    base = nickname.strip() or "?대쫫 ?놁쓬"
+    base = nickname.strip() or "이름 없음"
     if not _nickname_exists(db, base, exclude_user_id=exclude_user_id):
         return base
     for suffix in range(2, 10000):
         candidate = f"{base[:95]}{suffix}"
         if not _nickname_exists(db, candidate, exclude_user_id=exclude_user_id):
             return candidate
-    raise ValueError("?ъ슜 媛?ν븳 ?됰꽕?꾩쓣 留뚮뱾 ???놁뼱??")
+    raise ValueError("사용 가능한 닉네임을 만들 수 없어요.")
 
 
 def upsert_social_user(
@@ -392,7 +215,7 @@ def link_social_identity(
 ) -> User:
     user = db.get(User, user_id)
     if not user:
-        raise ValueError("?곌껐??湲곗〈 怨꾩젙??李얠쓣 ???놁뼱??")
+        raise ValueError("연결할 기존 계정을 찾을 수 없어요.")
 
     now = utcnow_naive()
     existing_identity = db.scalars(
@@ -400,7 +223,7 @@ def link_social_identity(
     ).first()
     if existing_identity:
         if existing_identity.user_id != user_id:
-            raise ValueError("?대? ?ㅻⅨ 怨꾩젙???곌껐??濡쒓렇???섎떒?댁뿉??")
+            raise ValueError("이미 다른 계정에 연결된 로그인 수단이에요.")
         if existing_identity.email != email or existing_identity.profile_image != profile_image:
             existing_identity.email = email
             existing_identity.profile_image = profile_image
@@ -413,7 +236,7 @@ def link_social_identity(
         select(UserIdentity).where(UserIdentity.user_id == user_id, UserIdentity.provider == provider)
     ).first()
     if provider_slot:
-        raise ValueError("?대? 媛숈? ?쒓났?먯쓽 怨꾩젙???곌껐???덉뼱??")
+        raise ValueError("이미 같은 제공자의 계정이 연결돼 있어요.")
 
     if email and not user.email:
         user.email = email
@@ -436,7 +259,7 @@ def link_social_identity(
 
 
 def upsert_naver_user(db: Session, profile: NaverProfile) -> User:
-    nickname = profile.nickname or profile.name or "?대쫫 ?놁쓬"
+    nickname = profile.nickname or profile.name or "이름 없음"
     return upsert_social_user(
         db,
         provider="naver",
@@ -461,7 +284,7 @@ def link_naver_identity(db: Session, user_id: str, profile: NaverProfile) -> Use
 def update_user_profile(db: Session, user_id: str, payload: ProfileUpdateRequest) -> User:
     user = db.get(User, user_id)
     if not user:
-        raise ValueError("?ъ슜???뺣낫瑜?李얠쓣 ???놁뼱??")
+        raise ValueError("사용자 정보를 찾을 수 없어요.")
 
     nickname = ensure_unique_nickname(db, payload.nickname, exclude_user_id=user_id)
     now = utcnow_naive()
@@ -629,7 +452,7 @@ def list_places(db: Session, category: CategoryFilter = "all") -> list[PlaceOut]
 def get_place(db: Session, place_id: str) -> PlaceOut:
     place = db.scalars(select(MapPlace).where(MapPlace.slug == place_id, MapPlace.is_active.is_(True))).first()
     if not place:
-        raise ValueError("?μ냼瑜?李얠쓣 ???놁뼱??")
+        raise ValueError("장소를 찾을 수 없어요.")
     return to_place_out(place)
 
 
@@ -672,11 +495,11 @@ def get_review_comments(db: Session, review_id: str) -> list[CommentOut]:
 def create_review(db: Session, payload: ReviewCreate, user_id: str, nickname: str) -> ReviewOut:
     body = payload.body.strip()
     if not body:
-        raise ValueError("?꾧린 蹂몃Ц???곸뼱 二쇱꽭??")
+        raise ValueError("리뷰 본문을 적어 주세요.")
 
     place = db.scalars(select(MapPlace).where(MapPlace.slug == payload.place_id, MapPlace.is_active.is_(True))).first()
     if not place:
-        raise ValueError("?μ냼瑜?李얠쓣 ???놁뼱??")
+        raise ValueError("장소를 찾을 수 없어요.")
 
     stamp = db.scalars(
         select(UserStamp)
@@ -684,16 +507,25 @@ def create_review(db: Session, payload: ReviewCreate, user_id: str, nickname: st
         .where(UserStamp.stamp_id == parse_stamp_id(payload.stamp_id))
     ).first()
     if not stamp or stamp.user_id != user_id:
-        raise ValueError("?대떦 諛⑸Ц ?ㅽ꺃?꾨? 李얠쓣 ???놁뼱??")
+        raise ValueError("해당 방문 스탬프를 찾을 수 없어요.")
     if stamp.position_id != place.position_id:
-        raise ValueError("?좏깮???μ냼? ?ㅽ꺃?꾧? ?쇱튂?섏? ?딆븘??")
+        raise ValueError("선택한 장소와 스탬프가 일치하지 않아요.")
 
     existing_feed = db.scalars(select(Feed).where(Feed.stamp_id == stamp.stamp_id)).first()
     if existing_feed:
-        raise ValueError("媛숈? 諛⑸Ц ?ㅽ꺃?꾨줈???꾧린 ?섎굹留??④만 ???덉뼱??")
+        raise ValueError("같은 방문 인증으로는 피드를 한 번만 남길 수 있어요.")
+
+    now = utcnow_naive()
+    today = to_seoul_date(now)
+    day_start = datetime.combine(today, time.min)
+    day_end = day_start + timedelta(days=1)
+    existing_daily_feed = db.scalars(
+        select(Feed.feed_id).where(Feed.user_id == user_id, Feed.created_at >= day_start, Feed.created_at < day_end)
+    ).first()
+    if existing_daily_feed:
+        raise ValueError("피드는 하루에 하나만 작성할 수 있어요.")
 
     user = get_or_create_user(db, user_id, nickname)
-    now = utcnow_naive()
     feed = Feed(
         position_id=place.position_id,
         user_id=user.user_id,
@@ -726,9 +558,9 @@ def toggle_review_like(db: Session, review_id: str, user_id: str, nickname: str)
     review_key = parse_review_id(review_id)
     feed = db.scalars(select(Feed).options(joinedload(Feed.likes)).where(Feed.feed_id == review_key)).unique().first()
     if not feed:
-        raise ValueError("?꾧린瑜?李얠? 紐삵뻽?댁슂.")
+        raise ValueError("리뷰를 찾지 못했어요.")
     if feed.user_id == user_id:
-        raise ValueError("?닿? ???꾧린?먮뒗 醫뗭븘?붾? ?꾨? ???놁뼱??")
+        raise ValueError("내가 쓴 리뷰에는 좋아요를 누를 수 없어요.")
 
     user = get_or_create_user(db, user_id, nickname)
     existing_like = db.scalars(
@@ -747,19 +579,19 @@ def toggle_review_like(db: Session, review_id: str, user_id: str, nickname: str)
 def create_comment(db: Session, review_id: str, payload: CommentCreate, user_id: str, nickname: str) -> list[CommentOut]:
     body = payload.body.strip()
     if not body:
-        raise ValueError("?볤? ?댁슜???곸뼱 二쇱꽭??")
+        raise ValueError("댓글 내용을 적어 주세요.")
 
     review_key = parse_review_id(review_id)
     feed = db.get(Feed, review_key)
     if not feed:
-        raise ValueError("?꾧린瑜?李얠쓣 ???놁뼱??")
+        raise ValueError("리뷰를 찾을 수 없어요.")
 
     parent_id: int | None = None
     if payload.parent_id:
         parent_id = parse_comment_id(payload.parent_id)
         parent = db.get(UserComment, parent_id)
         if not parent or parent.feed_id != review_key:
-            raise ValueError("媛숈? ?꾧린 ?덉쓽 ?볤??먮쭔 ?듦????④만 ???덉뼱??")
+            raise ValueError("같은 리뷰 안의 댓글에만 답글을 달 수 있어요.")
         # Enforce 2-level depth: if parent is itself a reply, use its root comment instead
         if parent.parent_id is not None:
             parent_id = parent.parent_id
@@ -795,9 +627,9 @@ def delete_comment(
         select(UserComment).where(UserComment.comment_id == comment_key, UserComment.feed_id == review_key)
     ).first()
     if not comment:
-        raise ValueError("?볤???李얠? 紐삵뻽?댁슂.")
+        raise ValueError("댓글을 찾지 못했어요.")
     if comment.user_id != user_id and not is_admin:
-        raise PermissionError("???볤?留???젣?????덉뼱??")
+        raise PermissionError("내 댓글만 삭제할 수 있어요.")
     if not comment.is_deleted:
         comment.is_deleted = True
         comment.body = ""
@@ -810,9 +642,9 @@ def delete_review(db: Session, review_id: str, user_id: str, *, is_admin: bool =
     review_key = parse_review_id(review_id)
     feed = db.get(Feed, review_key)
     if not feed:
-        raise ValueError("?꾧린瑜?李얠? 紐삵뻽?댁슂.")
+        raise ValueError("리뷰를 찾지 못했어요.")
     if feed.user_id != user_id and not is_admin:
-        raise PermissionError("???꾧린留???젣?????덉뼱??")
+        raise PermissionError("내 리뷰만 삭제할 수 있어요.")
     db.delete(feed)
     db.commit()
 
@@ -820,7 +652,7 @@ def delete_review(db: Session, review_id: str, user_id: str, *, is_admin: bool =
 def delete_account(db: Session, user_id: str) -> None:
     user = db.get(User, user_id)
     if not user:
-        raise ValueError("?ъ슜???뺣낫瑜?李얠? 紐삵뻽?댁슂.")
+        raise ValueError("사용자 정보를 찾지 못했어요.")
     db.delete(user)
     db.commit()
 
@@ -831,7 +663,7 @@ def list_courses(db: Session, mood: CourseMood | None = None) -> list[CourseOut]
         .options(joinedload(Course.course_places).joinedload(CoursePlace.place))
         .order_by(Course.display_order.asc(), Course.course_id.asc())
     )
-    if mood and mood != "?꾩껜":
+    if mood and mood != "전체":
         stmt = stmt.where(Course.mood == mood)
     return [to_course_out(course) for course in db.scalars(stmt).unique().all()]
 
@@ -890,7 +722,7 @@ def toggle_stamp(
     get_or_create_user(db, user_id, user_id)
     place = db.scalars(select(MapPlace).where(MapPlace.slug == place_id, MapPlace.is_active.is_(True))).first()
     if not place:
-        raise ValueError("?μ냼瑜?李얠쓣 ???놁뼱??")
+        raise ValueError("장소를 찾을 수 없어요.")
 
     now = utcnow_naive()
     stamp_date = to_seoul_date(now)
@@ -956,7 +788,7 @@ def build_my_comments(db: Session, user_id: str) -> list[MyCommentOut]:
 def get_my_page(db: Session, user_id: str, is_admin: bool) -> MyPageResponse:
     user = db.get(User, user_id)
     if not user:
-        raise ValueError("?ъ슜???뺣낫瑜?李얠쓣 ???놁뼱??")
+        raise ValueError("사용자 정보를 찾을 수 없어요.")
 
     reviews = list_reviews(db, user_id=user_id, current_user_id=user_id)
     stamp_state = get_stamps(db, user_id)
@@ -1023,13 +855,29 @@ def get_admin_summary(db: Session, settings: Settings) -> AdminSummaryResponse:
     )
 
 
-def update_place_visibility(db: Session, place_id: str, is_active: bool) -> AdminPlaceOut:
+def update_place_visibility(
+    db: Session,
+    place_id: str,
+    is_active: bool | None = None,
+    is_manual_override: bool | None = None,
+) -> AdminPlaceOut:
+    """장소 노출 여부와 공공데이터 동기화 보호 여부를 변경합니다."""
+
     place = db.scalars(select(MapPlace).where(MapPlace.slug == place_id)).first()
     if not place:
-        raise ValueError("?μ냼瑜?李얠쓣 ???놁뼱??")
-    place.is_active = is_active
-    place.updated_at = utcnow_naive()
-    db.commit()
+        raise ValueError("장소를 찾을 수 없어요.")
+
+    changed = False
+    if is_active is not None and place.is_active != is_active:
+        place.is_active = is_active
+        changed = True
+    if is_manual_override is not None and place.is_manual_override != is_manual_override:
+        place.is_manual_override = is_manual_override
+        changed = True
+    if changed:
+        place.updated_at = utcnow_naive()
+        db.commit()
+
     review_count = db.scalar(select(func.count()).select_from(Feed).where(Feed.position_id == place.position_id)) or 0
     return to_admin_place_out(place, int(review_count))
 
@@ -1049,6 +897,8 @@ def load_public_bundle(settings: Settings) -> dict:
 
 def import_public_bundle(db: Session, settings: Settings) -> PublicImportResponse:
     return sync_public_bundle(db, settings)
+
+
 
 
 

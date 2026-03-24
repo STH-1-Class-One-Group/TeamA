@@ -1,4 +1,4 @@
-﻿# JamIssue PRD 구현 현황
+# JamIssue PRD 구현 현황
 
 기준일: 2026-03-20  
 기준 브랜치: `codex/production-deploy`
@@ -134,3 +134,5 @@
 - [community-routes.md](/D:/Code305/JamIssue/docs/community-routes.md)
 - [account-identity-schema.md](/D:/Code305/JamIssue/docs/account-identity-schema.md)
 - [growgardens-deploy-runbook.md](/D:/Code305/JamIssue/docs/growgardens-deploy-runbook.md)
+
+- [search-recommendation-scope.md](/D:/Code305/JamIssue/docs/search-recommendation-scope.md)

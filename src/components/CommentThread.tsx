@@ -1,13 +1,17 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Comment } from '../types';
 
 interface CommentThreadProps {
   comments: Comment[];
   canWriteComment: boolean;
+  currentUserId?: string | null;
   submittingReviewId: string | null;
+  mutatingCommentId: string | null;
   highlightedCommentId: string | null;
   reviewId: string;
   onSubmitComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
+  onUpdateComment: (reviewId: string, commentId: string, body: string) => Promise<void>;
+  onDeleteComment: (reviewId: string, commentId: string) => Promise<void>;
   onRequestLogin: () => void;
 }
 
@@ -15,9 +19,13 @@ interface CommentItemProps {
   comment: Comment;
   reviewId: string;
   canWriteComment: boolean;
+  currentUserId?: string | null;
   submittingReviewId: string | null;
+  mutatingCommentId: string | null;
   highlightedCommentId: string | null;
   onSubmitComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
+  onUpdateComment: (reviewId: string, commentId: string, body: string) => Promise<void>;
+  onDeleteComment: (reviewId: string, commentId: string) => Promise<void>;
   onRequestLogin: () => void;
   isReply?: boolean;
 }
@@ -26,16 +34,29 @@ function CommentItem({
   comment,
   reviewId,
   canWriteComment,
+  currentUserId,
   submittingReviewId,
+  mutatingCommentId,
   highlightedCommentId,
   onSubmitComment,
+  onUpdateComment,
+  onDeleteComment,
   onRequestLogin,
   isReply = false,
 }: CommentItemProps) {
-  const [replyBody, setReplyBody] = useState('');
-  const [replyOpen, setReplyOpen] = useState(false);
   const itemRef = useRef<HTMLLIElement | null>(null);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyBody, setReplyBody] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editingBody, setEditingBody] = useState(comment.body);
+
+  const isMine = currentUserId === comment.userId;
+  const isMutating = mutatingCommentId === comment.id;
   const isHighlighted = highlightedCommentId === comment.id;
+
+  useEffect(() => {
+    setEditingBody(comment.body);
+  }, [comment.body]);
 
   useEffect(() => {
     if (!isHighlighted) {
@@ -56,11 +77,26 @@ function CommentItem({
     if (replyBody.trim().length < 2) {
       return;
     }
-
     const parentId = isReply && comment.parentId ? comment.parentId : comment.id;
     await onSubmitComment(reviewId, replyBody.trim(), parentId);
     setReplyBody('');
     setReplyOpen(false);
+  }
+
+  async function handleEditSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (editingBody.trim().length < 2) {
+      return;
+    }
+    await onUpdateComment(reviewId, comment.id, editingBody.trim());
+    setEditing(false);
+  }
+
+  async function handleDelete() {
+    if (!window.confirm('이 댓글을 삭제할까요?')) {
+      return;
+    }
+    await onDeleteComment(reviewId, comment.id);
   }
 
   function handleReplyToggle() {
@@ -68,16 +104,7 @@ function CommentItem({
       onRequestLogin();
       return;
     }
-
-    setReplyOpen((current) => {
-      const next = !current;
-      if (next) {
-        window.requestAnimationFrame(() => {
-          itemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        });
-      }
-      return next;
-    });
+    setReplyOpen((current) => !current);
   }
 
   return (
@@ -94,11 +121,52 @@ function CommentItem({
             <strong>{comment.author}</strong>
             <span>{comment.createdAt}</span>
           </div>
-          <p>{comment.isDeleted ? '삭제된 댓글입니다.' : comment.body}</p>
-          {!comment.isDeleted && !isReply && (
-            <button type="button" className="comment-thread__reply-toggle" onClick={handleReplyToggle}>
-              답글 달기
-            </button>
+
+          {editing && !comment.isDeleted ? (
+            <form className="comment-thread__reply-form" onSubmit={handleEditSubmit}>
+              <input
+                value={editingBody}
+                onChange={(event) => setEditingBody(event.target.value)}
+                placeholder="댓글 내용을 수정해 보세요"
+              />
+              <button type="submit" className="comment-thread__submit" disabled={isMutating || editingBody.trim().length < 2}>
+                {isMutating ? '수정 중' : '수정'}
+              </button>
+            </form>
+          ) : (
+            <p>{comment.isDeleted ? '삭제된 댓글입니다.' : comment.body}</p>
+          )}
+
+          {!comment.isDeleted && (
+            <div className="comment-thread__actions">
+              {!isReply && (
+                <button type="button" className="comment-thread__reply-toggle" onClick={handleReplyToggle}>
+                  답글 달기
+                </button>
+              )}
+              {isMine && !editing && (
+                <>
+                  <button type="button" className="comment-thread__reply-toggle" onClick={() => setEditing(true)}>
+                    수정
+                  </button>
+                  <button type="button" className="comment-thread__reply-toggle" onClick={() => void handleDelete()} disabled={isMutating}>
+                    삭제
+                  </button>
+                </>
+              )}
+              {isMine && editing && (
+                <button
+                  type="button"
+                  className="comment-thread__reply-toggle"
+                  onClick={() => {
+                    setEditing(false);
+                    setEditingBody(comment.body);
+                  }}
+                >
+                  취소
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -106,7 +174,7 @@ function CommentItem({
           <form className="comment-thread__reply-form" onSubmit={handleReplySubmit}>
             <input value={replyBody} onChange={(event) => setReplyBody(event.target.value)} placeholder="답글 내용을 적어 보세요" />
             <button type="submit" className="comment-thread__submit" disabled={submittingReviewId === reviewId || replyBody.trim().length < 2}>
-              {submittingReviewId === reviewId ? '보내는 중' : '등록'}
+              {submittingReviewId === reviewId ? '등록 중' : '등록'}
             </button>
           </form>
         )}
@@ -119,9 +187,13 @@ function CommentItem({
                 comment={reply}
                 reviewId={reviewId}
                 canWriteComment={canWriteComment}
+                currentUserId={currentUserId}
                 submittingReviewId={submittingReviewId}
+                mutatingCommentId={mutatingCommentId}
                 highlightedCommentId={highlightedCommentId}
                 onSubmitComment={onSubmitComment}
+                onUpdateComment={onUpdateComment}
+                onDeleteComment={onDeleteComment}
                 onRequestLogin={onRequestLogin}
                 isReply={true}
               />
@@ -136,10 +208,14 @@ function CommentItem({
 export function CommentThread({
   comments,
   canWriteComment,
+  currentUserId = null,
   submittingReviewId,
+  mutatingCommentId,
   highlightedCommentId,
   reviewId,
   onSubmitComment,
+  onUpdateComment,
+  onDeleteComment,
   onRequestLogin,
 }: CommentThreadProps) {
   const [commentBody, setCommentBody] = useState('');
@@ -162,7 +238,7 @@ export function CommentThread({
       <form className="comment-thread__form" onSubmit={handleSubmit}>
         <input value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="댓글 내용을 적어 보세요" />
         <button type="submit" className="comment-thread__submit" disabled={submittingReviewId === reviewId || commentBody.trim().length < 2}>
-          {submittingReviewId === reviewId ? '올리는 중' : '등록'}
+          {submittingReviewId === reviewId ? '등록 중' : '등록'}
         </button>
       </form>
 
@@ -174,9 +250,13 @@ export function CommentThread({
               comment={comment}
               reviewId={reviewId}
               canWriteComment={canWriteComment}
+              currentUserId={currentUserId}
               submittingReviewId={submittingReviewId}
+              mutatingCommentId={mutatingCommentId}
               highlightedCommentId={highlightedCommentId}
               onSubmitComment={onSubmitComment}
+              onUpdateComment={onUpdateComment}
+              onDeleteComment={onDeleteComment}
               onRequestLogin={onRequestLogin}
             />
           ))}

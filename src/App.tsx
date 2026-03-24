@@ -1,28 +1,45 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import {
   claimStamp,
   createComment,
+  updateComment,
+  deleteComment,
+  deleteReview,
   createReview,
   createUserRoute,
-  getCommunityRoutes,
-  getCuratedCourses,
+  getAuthSession,
   getFestivals,
   getMapBootstrap,
-  getMySummary,
+  getMyCommentsPage,
   getProviderLoginUrl,
+  getReviewDetail,
+  getReviewFeedPage,
   getReviews,
+  importPublicData,
   logout,
   toggleCommunityRouteLike,
   toggleReviewLike,
+  updatePlaceVisibility,
   updateProfile,
   uploadReviewImage,
 } from './api/client';
 import { BottomNav } from './components/BottomNav';
 import { CourseTab } from './components/CourseTab';
+import { EventTab } from './components/EventTab';
 import { FeedTab } from './components/FeedTab';
+import { FloatingBackButton } from './components/FloatingBackButton';
 import { MapTabStage } from './components/MapTabStage';
 import { MyPagePanel } from './components/MyPagePanel';
-import { useAppRouteState, clearAuthQueryParams, getInitialNotice, getLoginReturnUrl, getInitialMapViewport, updateMapViewportInUrl } from './hooks/useAppRouteState';
+import {
+  useAppRouteState,
+  clearAuthQueryParams,
+  getInitialNotice,
+  getLoginReturnUrl,
+  getInitialMapViewport,
+  updateMapViewportInUrl,
+} from './hooks/useAppRouteState';
+import { useAppDataState } from './hooks/useAppDataState';
+import { useAppTabDataLoaders } from './hooks/useAppTabDataLoaders';
 import { getCurrentDevicePosition } from './lib/geolocation';
 import {
   calculateDistanceMeters,
@@ -33,26 +50,21 @@ import {
 } from './lib/visits';
 import type {
   ApiStatus,
-  AuthProvider,
-  BootstrapResponse,
   Category,
   CommunityRouteSort,
+  DrawerState,
   FestivalItem,
-  MyPageResponse,
   MyPageTabKey,
   Place,
   ReviewMood,
+  RoutePreview,
   SessionUser,
   Tab,
-  UserRoute,
 } from './types';
 
-const emptyProviders: AuthProvider[] = [
-  { key: 'naver', label: '네이버', isEnabled: false, loginUrl: null },
-  { key: 'kakao', label: '카카오', isEnabled: false, loginUrl: null },
-];
-
 const STAMP_UNLOCK_RADIUS_METERS = 120;
+
+
 
 function filterPlacesByCategory(places: Place[], category: Category) {
   if (category === 'all') {
@@ -66,8 +78,19 @@ function formatErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message;
   }
+  return '\uC694\uCCAD\uC744 \uCC98\uB9AC\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694. \uC7A0\uC2DC \uB4A4\uC5D0 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.';
+}
 
-  return '요청을 처리하지 못했어요.';
+function reportBackgroundError(error: unknown) {
+  console.error(error);
+}
+
+function TabPanelFallback() {
+  return (
+    <section className="page-panel page-panel--scrollable page-panel--loading">
+      <div className="page-panel__loading-copy">Loading...</div>
+    </section>
+  );
 }
 
 export default function App() {
@@ -88,26 +111,9 @@ export default function App() {
   const [initialMapViewport] = useState(getInitialMapViewport);
 
   const [myPageTab, setMyPageTab] = useState<MyPageTabKey>('stamps');
+  const [feedPlaceFilterId, setFeedPlaceFilterId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [notice, setNotice] = useState<string | null>(getInitialNotice);
-  const [bootstrapStatus, setBootstrapStatus] = useState<ApiStatus>('idle');
-  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
-  const [places, setPlaces] = useState<Place[]>([]);
-  const [festivals, setFestivals] = useState<FestivalItem[]>([]);
-  const [reviews, setReviews] = useState<BootstrapResponse['reviews']>([]);
-  const [selectedPlaceReviews, setSelectedPlaceReviews] = useState<BootstrapResponse['reviews']>([]);
-  const [courses, setCourses] = useState<BootstrapResponse['courses']>([]);
-  const [stampState, setStampState] = useState<BootstrapResponse['stamps']>({
-    collectedPlaceIds: [],
-    logs: [],
-    travelSessions: [],
-  });
-  const [hasRealData, setHasRealData] = useState(true);
-  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
-  const [providers, setProviders] = useState<AuthProvider[]>(emptyProviders);
-  const [communityRoutes, setCommunityRoutes] = useState<UserRoute[]>([]);
-  const [communityRouteSort, setCommunityRouteSort] = useState<CommunityRouteSort>('popular');
-  const [myPage, setMyPage] = useState<MyPageResponse | null>(null);
   const [currentPosition, setCurrentPosition] = useState<{ latitude: number; longitude: number } | null>(null);
   const [mapLocationStatus, setMapLocationStatus] = useState<ApiStatus>('idle');
   const [mapLocationMessage, setMapLocationMessage] = useState<string | null>(null);
@@ -116,21 +122,86 @@ export default function App() {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewLikeUpdatingId, setReviewLikeUpdatingId] = useState<string | null>(null);
   const [commentSubmittingReviewId, setCommentSubmittingReviewId] = useState<string | null>(null);
+  const [commentMutatingId, setCommentMutatingId] = useState<string | null>(null);
+  const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null);
   const [activeCommentReviewId, setActiveCommentReviewId] = useState<string | null>(null);
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
-  const [returnView, setReturnView] = useState<{ tab: Tab; myPageTab: MyPageTabKey; activeCommentReviewId: string | null; highlightedCommentId: string | null } | null>(null);
+  const [highlightedReviewId, setHighlightedReviewId] = useState<string | null>(null);
+  const [returnView, setReturnView] = useState<{
+    tab: Tab;
+    myPageTab: MyPageTabKey;
+    activeCommentReviewId: string | null;
+    highlightedCommentId: string | null;
+    highlightedReviewId: string | null;
+    placeId: string | null;
+    festivalId: string | null;
+    drawerState: DrawerState;
+    feedPlaceFilterId: string | null;
+  } | null>(null);
   const [stampActionStatus, setStampActionStatus] = useState<ApiStatus>('idle');
-  const [stampActionMessage, setStampActionMessage] = useState('장소를 선택하면 오늘 스탬프 가능 여부를 바로 알려드릴게요.');
+  const [stampActionMessage, setStampActionMessage] = useState('장소를 선택하면 오늘 스탬프 가능 여부를 바로 확인할 수 있어요.');
   const [routeSubmitting, setRouteSubmitting] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeLikeUpdatingId, setRouteLikeUpdatingId] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [myPageError, setMyPageError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const communityRoutesCacheRef = useRef<Partial<Record<CommunityRouteSort, UserRoute[]>>>({});
-  const placeReviewsCacheRef = useRef<Record<string, BootstrapResponse['reviews']>>({});
-  const feedLoadedRef = useRef(false);
-  const coursesLoadedRef = useRef(false);
+  const [feedNextCursor, setFeedNextCursor] = useState<string | null>(null);
+  const [feedHasMore, setFeedHasMore] = useState(false);
+  const [feedLoadingMore, setFeedLoadingMore] = useState(false);
+  const [myCommentsNextCursor, setMyCommentsNextCursor] = useState<string | null>(null);
+  const [myCommentsHasMore, setMyCommentsHasMore] = useState(false);
+  const [myCommentsLoadingMore, setMyCommentsLoadingMore] = useState(false);
+  const [myCommentsLoadedOnce, setMyCommentsLoadedOnce] = useState(false);
+
+  const {
+    bootstrapStatus,
+    setBootstrapStatus,
+    bootstrapError,
+    setBootstrapError,
+    places,
+    setPlaces,
+    festivals,
+    setFestivals,
+    reviews,
+    setReviews,
+    selectedPlaceReviews,
+    setSelectedPlaceReviews,
+    courses,
+    setCourses,
+    stampState,
+    setStampState,
+    hasRealData,
+    setHasRealData,
+    sessionUser,
+    setSessionUser,
+    providers,
+    setProviders,
+    communityRoutes,
+    setCommunityRoutes,
+    communityRouteSort,
+    setCommunityRouteSort,
+    myPage,
+    setMyPage,
+    adminSummary,
+    setAdminSummary,
+    adminBusyPlaceId,
+    setAdminBusyPlaceId,
+    adminLoading,
+    setAdminLoading,
+    selectedRoutePreview,
+    setSelectedRoutePreview,
+    communityRoutesCacheRef,
+    placeReviewsCacheRef,
+    feedLoadedRef,
+    coursesLoadedRef,
+    replaceCommunityRoutes,
+    patchCommunityRoutes,
+    patchReviewCollections,
+    upsertReviewCollections,
+    resetReviewCaches,
+  } = useAppDataState(selectedPlaceId);
 
   const filteredPlaces = useMemo(() => filterPlacesByCategory(places, activeCategory), [places, activeCategory]);
   const selectedPlace = useMemo(() => {
@@ -140,6 +211,16 @@ export default function App() {
 
     return places.find((place) => place.id === selectedPlaceId) ?? null;
   }, [places, selectedPlaceId]);
+  const routePreviewPlaces = useMemo(() => {
+    if (!selectedRoutePreview) {
+      return [];
+    }
+
+    return selectedRoutePreview.placeIds
+      .map((placeId) => places.find((place) => place.id === placeId) ?? null)
+      .filter(Boolean) as Place[];
+  }, [places, selectedRoutePreview]);
+
   const selectedFestival = useMemo(() => {
     if (!selectedFestivalId) {
       return null;
@@ -154,87 +235,59 @@ export default function App() {
     selectedPlace && currentPosition
       ? calculateDistanceMeters(currentPosition.latitude, currentPosition.longitude, selectedPlace.latitude, selectedPlace.longitude)
       : null;
-  const canCreateReview = Boolean(sessionUser && selectedPlace && todayStamp);
-  const placeNameById = useMemo(() => Object.fromEntries(places.map((place) => [place.id, place.name])), [places]);
-  function replaceCommunityRoutes(nextRoutes: UserRoute[], sort: CommunityRouteSort = communityRouteSort) {
-    communityRoutesCacheRef.current[sort] = nextRoutes;
-    setCommunityRoutes(nextRoutes);
-  }
-  async function fetchCommunityRoutes(sort: CommunityRouteSort, force = false) {
-    const cached = communityRoutesCacheRef.current[sort];
-    if (!force && cached) {
-      setCommunityRoutes(cached);
-      return cached;
+  const knownMyReviews = useMemo(() => {
+    if (!sessionUser) {
+      return [];
     }
-    const nextRoutes = await getCommunityRoutes(sort);
-    communityRoutesCacheRef.current[sort] = nextRoutes;
-    setCommunityRoutes(nextRoutes);
-    return nextRoutes;
-  }
-  function patchCommunityRoutes(routeId: string, updater: (route: UserRoute) => UserRoute) {
-    const nextCache: Partial<Record<CommunityRouteSort, UserRoute[]>> = {};
-    for (const sortKey of Object.keys(communityRoutesCacheRef.current) as CommunityRouteSort[]) {
-      const routes = communityRoutesCacheRef.current[sortKey];
-      if (!routes) {
+
+    const reviewMap = new Map();
+    for (const review of [...reviews, ...selectedPlaceReviews, ...(myPage?.reviews ?? [])]) {
+      if (review.userId !== sessionUser.id) {
         continue;
       }
-      nextCache[sortKey] = routes.map((route) => (route.id === routeId ? updater(route) : route));
+      reviewMap.set(review.id, review);
     }
-    communityRoutesCacheRef.current = nextCache;
-    setCommunityRoutes((current) => current.map((route) => (route.id === routeId ? updater(route) : route)));
-  }
-  function patchReviewCollections(reviewId: string, updater: (review: BootstrapResponse['reviews'][number]) => BootstrapResponse['reviews'][number]) {
-    setReviews((current) => current.map((review) => (review.id === reviewId ? updater(review) : review)));
-    setSelectedPlaceReviews((current) => current.map((review) => (review.id === reviewId ? updater(review) : review)));
-    for (const placeId of Object.keys(placeReviewsCacheRef.current)) {
-      placeReviewsCacheRef.current[placeId] = placeReviewsCacheRef.current[placeId].map((review) =>
-        review.id === reviewId ? updater(review) : review,
-      );
-    }
-  }
 
-  function upsertReviewCollections(review: BootstrapResponse['reviews'][number]) {
-    setReviews((current) => [review, ...current.filter((currentReview) => currentReview.id !== review.id)]);
-    if (selectedPlaceId === review.placeId) {
-      setSelectedPlaceReviews((current) => [review, ...current.filter((currentReview) => currentReview.id !== review.id)]);
+    return [...reviewMap.values()];
+  }, [myPage?.reviews, reviews, selectedPlaceReviews, sessionUser]);
+  const hasCreatedReviewToday = useMemo(() => {
+    if (!sessionUser || !todayStamp) {
+      return false;
     }
-    const cachedPlaceReviews = placeReviewsCacheRef.current[review.placeId] ?? [];
-    placeReviewsCacheRef.current[review.placeId] = [review, ...cachedPlaceReviews.filter((currentReview) => currentReview.id !== review.id)];
-  }
 
-  async function ensureFeedReviews(force = false) {
-    if (!force && feedLoadedRef.current) {
-      return;
-    }
-    const nextReviews = await getReviews();
-    setReviews(nextReviews);
-    feedLoadedRef.current = true;
-  }
-
-  async function ensureCuratedCourses(force = false) {
-    if (!force && coursesLoadedRef.current) {
-      return;
-    }
-    const response = await getCuratedCourses();
-    setCourses(response.courses);
-    coursesLoadedRef.current = true;
-  }
-
-  async function refreshMyPageForUser(user: SessionUser | null, force = false) {
-    if (!user) {
-      setMyPage(null);
-      return null;
-    }
-    if (!force && activeTab !== 'my' && myPage === null) {
-      return null;
-    }
-    const nextMyPage = await getMySummary();
-    setMyPage(nextMyPage);
-    return nextMyPage;
-  }
+    return knownMyReviews.some((review) => review.stampId === todayStamp.id || review.visitedAt.startsWith(todayStamp.stampedDate));
+  }, [knownMyReviews, sessionUser, todayStamp]);
+  const canCreateReview = Boolean(sessionUser && selectedPlace && todayStamp && !hasCreatedReviewToday);
+  const placeNameById = useMemo(() => Object.fromEntries(places.map((place) => [place.id, place.name])), [places]);
+  const {
+    fetchCommunityRoutes,
+    ensureFeedReviews,
+    ensureCuratedCourses,
+    refreshAdminSummary,
+    refreshMyPageForUser,
+  } = useAppTabDataLoaders({
+    activeTab,
+    adminSummary,
+    myPage,
+    sessionUser,
+    communityRoutesCacheRef,
+    feedLoadedRef,
+    coursesLoadedRef,
+    replaceCommunityRoutes,
+    setCommunityRoutes,
+    setReviews,
+    setFeedHasMore,
+    setFeedNextCursor,
+    setCourses,
+    setAdminLoading,
+    setAdminSummary,
+    setMyPage,
+    setMyPageError,
+  });
 
   function handleOpenReviewComments(reviewId: string, commentId: string | null = null) {
     goToTab('feed');
+    setHighlightedReviewId(reviewId ?? null);
     setActiveCommentReviewId(reviewId);
     setHighlightedCommentId(commentId);
   }
@@ -244,91 +297,273 @@ export default function App() {
     setHighlightedCommentId(null);
   }
 
-  function handleOpenPlaceWithReturn(placeId: string) {
+  function handleOpenRoutePreview(route: RoutePreview) {
     if (activeTab !== 'map') {
       setReturnView({
         tab: activeTab,
         myPageTab,
         activeCommentReviewId,
         highlightedCommentId,
+        highlightedReviewId,
+        placeId: selectedPlaceId,
+        festivalId: selectedFestivalId,
+        drawerState,
+        feedPlaceFilterId,
       });
     }
+    setSelectedRoutePreview(route);
+    handleCloseReviewComments();
+    commitRouteState({ tab: 'map', placeId: null, festivalId: null, drawerState: 'closed' }, activeTab === 'map' ? 'replace' : 'push');
+  }
+
+  function handleOpenPlaceWithReturn(placeId: string) {
+    if (activeTab !== 'map') {
+      const preserveFeedFocus = activeTab !== 'feed';
+      setReturnView({
+        tab: activeTab,
+        myPageTab,
+        activeCommentReviewId: preserveFeedFocus ? activeCommentReviewId : null,
+        highlightedCommentId: preserveFeedFocus ? highlightedCommentId : null,
+        highlightedReviewId: preserveFeedFocus ? highlightedReviewId : null,
+        placeId: selectedPlaceId,
+        festivalId: selectedFestivalId,
+        drawerState,
+        feedPlaceFilterId,
+      });
+    }
+    setSelectedRoutePreview(null);
     openPlace(placeId);
   }
+
+
+  function handleOpenFestivalWithReturn(festivalId: string) {
+    if (activeTab !== 'map') {
+      setReturnView({
+        tab: activeTab,
+        myPageTab,
+        activeCommentReviewId,
+        highlightedCommentId,
+        highlightedReviewId,
+        placeId: selectedPlaceId,
+        festivalId: selectedFestivalId,
+        drawerState,
+        feedPlaceFilterId,
+      });
+    }
+    setSelectedRoutePreview(null);
+    openFestival(festivalId);
+  }
+  async function ensureReviewLoadedById(reviewId: string | null) {
+    if (!reviewId) {
+      return null;
+    }
+
+    const existing = [...reviews, ...selectedPlaceReviews, ...(myPage?.reviews ?? [])].find((review) => review.id === reviewId) ?? null;
+    if (existing) {
+      upsertReviewCollections(existing);
+      return existing;
+    }
+
+    try {
+      const loaded = await getReviewDetail(reviewId);
+      upsertReviewCollections(loaded);
+      return loaded;
+    } catch (error) {
+      setNotice(formatErrorMessage(error));
+      return null;
+    }
+  }
+
+  async function handleOpenReviewWithReturn(reviewId: string | null) {
+    await ensureReviewLoadedById(reviewId);
+    if (activeTab !== 'feed') {
+      setReturnView({
+        tab: activeTab,
+        myPageTab,
+        activeCommentReviewId,
+        highlightedCommentId,
+        highlightedReviewId,
+        placeId: selectedPlaceId,
+        festivalId: selectedFestivalId,
+        drawerState,
+        feedPlaceFilterId,
+      });
+    }
+    setFeedPlaceFilterId(null);
+    setHighlightedReviewId(reviewId);
+    setHighlightedCommentId(null);
+    setActiveCommentReviewId(null);
+    goToTab('feed');
+  }
+
+  function handleOpenPlaceFeedWithReturn(placeId: string) {
+    if (activeTab !== 'feed') {
+      setReturnView({
+        tab: activeTab,
+        myPageTab,
+        activeCommentReviewId,
+        highlightedCommentId,
+        highlightedReviewId,
+        placeId: selectedPlaceId,
+        festivalId: selectedFestivalId,
+        drawerState,
+        feedPlaceFilterId,
+      });
+    }
+    setSelectedRoutePreview(null);
+    setSelectedRoutePreview(null);
+    setFeedPlaceFilterId(placeId);
+    setHighlightedReviewId(null);
+    setHighlightedCommentId(null);
+    setActiveCommentReviewId(null);
+    goToTab('feed');
+  }
+
+  async function loadMoreFeedReviews() {
+    if (feedLoadingMore || !feedHasMore) {
+      return;
+    }
+
+    setFeedLoadingMore(true);
+    try {
+      const page = await getReviewFeedPage({ cursor: feedNextCursor, limit: 10 });
+      setReviews((current) => {
+        const existingIds = new Set(current.map((review) => review.id));
+        const nextItems = page.items.filter((review) => !existingIds.has(review.id));
+        return [...current, ...nextItems];
+      });
+      setFeedNextCursor(page.nextCursor);
+      setFeedHasMore(Boolean(page.nextCursor));
+    } catch (error) {
+      reportBackgroundError(error);
+    } finally {
+      setFeedLoadingMore(false);
+    }
+  }
+
+  async function loadMoreMyComments(initial = false) {
+    if (!sessionUser || !myPage) {
+      return;
+    }
+    if (myCommentsLoadingMore || (!initial && !myCommentsHasMore)) {
+      return;
+    }
+
+    setMyCommentsLoadingMore(true);
+    setMyCommentsLoadedOnce(true);
+    try {
+      const page = await getMyCommentsPage({ cursor: initial ? null : myCommentsNextCursor, limit: 10 });
+      setMyPage((current) => {
+        if (!current) {
+          return current;
+        }
+        const base = initial ? [] : current.comments;
+        const existingIds = new Set(base.map((comment) => comment.id));
+        const nextItems = page.items.filter((comment) => !existingIds.has(comment.id));
+        return {
+          ...current,
+          comments: [...base, ...nextItems],
+        };
+      });
+      setMyCommentsNextCursor(page.nextCursor);
+      setMyCommentsHasMore(Boolean(page.nextCursor));
+    } catch (error) {
+      reportBackgroundError(error);
+    } finally {
+      setMyCommentsLoadingMore(false);
+    }
+  }
+
+  async function handleOpenCommentWithReturn(reviewId: string, commentId: string | null = null) {
+    if (activeTab !== 'feed') {
+      setReturnView({
+        tab: activeTab,
+        myPageTab,
+        activeCommentReviewId,
+        highlightedCommentId,
+        highlightedReviewId,
+        placeId: selectedPlaceId,
+        festivalId: selectedFestivalId,
+        drawerState,
+        feedPlaceFilterId,
+      });
+    }
+    await ensureReviewLoadedById(reviewId);
+    handleOpenReviewComments(reviewId, commentId);
+  }
+
+  useEffect(() => {
+    if (!selectedPlace) {
+      setStampActionMessage('\uC7A5\uC18C\uB97C \uC120\uD0DD\uD558\uBA74 \uC624\uB298 \uC2A4\uD0EC\uD504 \uAC00\uB2A5 \uC5EC\uBD80\uB97C \uBC14\uB85C \uD655\uC778\uD560 \uC218 \uC788\uC5B4\uC694.');
+      return;
+    }
+
+    if (!sessionUser) {
+      setStampActionMessage(`${selectedPlace.name}\uC5D0\uC11C \uC2A4\uD0EC\uD504\uB97C \uCC0D\uC73C\uB824\uBA74 \uBA3C\uC800 \uB85C\uADF8\uC778\uD574 \uC8FC\uC138\uC694.`);
+      return;
+    }
+
+    if (todayStamp) {
+      setStampActionMessage(`${todayStamp.visitLabel} \uC624\uB298 \uC2A4\uD0EC\uD504\uB97C \uC774\uBBF8 \uCC0D\uC5C8\uC5B4\uC694.`);
+      return;
+    }
+
+    if (typeof selectedPlaceDistanceMeters !== 'number') {
+      setStampActionMessage('\uD604\uC7AC \uC704\uCE58\uB97C \uD655\uC778\uD558\uBA74 \uC624\uB298 \uC2A4\uD0EC\uD504 \uAC00\uB2A5 \uC5EC\uBD80\uB97C \uBC14\uB85C \uC548\uB0B4\uD574 \uB4DC\uB9B4\uAC8C\uC694.');
+      return;
+    }
+
+    if (selectedPlaceDistanceMeters <= STAMP_UNLOCK_RADIUS_METERS) {
+      setStampActionMessage(`\uD604\uC7A5 \uBC18\uACBD ${formatDistanceMeters(selectedPlaceDistanceMeters)} \uC548\uC774\uC5D0\uC694. \uC9C0\uAE08 \uBC14\uB85C \uC624\uB298 \uC2A4\uD0EC\uD504\uB97C \uCC0D\uC744 \uC218 \uC788\uC5B4\uC694.`);
+      return;
+    }
+
+    setStampActionMessage(`\uD604\uC7A5\uAE4C\uC9C0 ${formatDistanceMeters(selectedPlaceDistanceMeters)} \uB0A8\uC544 \uC788\uC5B4\uC694. ${STAMP_UNLOCK_RADIUS_METERS}m \uC548\uC73C\uB85C \uB4E4\uC5B4\uC624\uBA74 \uC624\uB298 \uC2A4\uD0EC\uD504\uB97C \uCC0D\uC744 \uC218 \uC788\uC5B4\uC694.`);
+  }, [selectedPlace, selectedPlaceDistanceMeters, sessionUser, todayStamp]);
 
   useEffect(() => {
     void loadApp(true);
   }, []);
 
   useEffect(() => {
-    if (activeTab !== 'map' || mapLocationStatus !== 'idle') {
+    if (activeTab === 'feed') {
+      void ensureFeedReviews().catch(reportBackgroundError);
       return;
     }
 
-    void refreshCurrentPosition(false);
-  }, [activeTab, mapLocationStatus]);
+    if (activeTab === 'course') {
+      void ensureCuratedCourses().catch(reportBackgroundError);
+      void fetchCommunityRoutes(communityRouteSort).catch(reportBackgroundError);
+      return;
+    }
+
+    if (activeTab === 'my') {
+      if (sessionUser && myPage === null) {
+        void refreshMyPageForUser(sessionUser, true).catch(reportBackgroundError);
+      }
+      if (sessionUser?.isAdmin && myPageTab === 'admin' && adminSummary === null) {
+        void refreshAdminSummary().catch(reportBackgroundError);
+      }
+      if (sessionUser && myPage && myPageTab === 'comments' && !myCommentsLoadedOnce) {
+        void loadMoreMyComments(true);
+      }
+    }
+  }, [
+    activeTab,
+    communityRouteSort,
+    sessionUser,
+    myPage,
+    myPageTab,
+    adminSummary,
+    myCommentsLoadedOnce,
+  ]);
 
   useEffect(() => {
-    if (!notice) {
-      return;
-    }
-    const timeout = window.setTimeout(() => setNotice(null), 3200);
-    return () => window.clearTimeout(timeout);
-  }, [notice]);
-  useEffect(() => {
-    if (activeTab === 'my' && sessionUser && !myPage) {
-      void refreshMyPageForUser(sessionUser, true);
-    }
-  }, [activeTab, myPage, sessionUser]);
-
-  useEffect(() => {
-    if (activeTab !== 'course') {
+    if (activeTab !== 'map') {
+      setSelectedPlaceReviews([]);
       return;
     }
 
-    void ensureCuratedCourses().catch((error) => {
-      setNotice(formatErrorMessage(error));
-    });
-
-    const cached = communityRoutesCacheRef.current[communityRouteSort];
-    if (cached) {
-      setCommunityRoutes(cached);
-      return;
-    }
-
-    void fetchCommunityRoutes(communityRouteSort, true).catch((error) => {
-      setNotice(formatErrorMessage(error));
-    });
-  }, [activeTab, communityRouteSort]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (communityRoutesCacheRef.current[communityRouteSort]) {
-      return;
-    }
-
-    const run = () => {
-      void fetchCommunityRoutes(communityRouteSort, true).catch(() => {});
-    };
-
-    const timeout = window.setTimeout(run, 180);
-    return () => window.clearTimeout(timeout);
-  }, [communityRouteSort]);
-
-  useEffect(() => {
-    if (activeTab !== 'feed' && activeCommentReviewId === null) {
-      return;
-    }
-
-    void ensureFeedReviews().catch((error) => {
-      setNotice(formatErrorMessage(error));
-    });
-  }, [activeCommentReviewId, activeTab]);
-
-  useEffect(() => {
     if (!selectedPlaceId) {
       setSelectedPlaceReviews([]);
       return;
@@ -345,65 +580,8 @@ export default function App() {
         placeReviewsCacheRef.current[selectedPlaceId] = nextReviews;
         setSelectedPlaceReviews(nextReviews);
       })
-      .catch((error) => {
-        setNotice(formatErrorMessage(error));
-      });
-  }, [selectedPlaceId]);
-
-  useEffect(() => {
-    if (activeTab !== 'feed' && activeCommentReviewId !== null) {
-      setActiveCommentReviewId(null);
-      setHighlightedCommentId(null);
-    }
-  }, [activeCommentReviewId, activeTab]);
-
-  useEffect(() => {
-    if (!selectedPlaceId) {
-      return;
-    }
-
-    const isVisibleInCurrentCategory = filteredPlaces.some((place) => place.id === selectedPlaceId);
-    if (!isVisibleInCurrentCategory) {
-      commitRouteState(
-        {
-          tab: 'map',
-          placeId: null,
-          festivalId: null,
-          drawerState: 'closed',
-        },
-        'replace',
-      );
-    }
-  }, [commitRouteState, filteredPlaces, selectedPlaceId]);
-
-  useEffect(() => {
-    if (!selectedPlace) {
-      setStampActionMessage('장소를 선택하면 오늘 스탬프 가능 여부를 바로 알려드릴게요.');
-      return;
-    }
-
-    if (!sessionUser) {
-      setStampActionMessage(`로그인하면 ${selectedPlace.name}에서 바로 현장 스탬프를 찍을 수 있어요.`);
-      return;
-    }
-
-    if (todayStamp) {
-      setStampActionMessage(`${todayStamp.visitLabel} 스탬프를 이미 찍었어요. 오늘 피드와 코스로 바로 이어갈 수 있어요.`);
-      return;
-    }
-
-    if (typeof selectedPlaceDistanceMeters !== 'number') {
-      setStampActionMessage('현재 위치를 확인하면 스탬프 가능 여부를 바로 알려드릴게요.');
-      return;
-    }
-
-    if (selectedPlaceDistanceMeters <= STAMP_UNLOCK_RADIUS_METERS) {
-      setStampActionMessage(`현재 약 ${formatDistanceMeters(selectedPlaceDistanceMeters)} 거리예요. 지금 바로 스탬프를 찍을 수 있어요.`);
-      return;
-    }
-
-    setStampActionMessage(`현재 약 ${formatDistanceMeters(selectedPlaceDistanceMeters)} 거리예요. ${STAMP_UNLOCK_RADIUS_METERS}m 안으로 들어오면 스탬프가 열려요.`);
-  }, [selectedPlace, selectedPlaceDistanceMeters, sessionUser, todayStamp]);
+      .catch(reportBackgroundError);
+  }, [activeTab, selectedPlaceId]);
 
   async function loadApp(withLoading: boolean) {
     const authParams = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search);
@@ -425,10 +603,14 @@ export default function App() {
       setStampState(bootstrap.stamps);
       setHasRealData(bootstrap.hasRealData);
       setSessionUser(bootstrap.auth.user);
-      placeReviewsCacheRef.current = {};
-      feedLoadedRef.current = false;
-      coursesLoadedRef.current = false;
-      setSelectedPlaceReviews([]);
+      resetReviewCaches();
+      setFeedNextCursor(null);
+      setFeedHasMore(false);
+      setFeedLoadingMore(false);
+      setMyCommentsNextCursor(null);
+      setMyCommentsHasMore(false);
+      setMyCommentsLoadingMore(false);
+      setMyCommentsLoadedOnce(false);
       setProviders(bootstrap.auth.providers);
       setSelectedPlaceId((current) => (current && bootstrap.places.some((place) => place.id === current) ? current : null));
       setSelectedFestivalId((current) => (current && festivalResult.some((festival) => festival.id === current) ? current : null));
@@ -444,7 +626,7 @@ export default function App() {
       setBootstrapStatus('ready');
       if (authState === 'naver-success' && bootstrap.auth.user?.profileCompletedAt === null) {
         goToTab('my');
-        setNotice('닉네임을 먼저 저장하면 바로 피드와 코스로 이어갈 수 있어요.');
+        setNotice('닉네임을 먼저 정하면 같은 계정으로 스탬프와 피드를 이어서 남길 수 있어요.');
       }
     } catch (error) {
       setBootstrapError(formatErrorMessage(error));
@@ -462,7 +644,7 @@ export default function App() {
       const nextPosition = await getCurrentDevicePosition();
       setCurrentPosition({ latitude: nextPosition.latitude, longitude: nextPosition.longitude });
       setMapLocationStatus('ready');
-      setMapLocationMessage(`현재 위치를 다시 잡았어요. 예상 오차는 약 ${formatDistanceMeters(nextPosition.accuracyMeters)}예요.`);
+      setMapLocationMessage(`현재 위치를 확인했어요. 위치 정확도는 약 ${formatDistanceMeters(nextPosition.accuracyMeters)}예요.`);
       if (shouldFocusMap) {
         setMapLocationFocusKey((current) => current + 1);
       }
@@ -480,7 +662,7 @@ export default function App() {
   async function handleClaimStamp(place: Place) {
     if (!sessionUser) {
       goToTab('my');
-      setNotice('로그인해야 현장 스탬프를 찍을 수 있어요.');
+      setNotice('로그인하면 스탬프를 찍고 피드도 남길 수 있어요.');
       return;
     }
 
@@ -494,7 +676,7 @@ export default function App() {
         longitude: nextPosition.longitude,
       });
       setStampState(nextStampState);
-      setNotice(`${place.name}에서 오늘 스탬프를 찍었어요.`);
+        setNotice(`${place.name}에서 오늘 스탬프를 찍었어요.`);
       commitRouteState(
         {
           tab: 'map',
@@ -534,7 +716,7 @@ export default function App() {
       });
       upsertReviewCollections(createdReview);
       await refreshMyPageForUser(sessionUser);
-      setNotice('피드를 남겼어요. 같은 여행 흐름으로 코스까지 이어갈 수 있어요.');
+      setNotice('피드를 남겼어요. 이제 다른 장소도 이어서 둘러볼 수 있어요.');
       commitRouteState(
         {
           tab: 'map',
@@ -570,6 +752,105 @@ export default function App() {
       setNotice(formatErrorMessage(error));
     } finally {
       setCommentSubmittingReviewId(null);
+    }
+  }
+
+  async function handleUpdateComment(reviewId: string, commentId: string, body: string) {
+    if (!sessionUser) {
+      goToTab('my');
+      setNotice('댓글을 수정하려면 먼저 로그인해 주세요.');
+      return;
+    }
+
+    setCommentMutatingId(commentId);
+    try {
+      const updatedComments = await updateComment(reviewId, commentId, { body });
+      patchReviewCollections(reviewId, (review) => ({
+        ...review,
+        comments: updatedComments,
+        commentCount: updatedComments.length,
+      }));
+      if (activeTab === 'my') {
+        await refreshMyPageForUser(sessionUser, true);
+      }
+    } catch (error) {
+      setNotice(formatErrorMessage(error));
+    } finally {
+      setCommentMutatingId(null);
+    }
+  }
+
+  async function handleDeleteComment(reviewId: string, commentId: string) {
+    if (!sessionUser) {
+      goToTab('my');
+      setNotice('댓글을 삭제하려면 먼저 로그인해 주세요.');
+      return;
+    }
+
+    setCommentMutatingId(commentId);
+    try {
+      const updatedComments = await deleteComment(reviewId, commentId);
+      patchReviewCollections(reviewId, (review) => ({
+        ...review,
+        comments: updatedComments,
+        commentCount: updatedComments.length,
+      }));
+      if (activeTab === 'my') {
+        await refreshMyPageForUser(sessionUser, true);
+      }
+    } catch (error) {
+      setNotice(formatErrorMessage(error));
+    } finally {
+      setCommentMutatingId(null);
+    }
+  }
+
+  async function handleDeleteReview(reviewId: string) {
+    if (!sessionUser) {
+      goToTab('my');
+      setNotice('피드를 삭제하려면 먼저 로그인해 주세요.');
+      return;
+    }
+    if (!window.confirm('이 피드를 삭제할까요?')) {
+      return;
+    }
+
+    setDeletingReviewId(reviewId);
+    try {
+      await deleteReview(reviewId);
+      setReviews((current) => current.filter((review) => review.id !== reviewId));
+      setSelectedPlaceReviews((current) => current.filter((review) => review.id !== reviewId));
+      for (const placeId of Object.keys(placeReviewsCacheRef.current)) {
+        placeReviewsCacheRef.current[placeId] = placeReviewsCacheRef.current[placeId].filter((review) => review.id !== reviewId);
+      }
+      setMyPage((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          reviews: current.reviews.filter((review) => review.id !== reviewId),
+          comments: current.comments.filter((comment) => comment.reviewId !== reviewId),
+          stats: {
+            ...current.stats,
+            reviewCount: Math.max(0, current.stats.reviewCount - 1),
+          },
+        };
+      });
+      if (activeCommentReviewId === reviewId) {
+        handleCloseReviewComments();
+      }
+      if (highlightedReviewId === reviewId) {
+        setHighlightedReviewId(null);
+      }
+      setNotice('피드를 삭제했어요.');
+      if (activeTab === 'my') {
+        await refreshMyPageForUser(sessionUser, true);
+      }
+    } catch (error) {
+      setNotice(formatErrorMessage(error));
+    } finally {
+      setDeletingReviewId(null);
     }
   }
 
@@ -609,6 +890,23 @@ export default function App() {
         likeCount: result.likeCount,
         likedByMe: result.likedByMe,
       }));
+      setMyPage((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          routes: current.routes.map((route) =>
+            route.id === routeId
+              ? {
+                  ...route,
+                  likeCount: result.likeCount,
+                  likedByMe: result.likedByMe,
+                }
+              : route,
+          ),
+        };
+      });
     } catch (error) {
       setNotice(formatErrorMessage(error));
     } finally {
@@ -619,7 +917,7 @@ export default function App() {
   async function handlePublishRoute(payload: { travelSessionId: string; title: string; description: string; mood: string }) {
     if (!sessionUser) {
       goToTab('my');
-      setRouteError('로그인한 뒤에만 여행 세션을 코스로 발행할 수 있어요.');
+      setRouteError('로그인하면 여행 세션을 코스로 발행할 수 있어요.');
       return;
     }
     setRouteSubmitting(true);
@@ -654,12 +952,83 @@ export default function App() {
           },
         };
       });
-      setNotice('여행 세션을 공개 코스로 발행했어요. 이제 다른 사용자도 이 경로를 볼 수 있어요.');
+      setNotice('코스를 발행했어요. 공개 경로 탭에서 바로 확인할 수 있어요.');
       setMyPageTab('routes');
     } catch (error) {
       setRouteError(formatErrorMessage(error));
     } finally {
       setRouteSubmitting(false);
+    }
+  }
+
+  async function handleToggleAdminPlace(placeId: string, nextValue: boolean) {
+    if (!sessionUser?.isAdmin) {
+      return;
+    }
+    setAdminBusyPlaceId(placeId);
+    try {
+      const updated = await updatePlaceVisibility(placeId, { isActive: nextValue });
+      setAdminSummary((current) => current ? {
+        ...current,
+        places: current.places.map((place) => place.id === placeId ? updated : place),
+      } : current);
+      const nextMap = await getMapBootstrap();
+      setPlaces(nextMap.places);
+      setStampState(nextMap.stamps);
+      setHasRealData(nextMap.hasRealData);
+      setNotice(nextValue ? '\uC7A5\uC18C \uB178\uCD9C\uC744 \uCF1C\uB450\uC5C8\uC5B4\uC694.' : '\uC7A5\uC18C \uB178\uCD9C\uC744 \uC228\uACBC\uC5B4\uC694.');
+    } catch (error) {
+      setNotice(formatErrorMessage(error));
+    } finally {
+      setAdminBusyPlaceId(null);
+    }
+  }
+
+
+  async function handleToggleAdminManualOverride(placeId: string, nextValue: boolean) {
+    if (!sessionUser?.isAdmin) {
+      return;
+    }
+    setAdminBusyPlaceId(placeId);
+    try {
+      const updated = await updatePlaceVisibility(placeId, { isManualOverride: nextValue });
+      setAdminSummary((current) => current ? {
+        ...current,
+        places: current.places.map((place) => place.id === placeId ? updated : place),
+      } : current);
+      setNotice(nextValue ? '공공데이터 자동 동기화에서 보호해둘게요.' : '공공데이터 자동 동기화 보호를 해제했어요.');
+    } catch (error) {
+      setNotice(formatErrorMessage(error));
+    } finally {
+      setAdminBusyPlaceId(null);
+    }
+  }
+
+  async function handleRefreshAdminImport() {
+    if (!sessionUser?.isAdmin) {
+      return;
+    }
+
+    setAdminLoading(true);
+    try {
+      await importPublicData();
+      const [nextSummary, nextMap, nextFestivals] = await Promise.all([
+        refreshAdminSummary(true),
+        getMapBootstrap(),
+        getFestivals(),
+      ]);
+      if (nextSummary) {
+        setAdminSummary(nextSummary);
+      }
+      setPlaces(nextMap.places);
+      setStampState(nextMap.stamps);
+      setHasRealData(nextMap.hasRealData);
+      setFestivals(nextFestivals);
+      setNotice('행사 데이터를 다시 불러왔어요.');
+    } catch (error) {
+      setNotice(formatErrorMessage(error));
+    } finally {
+      setAdminLoading(false);
     }
   }
 
@@ -676,7 +1045,7 @@ export default function App() {
       if (auth.user) {
         setMyPage((current) => (current && auth.user ? { ...current, user: auth.user } : current));
       }
-      setNotice('닉네임을 저장했어요. 이제 메인 흐름으로 바로 이어갈 수 있어요.');
+      setNotice('닉네임을 저장했어요. 이제 같은 계정으로 기록을 이어볼 수 있어요.');
     } catch (error) {
       setProfileError(formatErrorMessage(error));
     } finally {
@@ -699,16 +1068,46 @@ export default function App() {
     }
   }
 
-  const canNavigateBack = activeCommentReviewId !== null || activeTab !== 'map' || selectedPlaceId !== null || selectedFestivalId !== null || drawerState !== 'closed';
+  const canNavigateBack =
+    returnView !== null ||
+    activeCommentReviewId !== null ||
+    activeTab !== 'map' ||
+    selectedPlaceId !== null ||
+    selectedFestivalId !== null ||
+    drawerState !== 'closed' ||
+    selectedRoutePreview !== null ||
+    (typeof window !== 'undefined' && window.history.length > 1);
 
   function handleNavigateBack() {
-    if (returnView && activeTab === 'map') {
+    if (returnView) {
       setMyPageTab(returnView.myPageTab);
       setActiveCommentReviewId(returnView.activeCommentReviewId);
       setHighlightedCommentId(returnView.highlightedCommentId);
+      setHighlightedReviewId(returnView.highlightedReviewId);
+      setFeedPlaceFilterId(returnView.feedPlaceFilterId);
+      setSelectedRoutePreview(null);
+      setSelectedRoutePreview(null);
       const nextTab = returnView.tab;
       setReturnView(null);
-      commitRouteState({ tab: nextTab, placeId: null, festivalId: null, drawerState: 'closed' }, 'replace');
+      commitRouteState(
+        {
+          tab: nextTab,
+          placeId: nextTab === 'map' ? returnView.placeId : null,
+          festivalId: nextTab === 'map' ? returnView.festivalId : null,
+          drawerState: nextTab === 'map' ? returnView.drawerState : 'closed',
+        },
+        'replace',
+      );
+      return;
+    }
+
+    if (selectedRoutePreview) {
+      setSelectedRoutePreview(null);
+      return;
+    }
+
+    if (selectedRoutePreview) {
+      setSelectedRoutePreview(null);
       return;
     }
 
@@ -726,11 +1125,46 @@ export default function App() {
     goToTab('map', 'replace');
   }
 
+  function handleBottomNavChange(nextTab: Tab) {
+    setSelectedRoutePreview(null);
+    handleCloseReviewComments();
+
+    if (nextTab !== 'feed') {
+      setFeedPlaceFilterId(null);
+      setHighlightedReviewId(null);
+    }
+
+    if (nextTab === 'map') {
+      commitRouteState(
+        {
+          tab: 'map',
+          placeId: selectedPlaceId,
+          festivalId: selectedFestivalId,
+          drawerState,
+        },
+        'replace',
+      );
+      return;
+    }
+
+    commitRouteState(
+      {
+        tab: nextTab,
+        placeId: null,
+        festivalId: null,
+        drawerState: 'closed',
+      },
+      'push',
+    );
+  }
+
   const reviewProofMessage = !sessionUser
-    ? '로그인한 뒤 스탬프를 찍어야 피드를 작성할 수 있어요.'
-    : todayStamp
-      ? `${todayStamp.visitLabel} 스탬프가 있어요. 지금 이 장소 피드를 바로 남길 수 있어요.`
-      : '오늘 스탬프를 찍으면 피드 작성 버튼이 바로 열려요.';
+    ? '\uB85C\uADF8\uC778\uD558\uBA74 \uC624\uB298 \uBC29\uBB38 \uC778\uC99D \uB4A4\uC5D0\uB9CC \uD53C\uB4DC\uB97C \uB0A8\uAE38 \uC218 \uC788\uC5B4\uC694.'
+    : hasCreatedReviewToday
+      ? '\uC624\uB298\uC740 \uC774\uBBF8 \uC774 \uC7A5\uC18C \uD53C\uB4DC\uB97C \uC791\uC131\uD588\uC5B4\uC694. \uD53C\uB4DC\uB294 \uD558\uB8E8\uC5D0 \uD558\uB098\uB9CC \uB0A8\uAE38 \uC218 \uC788\uC5B4\uC694.'
+      : todayStamp
+        ? `${todayStamp.visitLabel} \uBC29\uBB38 \uC2A4\uD0EC\uD504\uAC00 \uD655\uC778\uB410\uC5B4\uC694. \uC624\uB298 \uD53C\uB4DC \uD55C \uAC1C\uB97C \uC791\uC131\uD560 \uC218 \uC788\uC5B4\uC694.`
+        : '\uC624\uB298 \uBC29\uBB38 \uC2A4\uD0EC\uD504\uB97C \uBA3C\uC800 \uCC0D\uC73C\uBA74 \uD53C\uB4DC\uB97C \uC791\uC131\uD560 \uC218 \uC788\uC5B4\uC694.';
 
   return (
     <div className="map-app-shell">
@@ -753,6 +1187,8 @@ export default function App() {
             drawerState={drawerState}
             sessionUser={sessionUser}
             selectedPlaceReviews={selectedPlaceReviews}
+            routePreview={selectedRoutePreview}
+            routePreviewPlaces={routePreviewPlaces}
             visitCount={visitCount}
             latestStamp={latestStamp}
             todayStamp={todayStamp}
@@ -761,14 +1197,26 @@ export default function App() {
             reviewProofMessage={reviewProofMessage}
             reviewError={reviewError}
             reviewSubmitting={reviewSubmitting}
-            reviewLikeUpdatingId={reviewLikeUpdatingId}
-            commentSubmittingReviewId={commentSubmittingReviewId}
             canCreateReview={canCreateReview}
+            hasCreatedReviewToday={hasCreatedReviewToday}
+            onOpenFeedReview={() => {
+              if (!selectedPlace) {
+                return;
+              }
+              handleOpenPlaceFeedWithReturn(selectedPlace.id);
+            }}
             initialMapCenter={{ lat: initialMapViewport.lat, lng: initialMapViewport.lng }}
             initialMapZoom={initialMapViewport.zoom}
-            onOpenPlace={openPlace}
-            onOpenFestival={openFestival}
+            onOpenPlace={(placeId) => {
+              setSelectedRoutePreview(null);
+              openPlace(placeId);
+            }}
+            onOpenFestival={(festivalId) => {
+              setSelectedRoutePreview(null);
+              openFestival(festivalId);
+            }}
             onCloseDrawer={closeDrawer}
+            onClearRoutePreview={() => setSelectedRoutePreview(null)}
             onExpandPlaceDrawer={() =>
               selectedPlace &&
               commitRouteState({ tab: 'map', placeId: selectedPlace.id, festivalId: null, drawerState: 'full' }, 'replace')
@@ -788,32 +1236,43 @@ export default function App() {
             onRequestLogin={() => goToTab('my')}
             onClaimStamp={handleClaimStamp}
             onCreateReview={handleCreateReview}
-            onToggleReviewLike={handleToggleReviewLike}
-            onCreateComment={handleCreateComment}
             onLocateCurrentPosition={() => void refreshCurrentPosition(true)}
             onMapViewportChange={updateMapViewportInUrl}
           />
         ) : (
           <div className="page-stage">
-            {notice && <div className="floating-notice">{notice}</div>}
-            {bootstrapStatus === 'loading' && <section className="floating-status">화면을 준비하고 있어요.</section>}
-            {bootstrapStatus === 'error' && <section className="floating-status floating-status--error">{bootstrapError}</section>}
 
             {activeTab === 'feed' && (
               <FeedTab
                 reviews={reviews}
                 sessionUser={sessionUser}
                 reviewLikeUpdatingId={reviewLikeUpdatingId}
+                placeFilterId={feedPlaceFilterId}
+                placeFilterName={feedPlaceFilterId ? placeNameById[feedPlaceFilterId] ?? null : null}
                 commentSubmittingReviewId={commentSubmittingReviewId}
+                commentMutatingId={commentMutatingId}
+                deletingReviewId={deletingReviewId}
                 activeCommentReviewId={activeCommentReviewId}
                 highlightedCommentId={highlightedCommentId}
+                highlightedReviewId={highlightedReviewId}
+                hasMore={feedHasMore && !feedPlaceFilterId}
+                loadingMore={feedLoadingMore}
+                onLoadMore={loadMoreFeedReviews}
                 onToggleReviewLike={handleToggleReviewLike}
                 onCreateComment={handleCreateComment}
+                onUpdateComment={handleUpdateComment}
+                onDeleteComment={handleDeleteComment}
+                onDeleteReview={handleDeleteReview}
                 onRequestLogin={() => goToTab('my')}
+                onClearPlaceFilter={() => setFeedPlaceFilterId(null)}
                 onOpenPlace={handleOpenPlaceWithReturn}
                 onOpenComments={handleOpenReviewComments}
                 onCloseComments={handleCloseReviewComments}
               />
+            )}
+
+            {activeTab === 'event' && (
+              <EventTab festivals={festivals} onOpenFestival={handleOpenFestivalWithReturn} />
             )}
 
             {activeTab === 'course' && (
@@ -827,10 +1286,11 @@ export default function App() {
                 onChangeSort={(sort) => {
                   setCommunityRouteSort(sort);
                   void fetchCommunityRoutes(sort)
-                    .catch((error) => setNotice(formatErrorMessage(error)));
+                    .catch(reportBackgroundError);
                 }}
                 onToggleLike={handleToggleRouteLike}
                 onOpenPlace={handleOpenPlaceWithReturn}
+                onOpenRoutePreview={handleOpenRoutePreview}
                 onRequestLogin={() => goToTab('my')}
               />
             )}
@@ -840,33 +1300,42 @@ export default function App() {
                 sessionUser={sessionUser}
                 myPage={myPage}
                 providers={providers}
+                myPageError={myPageError}
                 activeTab={myPageTab}
                 isLoggingOut={isLoggingOut}
                 profileSaving={profileSaving}
                 profileError={profileError}
                 routeSubmitting={routeSubmitting}
                 routeError={routeError}
+                adminSummary={adminSummary}
+                adminBusyPlaceId={adminBusyPlaceId}
+                adminLoading={adminLoading}
                 onChangeTab={setMyPageTab}
                 onLogin={startProviderLogin}
+                onRetry={async () => { if (sessionUser) { await refreshMyPageForUser(sessionUser, true); } }}
                 onLogout={handleLogout}
                 onSaveNickname={handleUpdateProfile}
                 onPublishRoute={handlePublishRoute}
                 onOpenPlace={handleOpenPlaceWithReturn}
-                onOpenComment={(reviewId, commentId) => handleOpenReviewComments(reviewId, commentId)}
+                onOpenComment={(reviewId, commentId) => handleOpenCommentWithReturn(reviewId, commentId)}
+                onOpenReview={handleOpenReviewWithReturn}
+                onDeleteReview={handleDeleteReview}
+                commentsHasMore={myCommentsHasMore}
+                commentsLoadingMore={myCommentsLoadingMore}
+                onLoadMoreComments={loadMoreMyComments}
+                onRefreshAdmin={handleRefreshAdminImport}
+                onToggleAdminPlace={handleToggleAdminPlace}
+                onToggleAdminManualOverride={handleToggleAdminManualOverride}
               />
             )}
           </div>
         )}
 
-        {canNavigateBack && (
-          <button type="button" className="app-back-button" onClick={handleNavigateBack} aria-label="이전으로 돌아가기">
-            <span aria-hidden="true">←</span>
-            <span>이전</span>
-          </button>
-        )}
+        {canNavigateBack && <FloatingBackButton onNavigateBack={handleNavigateBack} />}
 
-        <BottomNav activeTab={activeTab} onChange={goToTab} />
+        <BottomNav activeTab={activeTab} onChange={handleBottomNavChange} />
       </div>
     </div>
   );
 }
+

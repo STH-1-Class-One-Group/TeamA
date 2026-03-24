@@ -1,9 +1,13 @@
-﻿from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
+
+
+def utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class User(Base):
@@ -14,8 +18,8 @@ class User(Base):
     nickname: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     provider: Mapped[str] = mapped_column(String(50), default="demo", nullable=False)
     profile_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     identities: Mapped[list["UserIdentity"]] = relationship(
         back_populates="user",
@@ -72,8 +76,8 @@ class UserIdentity(Base):
     provider_user_id: Mapped[str] = mapped_column(String(120), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=True)
     profile_image: Mapped[str] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="identities")
 
@@ -91,6 +95,7 @@ class MapPlace(Base):
     summary: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    image_storage_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     vibe_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     visit_time: Mapped[str] = mapped_column(String(50), nullable=False)
     route_hint: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -98,9 +103,10 @@ class MapPlace(Base):
     hero_label: Mapped[str] = mapped_column(String(60), nullable=False)
     jam_color: Mapped[str] = mapped_column(String(20), nullable=False)
     accent_color: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_manual_override: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     feeds: Mapped[list["Feed"]] = relationship(back_populates="place")
     course_places: Mapped[list["CoursePlace"]] = relationship(back_populates="place")
@@ -119,8 +125,8 @@ class PublicDataSource(Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     source_url: Mapped[str] = mapped_column(String(255), nullable=True)
     last_imported_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     public_places: Mapped[list["PublicPlace"]] = relationship(back_populates="source")
     public_events: Mapped[list["PublicEvent"]] = relationship(back_populates="source")
@@ -150,8 +156,8 @@ class PublicPlace(Base):
     sync_status: Mapped[str] = mapped_column(String(20), nullable=False, default="imported")
     raw_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     normalized_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     source: Mapped["PublicDataSource"] = relationship(back_populates="public_places")
     map_links: Mapped[list["PublicPlaceMapLink"]] = relationship(back_populates="public_place")
@@ -167,9 +173,9 @@ class PublicPlaceMapLink(Base):
     match_method: Mapped[str] = mapped_column(String(30), nullable=False, default="slug")
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    linked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    linked_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     public_place: Mapped["PublicPlace"] = relationship(back_populates="map_links")
     place: Mapped["MapPlace"] = relationship(back_populates="public_links")
@@ -200,8 +206,8 @@ class PublicEvent(Base):
     sync_status: Mapped[str] = mapped_column(String(20), nullable=False, default="imported")
     raw_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     normalized_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     source: Mapped["PublicDataSource"] = relationship(back_populates="public_events")
     map_links: Mapped[list["PublicEventMapLink"]] = relationship(back_populates="public_event")
@@ -217,9 +223,9 @@ class PublicEventMapLink(Base):
     match_method: Mapped[str] = mapped_column(String(30), nullable=False, default="name-exact")
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    linked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    linked_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     public_event: Mapped["PublicEvent"] = relationship(back_populates="map_links")
     place: Mapped["MapPlace"] = relationship(back_populates="public_event_links")
@@ -236,8 +242,8 @@ class Feed(Base):
     mood: Mapped[str] = mapped_column(String(20), nullable=False)
     badge: Mapped[str] = mapped_column(String(50), nullable=False, default="로컬 메모")
     image_url: Mapped[str] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     place: Mapped["MapPlace"] = relationship(back_populates="feeds")
     user: Mapped["User"] = relationship(back_populates="feeds")
@@ -257,7 +263,7 @@ class FeedLike(Base):
     feed_like_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     feed_id: Mapped[int] = mapped_column(ForeignKey("feed.feed_id", ondelete="CASCADE"), nullable=False, index=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("user.user_id", ondelete="CASCADE"), nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
     feed: Mapped["Feed"] = relationship(back_populates="likes")
     user: Mapped["User"] = relationship(back_populates="feed_likes")
@@ -272,8 +278,8 @@ class UserComment(Base):
     parent_id: Mapped[int] = mapped_column(ForeignKey("user_comment.comment_id", ondelete="SET NULL"), nullable=True, index=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     feed: Mapped["Feed"] = relationship(back_populates="comments")
     user: Mapped["User"] = relationship(back_populates="comments")
@@ -318,8 +324,8 @@ class TravelSession(Base):
     ended_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     last_stamp_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     stamp_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="travel_sessions")
     stamp_logs: Mapped[list["UserStamp"]] = relationship(back_populates="travel_session")
@@ -336,7 +342,7 @@ class UserStamp(Base):
     travel_session_id: Mapped[int | None] = mapped_column(ForeignKey("travel_session.travel_session_id", ondelete="SET NULL"), nullable=True, index=True)
     stamp_date: Mapped[date] = mapped_column(Date, nullable=False)
     visit_ordinal: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="stamps")
     place: Mapped["MapPlace"] = relationship(back_populates="stamps")
@@ -356,8 +362,8 @@ class UserRoute(Base):
     is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_user_generated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     like_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="created_routes")
     travel_session: Mapped["TravelSession"] = relationship(back_populates="routes")
@@ -373,7 +379,7 @@ class UserRoutePlace(Base):
     route_id: Mapped[int] = mapped_column(ForeignKey("user_route.route_id", ondelete="CASCADE"), nullable=False, index=True)
     position_id: Mapped[int] = mapped_column(ForeignKey("map.position_id"), nullable=False, index=True)
     stop_order: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
     route: Mapped["UserRoute"] = relationship(back_populates="route_places")
     place: Mapped["MapPlace"] = relationship(back_populates="user_route_places")
@@ -386,7 +392,7 @@ class UserRouteLike(Base):
     route_like_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     route_id: Mapped[int] = mapped_column(ForeignKey("user_route.route_id", ondelete="CASCADE"), nullable=False, index=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("user.user_id", ondelete="CASCADE"), nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
     route: Mapped["UserRoute"] = relationship(back_populates="likes")
     user: Mapped["User"] = relationship(back_populates="route_likes")

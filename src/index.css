@@ -1839,3 +1839,34 @@ textarea {
   background: rgba(255, 127, 168, 0.15);
   margin: 0 0 4px;
 }
+
+
+.page-panel--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  contain: layout paint style;
+}
+
+.page-panel__loading-copy {
+  padding: 14px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.84);
+  background: rgba(255,255,255,0.82);
+  box-shadow: 0 12px 24px rgba(255, 143, 183, 0.1);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.review-stack,
+.comment-thread__list {
+  content-visibility: auto;
+  contain-intrinsic-size: 320px;
+}
+
+
+.list-load-more-sentinel {
+  width: 100%;
+  height: 1px;
+}

@@ -1,14 +1,20 @@
-﻿import { CommentThread } from './CommentThread';
+import { useEffect, useRef } from 'react';
+import { CommentThread } from './CommentThread';
 import type { Review } from '../types';
 
 interface ReviewListProps {
   reviews: Review[];
   canWriteComment: boolean;
   canToggleLike: boolean;
+  currentUserId?: string | null;
+  highlightedReviewId?: string | null;
   likingReviewId: string | null;
   submittingReviewId: string | null;
   onToggleLike: (reviewId: string) => Promise<void>;
   onSubmitComment: (reviewId: string, body: string, parentId?: string) => Promise<void>;
+  onUpdateComment: (reviewId: string, commentId: string, body: string) => Promise<void>;
+  onDeleteComment: (reviewId: string, commentId: string) => Promise<void>;
+  onDeleteReview?: (reviewId: string) => Promise<void>;
   onRequestLogin: () => void;
   onOpenPlace?: (placeId: string) => void;
   onOpenComments?: (reviewId: string) => void;
@@ -16,20 +22,88 @@ interface ReviewListProps {
   emptyBody: string;
 }
 
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="review-action-button__svg" aria-hidden="true">
+      <path
+        d="M12 21s-6.716-4.309-9.193-8.19C1.25 10.387 2.17 6.9 5.41 5.61c1.98-.788 4.183-.145 5.59 1.495 1.408-1.64 3.611-2.283 5.59-1.495 3.24 1.29 4.16 4.777 2.603 7.2C18.716 16.691 12 21 12 21Z"
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CommentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="review-action-button__svg" aria-hidden="true">
+      <path
+        d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 13.5v-7Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function ReviewList({
   reviews,
   canWriteComment,
   canToggleLike,
+  currentUserId = null,
+  highlightedReviewId = null,
   likingReviewId,
   submittingReviewId,
   onToggleLike,
   onSubmitComment,
+  onUpdateComment,
+  onDeleteComment,
+  onDeleteReview,
   onRequestLogin,
   onOpenPlace,
   onOpenComments,
   emptyTitle,
   emptyBody,
 }: ReviewListProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!highlightedReviewId) {
+      return;
+    }
+
+    const listEl = listRef.current;
+    if (!listEl) {
+      return;
+    }
+
+    const selector = `[data-review-id="${highlightedReviewId}"]`;
+    const scrollToReview = () => {
+      const target = listEl.querySelector<HTMLElement>(selector);
+      if (!target) {
+        return;
+      }
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    scrollToReview();
+    const rafA = window.requestAnimationFrame(scrollToReview);
+    const rafB = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(scrollToReview);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(rafA);
+      window.cancelAnimationFrame(rafB);
+    };
+  }, [highlightedReviewId, reviews]);
+
   if (reviews.length === 0) {
     return (
       <section className="sheet-card stack-gap">
@@ -40,9 +114,13 @@ export function ReviewList({
   }
 
   return (
-    <div className="review-stack">
+    <div ref={listRef} className="review-stack">
       {reviews.map((review) => (
-        <article key={review.id} className="review-card">
+        <article
+          key={review.id}
+          data-review-id={review.id}
+          className={review.id === highlightedReviewId ? 'review-card review-card--highlighted' : 'review-card'}
+        >
           <div className="review-card__top review-card__top--feed">
             <div className="review-card__title-block review-card__title-block--feed">
               <p className="eyebrow">{review.mood}</p>
@@ -73,9 +151,9 @@ export function ReviewList({
                 aria-pressed={review.likedByMe}
               >
                 <span className="review-action-button__icon" aria-hidden="true">
-                  {review.likedByMe ? '♥' : '♡'}
+                  <HeartIcon filled={review.likedByMe} />
                 </span>
-                <span className="review-action-button__label">{likingReviewId === review.id ? '반영 중' : review.likeCount}</span>
+                <span className="review-action-button__label">{review.likeCount}</span>
               </button>
               {onOpenComments ? (
                 <button
@@ -84,12 +162,16 @@ export function ReviewList({
                   onClick={() => onOpenComments(review.id)}
                   aria-label={`댓글 ${review.comments.length}개`}
                 >
-                  <span className="review-action-button__icon">💬</span>
+                  <span className="review-action-button__icon" aria-hidden="true">
+                    <CommentIcon />
+                  </span>
                   <span className="review-action-button__label">{review.comments.length}</span>
                 </button>
               ) : (
                 <span className="review-action-button review-action-button--static" aria-hidden="true">
-                  <span className="review-action-button__icon">💬</span>
+                  <span className="review-action-button__icon">
+                    <CommentIcon />
+                  </span>
                   <span className="review-action-button__label">{review.comments.length}</span>
                 </span>
               )}
@@ -105,10 +187,14 @@ export function ReviewList({
             <CommentThread
               comments={review.comments}
               canWriteComment={canWriteComment}
+              currentUserId={currentUserId}
               submittingReviewId={submittingReviewId}
+              mutatingCommentId={null}
               highlightedCommentId={null}
               reviewId={review.id}
               onSubmitComment={onSubmitComment}
+              onUpdateComment={onUpdateComment}
+              onDeleteComment={onDeleteComment}
               onRequestLogin={onRequestLogin}
             />
           )}

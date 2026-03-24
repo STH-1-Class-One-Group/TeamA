@@ -1,4 +1,4 @@
-﻿const PROVIDERS = [
+const PROVIDERS = [
   { key: 'naver', label: '네이버' },
   { key: 'kakao', label: '카카오' },
 ];
@@ -117,6 +117,14 @@ function encodeFilterValue(value) {
   return encodeURIComponent(String(value));
 }
 
+function parseListLimit(url, defaultLimit = 12, maxLimit = 24) {
+  const raw = Number(url.searchParams.get('limit') ?? defaultLimit);
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return defaultLimit;
+  }
+  return Math.min(Math.floor(raw), maxLimit);
+}
+
 function uniqueValues(values) {
   return [...new Set((values ?? []).filter((value) => value !== null && value !== undefined && value !== ''))];
 }
@@ -195,19 +203,30 @@ function buildSessionDurationLabel(session) {
 
 function buildStampLogs(stampRows, placesByPositionId) {
   const todayKey = toSeoulDateKey();
+  const sessionCounts = new Map();
+  for (const row of stampRows) {
+    if (!row.travel_session_id) {
+      continue;
+    }
+    const sessionId = String(row.travel_session_id);
+    sessionCounts.set(sessionId, (sessionCounts.get(sessionId) ?? 0) + 1);
+  }
+
   return [...stampRows]
     .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
     .map((row) => {
       const place = placesByPositionId.get(String(row.position_id));
+      const travelSessionId = row.travel_session_id ? String(row.travel_session_id) : null;
       return {
         id: String(row.stamp_id),
         placeId: place?.id ?? String(row.position_id),
-        placeName: place?.name ?? "장소 정보 없음",
+        placeName: place?.name ?? "?? ?? ??",
         stampedAt: formatDateTime(row.created_at),
         stampedDate: formatDate(row.created_at),
         visitNumber: row.visit_ordinal ?? 1,
         visitLabel: formatVisitLabel(row.visit_ordinal ?? 1),
-        travelSessionId: row.travel_session_id ? String(row.travel_session_id) : null,
+        travelSessionId,
+        travelSessionStampCount: travelSessionId ? Number(sessionCounts.get(travelSessionId) ?? 0) : 0,
         isToday: row.stamp_date === todayKey,
       };
     });
@@ -387,11 +406,15 @@ async function readSessionUser(request, env) {
   }
   return {
     ...payload.user,
+    isAdmin: isAdminUser(env, payload.user.id),
     profileCompletedAt: payload.user.profileCompletedAt ?? null,
   };
 }
 function buildRedirectUrl(baseUrl, params = {}) {
   const url = new URL(baseUrl);
+  if (url.hostname === 'api.data.go.kr' && url.protocol === 'https:') {
+    url.protocol = 'http:';
+  }
   for (const [key, value] of Object.entries(params)) {
     if (value) {
       url.searchParams.set(key, value);
@@ -663,7 +686,7 @@ async function loadStaticBaseRows(env) {
 
   return rememberPending(staticBaseCache, async () => {
     const [placeRows, courseRows, coursePlaceRows] = await Promise.all([
-      supabaseRequest(env, "map?select=position_id,slug,name,district,category,latitude,longitude,summary,description,vibe_tags,visit_time,route_hint,stamp_reward,hero_label,jam_color,accent_color,is_active&is_active=eq.true&order=position_id.asc"),
+      supabaseRequest(env, "map?select=position_id,slug,name,district,category,latitude,longitude,summary,description,image_url,image_storage_path,vibe_tags,visit_time,route_hint,stamp_reward,hero_label,jam_color,accent_color,is_active&is_active=eq.true&order=position_id.asc"),
       supabaseRequest(env, "course?select=course_id,title,mood,duration,note,color,display_order&order=display_order.asc"),
       supabaseRequest(env, "course_place?select=course_id,position_id,stop_order&order=stop_order.asc"),
     ]);
@@ -1037,6 +1060,89 @@ async function loadReviewData(env, sessionUserId = null, filters = {}) {
   return mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, likedFeedIds);
 }
 
+async function loadReviewPageData(env, sessionUserId = null, options = {}) {
+  const { cursor = null, limit = 10 } = options;
+  const { placeRows } = await loadStaticBaseRows(env);
+  const places = placeRows.map(mapPlace);
+  const placesByPositionId = new Map(places.map((place) => [place.positionId, place]));
+  const reviewQuery = [
+    'select=feed_id,position_id,user_id,stamp_id,body,mood,badge,image_url,created_at',
+    'order=created_at.desc',
+    `limit=${limit + 1}`,
+  ];
+
+  if (cursor) {
+    reviewQuery.push(`created_at=lt.${encodeFilterValue(cursor)}`);
+  }
+
+  const feedRows = await supabaseRequest(env, `feed?${reviewQuery.join('&')}`);
+  const nextCursor = feedRows.length > limit ? String(feedRows[limit].created_at) : null;
+  const pageRows = feedRows.slice(0, limit);
+  const feedIdsFilter = buildInFilter(pageRows.map((row) => row.feed_id));
+  const reviewStampIdsFilter = buildInFilter(pageRows.map((row) => row.stamp_id).filter(Boolean));
+  const [commentRows, likeRows, reviewStampRows, userFeedLikeRows = []] = await Promise.all([
+    feedIdsFilter
+      ? supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&feed_id=${feedIdsFilter}&order=created_at.asc`)
+      : Promise.resolve([]),
+    feedIdsFilter
+      ? supabaseRequest(env, `feed_like?select=feed_id,user_id&feed_id=${feedIdsFilter}`)
+      : Promise.resolve([]),
+    reviewStampIdsFilter
+      ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&stamp_id=${reviewStampIdsFilter}`)
+      : Promise.resolve([]),
+    sessionUserId && feedIdsFilter
+      ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=${feedIdsFilter}`)
+      : Promise.resolve([]),
+  ]);
+
+  const userIdsFilter = buildInFilter([
+    ...pageRows.map((row) => row.user_id),
+    ...commentRows.map((row) => row.user_id),
+  ]);
+  const userRows = userIdsFilter
+    ? await supabaseRequest(env, `user?select=user_id,nickname&user_id=${userIdsFilter}`)
+    : [];
+
+  const usersById = new Map(userRows.map((row) => [row.user_id, row]));
+  const stampRowsById = new Map((reviewStampRows ?? []).map((row) => [String(row.stamp_id), row]));
+  const likedFeedIds = new Set((userFeedLikeRows ?? []).map((row) => String(row.feed_id)));
+  return {
+    items: mapReviewRows(pageRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, likedFeedIds),
+    nextCursor,
+  };
+}
+
+async function loadMyCommentPageData(env, userId, options = {}) {
+  const { cursor = null, limit = 10 } = options;
+  const query = [
+    'select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at',
+    `user_id=eq.${encodeFilterValue(userId)}`,
+    'order=created_at.desc',
+    `limit=${limit + 1}`,
+  ];
+  if (cursor) {
+    query.push(`created_at=lt.${encodeFilterValue(cursor)}`);
+  }
+
+  const commentRows = await supabaseRequest(env, `user_comment?${query.join('&')}`);
+  const nextCursor = commentRows.length > limit ? String(commentRows[limit].created_at) : null;
+  const pageRows = commentRows.slice(0, limit);
+  const feedIdsFilter = buildInFilter(pageRows.map((row) => row.feed_id));
+  if (!feedIdsFilter) {
+    return { items: [], nextCursor };
+  }
+
+  const [feedRows, { placeRows }] = await Promise.all([
+    supabaseRequest(env, `feed?select=feed_id,position_id,body&feed_id=${feedIdsFilter}`),
+    loadStaticBaseRows(env),
+  ]);
+  const placesByPositionId = new Map(placeRows.map((row) => [String(row.position_id), { id: row.slug, name: row.name }]));
+  return {
+    items: mapMyComments(pageRows, feedRows ?? [], placesByPositionId),
+    nextCursor,
+  };
+}
+
 async function handleHealth(request, env) {
   return jsonResponse(200, {
     status: 'ok',
@@ -1216,6 +1322,24 @@ async function handleReviews(request, env, url) {
   return jsonResponse(200, reviews, env, request);
 }
 
+async function handleReviewFeed(request, env, url) {
+  const sessionUser = await readSessionUser(request, env);
+  const payload = await loadReviewPageData(env, sessionUser?.id ?? null, {
+    cursor: url.searchParams.get('cursor') ?? null,
+    limit: parseListLimit(url, 10, 20),
+  });
+  return jsonResponse(200, payload, env, request);
+}
+
+async function handleReviewDetail(request, env, reviewId) {
+  const sessionUser = await readSessionUser(request, env);
+  const review = await loadSingleReview(env, reviewId, sessionUser?.id ?? null);
+  if (!review) {
+    return jsonResponse(404, { detail: '??? ?? ? ???.' }, env, request);
+  }
+  return jsonResponse(200, review, env, request);
+}
+
 async function handleCommunityRoutes(request, env, url) {
   const sessionUser = await readSessionUser(request, env);
   const sort = url.searchParams.get('sort') === 'latest' ? 'latest' : 'popular';
@@ -1248,6 +1372,106 @@ function mapMyComments(commentRows, feedRows, placesByPositionId) {
       reviewBody: feed?.body ?? '',
     };
   });
+}
+
+async function buildAdminSummary(env) {
+  const [userCount, placeCount, reviewCount, commentCount, stampCount, placeRows, feedRows] = await Promise.all([
+    supabaseCount(env, 'user'),
+    supabaseCount(env, 'map'),
+    supabaseCount(env, 'feed'),
+    supabaseCount(env, 'user_comment'),
+    supabaseCount(env, 'user_stamp'),
+    supabaseRequest(env, 'map?select=position_id,slug,name,district,category,is_active,is_manual_override,updated_at&order=is_active.desc,name.asc'),
+    supabaseRequest(env, 'feed?select=position_id'),
+  ]);
+
+  const reviewCountByPosition = new Map();
+  for (const row of feedRows ?? []) {
+    const key = String(row.position_id);
+    reviewCountByPosition.set(key, (reviewCountByPosition.get(key) ?? 0) + 1);
+  }
+
+  return {
+    userCount,
+    placeCount,
+    reviewCount,
+    commentCount,
+    stampCount,
+    sourceReady: true,
+    places: (placeRows ?? []).map((row) => ({
+      id: row.slug,
+      name: row.name,
+      district: row.district,
+      category: normalizePlaceCategory(row.category, row.slug),
+      isActive: Boolean(row.is_active),
+      isManualOverride: Boolean(row.is_manual_override),
+      reviewCount: reviewCountByPosition.get(String(row.position_id)) ?? 0,
+      updatedAt: formatDateTime(row.updated_at),
+    })),
+  };
+}
+
+async function handleAdminSummary(request, env) {
+  const sessionUser = await readSessionUser(request, env);
+  if (!sessionUser || !sessionUser.isAdmin) {
+    return jsonResponse(403, { detail: '??? ???.' }, env, request);
+  }
+  return jsonResponse(200, await buildAdminSummary(env), env, request);
+}
+
+async function handleAdminPlaceVisibility(request, env, placeId) {
+  const sessionUser = await readSessionUser(request, env);
+  if (!sessionUser || !sessionUser.isAdmin) {
+    return jsonResponse(403, { detail: '???? ??? ? ???.' }, env, request);
+  }
+  const payload = await request.json().catch(() => null);
+  const body = {};
+  if (typeof payload?.isActive === 'boolean') body.is_active = payload.isActive;
+  if (typeof payload?.isManualOverride === 'boolean') body.is_manual_override = payload.isManualOverride;
+  body.updated_at = new Date().toISOString();
+  const updatedRows = await supabaseRequest(env, `map?slug=eq.${encodeFilterValue(placeId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+  const updatedRow = Array.isArray(updatedRows) ? updatedRows[0] : null;
+  if (!updatedRow) {
+    return jsonResponse(404, { detail: '??? ?? ? ???.' }, env, request);
+  }
+  const reviewRows = await supabaseRequest(env, `feed?select=feed_id&position_id=eq.${encodeFilterValue(updatedRow.position_id)}`);
+  return jsonResponse(200, {
+    id: updatedRow.slug,
+    name: updatedRow.name,
+    district: updatedRow.district,
+    category: normalizePlaceCategory(updatedRow.category, updatedRow.slug),
+    isActive: Boolean(updatedRow.is_active),
+    isManualOverride: Boolean(updatedRow.is_manual_override),
+    reviewCount: (reviewRows ?? []).length,
+    updatedAt: formatDateTime(updatedRow.updated_at),
+  }, env, request);
+}
+
+async function handleAdminImportPublicData(request, env) {
+  const sessionUser = await readSessionUser(request, env);
+  if (!sessionUser || !sessionUser.isAdmin) {
+    return jsonResponse(403, { detail: '관리자만 공공데이터를 다시 불러올 수 있어요.' }, env, request);
+  }
+
+  let importedEvents = 0;
+  if (env.APP_PUBLIC_EVENT_SERVICE_KEY) {
+    const imported = await syncFestivalsFromSource(env);
+    importedEvents = imported.length;
+    festivalsCache = {
+      expiresAt: 0,
+      syncAt: Date.now(),
+      value: null,
+      pending: null,
+    };
+  }
+
+  return jsonResponse(200, {
+    importedPlaces: importedEvents,
+    importedCourses: 0,
+  }, env, request);
 }
 
 async function handleMySummary(request, env) {
@@ -1289,12 +1513,15 @@ async function handleMySummary(request, env) {
   }, env, request);
 }
 function getFestivalSourceUrl(env) {
-  const baseUrl = String(env.APP_PUBLIC_EVENT_SOURCE_URL || 'https://api.data.go.kr/openapi/tn_pubr_public_cltur_fstvl_api').trim();
+  const baseUrl = String(env.APP_PUBLIC_EVENT_SOURCE_URL || 'http://api.data.go.kr/openapi/tn_pubr_public_cltur_fstvl_api').trim();
   if (!baseUrl) {
     return null;
   }
 
   const url = new URL(baseUrl);
+  if (url.hostname === 'api.data.go.kr' && url.protocol === 'https:') {
+    url.protocol = 'http:';
+  }
   if (!url.searchParams.get('serviceKey') && env.APP_PUBLIC_EVENT_SERVICE_KEY) {
     url.searchParams.set('serviceKey', env.APP_PUBLIC_EVENT_SERVICE_KEY);
   }
@@ -1395,6 +1622,10 @@ function createFestivalExternalId(title, startDate, venueName, roadAddress) {
   const seed = `${title}|${startDate.toISOString()}|${venueName || ''}|${roadAddress || ''}`;
   const bytes = textEncoder.encode(seed);
   return `festival-${base64UrlEncode(bytes).slice(0, 22)}`;
+}
+
+function getFestivalWindowEnd(now) {
+  return new Date(now + 30 * 24 * 60 * 60 * 1000);
 }
 
 function isDaejeonFestival(payload) {
@@ -1575,14 +1806,17 @@ async function handleFestivals(request, env) {
       }
     }
 
-    const upcomingCutoff = now + 30 * 24 * 60 * 60 * 1000;
     const nowIso = new Date(now).toISOString();
-    const rows = await supabaseRequest(env, `public_event?select=public_event_id,title,venue_name,road_address,starts_at,ends_at,source_page_url,latitude,longitude&district=eq.${encodeFilterValue('대전')}&ends_at=gte.${encodeFilterValue(nowIso)}&order=starts_at.asc&limit=40`);
+    const windowEndIso = getFestivalWindowEnd(now).toISOString();
+    const rows = await supabaseRequest(
+      env,
+      `public_event?select=public_event_id,title,venue_name,road_address,starts_at,ends_at,source_page_url,latitude,longitude&district=eq.${encodeFilterValue('대전')}&ends_at=gte.${encodeFilterValue(nowIso)}&starts_at=lte.${encodeFilterValue(windowEndIso)}&order=starts_at.asc&limit=40`,
+    );
     const value = (rows || [])
       .filter((row) => {
         const startTime = new Date(row.starts_at).getTime();
         const endTime = new Date(row.ends_at).getTime();
-        return Number.isFinite(startTime) && Number.isFinite(endTime) && endTime >= now && startTime <= upcomingCutoff;
+        return Number.isFinite(startTime) && Number.isFinite(endTime) && endTime >= now && startTime <= getFestivalWindowEnd(now).getTime();
       })
       .slice(0, 10)
       .map((row) => ({
@@ -1600,7 +1834,7 @@ async function handleFestivals(request, env) {
 
     festivalsCache = {
       ...festivalsCache,
-      value,
+      value: value,
       expiresAt: Date.now() + FESTIVALS_CACHE_TTL_MS,
       pending: null,
     };
@@ -1609,27 +1843,35 @@ async function handleFestivals(request, env) {
 
   return jsonResponse(200, festivals, env, request);
 }
+
 async function handleBannerEvents(request, env) {
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const windowEndIso = getFestivalWindowEnd(now).toISOString();
   const [eventRows, sourceRows] = await Promise.all([
-    supabaseRequest(env, 'public_event?select=public_event_id,title,venue_name,district,starts_at,ends_at,summary,source_page_url&order=starts_at.asc&limit=4'),
+    supabaseRequest(
+      env,
+      `public_event?select=public_event_id,title,venue_name,district,starts_at,ends_at,summary,source_page_url&district=eq.${encodeFilterValue('대전')}&ends_at=gte.${encodeFilterValue(nowIso)}&starts_at=lte.${encodeFilterValue(windowEndIso)}&order=starts_at.asc&limit=4`,
+    ),
     supabaseRequest(env, 'public_data_source?select=name,last_imported_at&provider=eq.public-event&limit=1'),
   ]);
 
   const source = sourceRows[0] ?? null;
-  const now = Date.now();
-  const items = eventRows.map((row) => ({
-    id: String(row.public_event_id),
-    title: row.title,
-    venueName: row.venue_name ?? null,
-    district: row.district ?? '',
-    startDate: row.starts_at,
-    endDate: row.ends_at,
-    dateLabel: `${formatDate(row.starts_at)} - ${formatDate(row.ends_at)}`,
-    summary: row.summary ?? '',
-    sourcePageUrl: row.source_page_url ?? null,
-    linkedPlaceName: null,
-    isOngoing: new Date(row.starts_at).getTime() <= now && new Date(row.ends_at).getTime() >= now,
-  }));
+  const items = eventRows.length > 0
+    ? eventRows.map((row) => ({
+        id: String(row.public_event_id),
+        title: row.title,
+        venueName: row.venue_name ?? null,
+        district: row.district ?? '',
+        startDate: row.starts_at,
+        endDate: row.ends_at,
+        dateLabel: row.starts_at && row.ends_at ? `${formatDate(row.starts_at)} - ${formatDate(row.ends_at)}` : '일정 업데이트 전',
+        summary: row.summary ?? '',
+        sourcePageUrl: row.source_page_url ?? null,
+        linkedPlaceName: null,
+        isOngoing: new Date(row.starts_at).getTime() <= now && new Date(row.ends_at).getTime() >= now,
+      }))
+    : [];
 
   return jsonResponse(200, {
     sourceReady: items.length > 0,
@@ -1684,7 +1926,7 @@ async function readFeedRow(env, reviewId) {
 }
 
 async function readCommentRow(env, commentId) {
-  const rows = await supabaseRequest(env, `user_comment?select=comment_id,feed_id,parent_id&comment_id=eq.${encodeFilterValue(commentId)}&limit=1`);
+  const rows = await supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,is_deleted&comment_id=eq.${encodeFilterValue(commentId)}&limit=1`);
   return rows?.[0] ?? null;
 }
 
@@ -1706,7 +1948,7 @@ async function loadSingleReview(env, reviewId, sessionUserId = null) {
   const [commentRows, likeRows, placeRows, stampRows, userFeedLikeRows = []] = await Promise.all([
     supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&feed_id=eq.${encodeFilterValue(reviewId)}&order=created_at.asc`),
     supabaseRequest(env, `feed_like?select=feed_id,user_id&feed_id=eq.${encodeFilterValue(reviewId)}`),
-    supabaseRequest(env, `map?select=position_id,slug,name,district,category,latitude,longitude,summary,description,vibe_tags,visit_time,route_hint,stamp_reward,hero_label,jam_color,accent_color,is_active&position_id=eq.${encodeFilterValue(reviewRow.position_id)}&limit=1`),
+    supabaseRequest(env, `map?select=position_id,slug,name,district,category,latitude,longitude,summary,description,image_url,image_storage_path,vibe_tags,visit_time,route_hint,stamp_reward,hero_label,jam_color,accent_color,is_active&position_id=eq.${encodeFilterValue(reviewRow.position_id)}&limit=1`),
     reviewRow.stamp_id
       ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&stamp_id=eq.${encodeFilterValue(reviewRow.stamp_id)}&limit=1`)
       : Promise.resolve([]),
@@ -1896,6 +2138,100 @@ async function handleCreateComment(request, env, reviewId) {
 
   const comments = (await loadSingleReview(env, reviewId, sessionResult.sessionUser.id))?.comments ?? [];
   return jsonResponse(200, comments, env, request);
+}
+
+async function handleUpdateComment(request, env, reviewId, commentId) {
+  const sessionResult = await requireSessionUser(request, env);
+  if (sessionResult.response) {
+    return sessionResult.response;
+  }
+
+  const reviewRow = await readFeedRow(env, reviewId);
+  if (!reviewRow) {
+    return jsonResponse(404, { detail: '후기를 찾지 못했어요.' }, env, request);
+  }
+
+  const commentRow = await readCommentRow(env, commentId);
+  if (!commentRow || String(commentRow.feed_id) !== String(reviewId)) {
+    return jsonResponse(404, { detail: '댓글을 찾지 못했어요.' }, env, request);
+  }
+  if (commentRow.user_id !== sessionResult.sessionUser.id) {
+    return jsonResponse(403, { detail: '내 댓글만 수정할 수 있어요.' }, env, request);
+  }
+  if (commentRow.is_deleted) {
+    return jsonResponse(400, { detail: '삭제된 댓글은 수정할 수 없어요.' }, env, request);
+  }
+
+  const payload = await readJsonBody(request);
+  const body = String(payload.body ?? '').trim();
+  if (!body) {
+    return jsonResponse(400, { detail: '댓글을 조금 더 적어 주세요.' }, env, request);
+  }
+
+  await supabaseRequest(env, `user_comment?comment_id=eq.${encodeFilterValue(commentId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      body,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  const comments = (await loadSingleReview(env, reviewId, sessionResult.sessionUser.id))?.comments ?? [];
+  return jsonResponse(200, comments, env, request);
+}
+
+async function handleDeleteComment(request, env, reviewId, commentId) {
+  const sessionResult = await requireSessionUser(request, env);
+  if (sessionResult.response) {
+    return sessionResult.response;
+  }
+
+  const reviewRow = await readFeedRow(env, reviewId);
+  if (!reviewRow) {
+    return jsonResponse(404, { detail: '후기를 찾지 못했어요.' }, env, request);
+  }
+
+  const commentRow = await readCommentRow(env, commentId);
+  if (!commentRow || String(commentRow.feed_id) !== String(reviewId)) {
+    return jsonResponse(404, { detail: '댓글을 찾지 못했어요.' }, env, request);
+  }
+  if (commentRow.user_id !== sessionResult.sessionUser.id) {
+    return jsonResponse(403, { detail: '내 댓글만 삭제할 수 있어요.' }, env, request);
+  }
+
+  await supabaseRequest(env, `user_comment?comment_id=eq.${encodeFilterValue(commentId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      body: '[deleted]',
+      is_deleted: true,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  const comments = (await loadSingleReview(env, reviewId, sessionResult.sessionUser.id))?.comments ?? [];
+  return jsonResponse(200, comments, env, request);
+}
+
+async function handleDeleteReview(request, env, reviewId) {
+  const sessionResult = await requireSessionUser(request, env);
+  if (sessionResult.response) {
+    return sessionResult.response;
+  }
+
+  const reviewRow = await readFeedRow(env, reviewId);
+  if (!reviewRow) {
+    return jsonResponse(404, { detail: '후기를 찾지 못했어요.' }, env, request);
+  }
+  if (reviewRow.user_id !== sessionResult.sessionUser.id) {
+    return jsonResponse(403, { detail: '내가 쓴 피드만 삭제할 수 있어요.' }, env, request);
+  }
+
+  await supabaseRequest(env, `feed?feed_id=eq.${encodeFilterValue(reviewId)}`, {
+    method: 'DELETE',
+    headers: { Prefer: 'return=minimal' },
+  });
+
+  return jsonResponse(200, { reviewId: String(reviewId), deleted: true }, env, request);
 }
 
 async function handleToggleReviewLike(request, env, reviewId) {
@@ -2142,10 +2478,6 @@ async function handleToggleCommunityRouteLike(request, env, routeId) {
   if (!routeRow) {
     return jsonResponse(404, { detail: '경로를 찾지 못했어요.' }, env, request);
   }
-  if (routeRow.user_id === sessionResult.sessionUser.id) {
-    return jsonResponse(400, { detail: '내가 만든 경로에는 좋아요를 남길 수 없어요.' }, env, request);
-  }
-
   const existingRows = await supabaseRequest(
     env,
     `user_route_like?select=route_like_id&route_id=eq.${encodeFilterValue(routeId)}&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&limit=1`,
@@ -2235,8 +2567,11 @@ async function proxyToOrigin(request, env) {
 async function routeRequest(request, env) {
   const url = new URL(request.url);
   const reviewCommentMatch = url.pathname.match(/^\/api\/reviews\/(\d+)\/comments$/);
+  const reviewCommentDetailMatch = url.pathname.match(/^\/api\/reviews\/(\d+)\/comments\/(\d+)$/);
   const reviewLikeMatch = url.pathname.match(/^\/api\/reviews\/(\d+)\/like$/);
+  const reviewDetailMatch = url.pathname.match(/^\/api\/reviews\/(\d+)$/);
   const communityRouteLikeMatch = url.pathname.match(/^\/api\/community-routes\/(\d+)\/like$/);
+  const adminPlaceMatch = url.pathname.match(/^\/api\/admin\/places\/([^/]+)$/);
 
   if (request.method === "OPTIONS") {
     return handlePreflight(env, request);
@@ -2271,6 +2606,9 @@ async function routeRequest(request, env) {
   if (request.method === "GET" && url.pathname === "/api/courses/curated") {
     return handleCuratedCourses(request, env);
   }
+  if (request.method === "GET" && url.pathname === "/api/review-feed") {
+    return handleReviewFeed(request, env, url);
+  }
   if (request.method === "GET" && url.pathname === "/api/reviews") {
     return handleReviews(request, env, url);
   }
@@ -2280,6 +2618,9 @@ async function routeRequest(request, env) {
   if (request.method === "POST" && url.pathname === "/api/reviews") {
     return handleCreateReview(request, env);
   }
+  if (request.method === "GET" && reviewDetailMatch) {
+    return handleReviewDetail(request, env, reviewDetailMatch[1]);
+  }
   if (request.method === "GET" && reviewCommentMatch) {
     const sessionUser = await readSessionUser(request, env);
     const comments = (await loadSingleReview(env, reviewCommentMatch[1], sessionUser?.id ?? null))?.comments ?? [];
@@ -2288,8 +2629,17 @@ async function routeRequest(request, env) {
   if (request.method === "POST" && reviewCommentMatch) {
     return handleCreateComment(request, env, reviewCommentMatch[1]);
   }
+  if (request.method === "PATCH" && reviewCommentDetailMatch) {
+    return handleUpdateComment(request, env, reviewCommentDetailMatch[1], reviewCommentDetailMatch[2]);
+  }
+  if (request.method === "DELETE" && reviewCommentDetailMatch) {
+    return handleDeleteComment(request, env, reviewCommentDetailMatch[1], reviewCommentDetailMatch[2]);
+  }
   if (request.method === "POST" && reviewLikeMatch) {
     return handleToggleReviewLike(request, env, reviewLikeMatch[1]);
+  }
+  if (request.method === "DELETE" && reviewDetailMatch) {
+    return handleDeleteReview(request, env, reviewDetailMatch[1]);
   }
   if (request.method === "POST" && url.pathname === "/api/stamps/toggle") {
     return handleToggleStamp(request, env);
@@ -2309,11 +2659,23 @@ async function routeRequest(request, env) {
   if (request.method === "GET" && url.pathname === "/api/my/summary") {
     return handleMySummary(request, env);
   }
+  if (request.method === "GET" && url.pathname === "/api/my/comments") {
+    return handleMyComments(request, env, url);
+  }
   if (request.method === "GET" && url.pathname === "/api/festivals") {
     return handleFestivals(request, env);
   }
   if (request.method === "GET" && url.pathname === "/api/banner/events") {
     return handleBannerEvents(request, env);
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/summary") {
+    return handleAdminSummary(request, env);
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/import/public-data") {
+    return handleAdminImportPublicData(request, env);
+  }
+  if (request.method === "PATCH" && adminPlaceMatch) {
+    return handleAdminPlaceVisibility(request, env, adminPlaceMatch[1]);
   }
 
   return proxyToOrigin(request, env);
@@ -2331,13 +2693,3 @@ export default {
     }
   },
 };
-
-
-
-
-
-
-
-
-
-

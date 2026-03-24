@@ -11,7 +11,7 @@ JamIssue는 대전 장소를 지도에서 탐색하고, 스탬프를 찍은 뒤 
 ## 핵심 사용자 흐름
 
 ### 1. 지도에서 장소 탐색
-- 하단 탭 `지도 / 피드 / 코스 / 마이`
+- 하단 탭 `지도 / 행사 / 피드 / 코스 / 마이`
 - 지도 탭에서 장소 마커와 축제 마커를 탐색
 - 장소를 누르면 바텀시트가 열리고 상세 정보, 방문 상태, 현장 스탬프 액션을 확인
 - 축제는 정보 레이어이며 스탬프/피드/코스와 분리
@@ -48,12 +48,37 @@ JamIssue는 대전 장소를 지도에서 탐색하고, 스탬프를 찍은 뒤 
   - 누적 스탬프 수
 - 설정에서 닉네임 수정 가능
 
+### 6. 관리자 흐름
+- 관리자 계정은 마이페이지에 `관리` 탭이 노출됨
+- 장소 노출/비노출 토글
+- 공공데이터 다시 불러오기
+- 관리자 여부는 Worker 환경변수 `APP_ADMIN_USER_IDS` 기준
+
+## 탭별 데이터 로딩 원칙
+
+JamIssue는 전체 화면 데이터를 한 번에 모두 읽지 않고, 탭 책임에 맞게 나눠서 읽습니다.
+
+- 지도
+  - `GET /api/map-bootstrap`
+  - 지도 장소, 스탬프 상태, 로그인 세션의 최소 데이터만 로드
+- 피드
+  - `GET /api/review-feed`
+  - 첫 페이지 로드 후 추가 페이지는 점진 로드
+- 코스
+  - `GET /api/courses/curated`
+  - `GET /api/community-routes`
+- 마이
+  - `GET /api/my/summary`
+  - `GET /api/my/comments`
+  - 댓글 목록은 summary에 전부 싣지 않고 별도 페이지네이션
+
 ## 현재 구현 기능 상세
 
 ### 지도 / 장소 / 축제
 - 장소 마커, 축제 마커, 카테고리 필터
 - 장소 바텀시트 `closed / partial / full`
 - 장소 상세에서 방문 회차, 태그, 설명, 스탬프 액션 확인
+- 행사 탭에서 축제 목록/상세를 별도 탐색
 - 축제는 공공데이터 API 기반으로 동기화
 - 축제는 대전 범위 / 진행 중 및 예정 행사 중심 정보 제공
 
@@ -81,6 +106,7 @@ JamIssue는 대전 장소를 지도에서 탐색하고, 스탬프를 찍은 뒤 
 - 프로필 설정 진입
 - 닉네임 수정
 - 닉네임 유니크 정책 적용
+- 관리자 계정이면 `관리` 탭 노출
 
 ### 인증
 - 내부 사용자 식별: `user`
@@ -102,6 +128,7 @@ JamIssue는 대전 장소를 지도에서 탐색하고, 스탬프를 찍은 뒤 
 ### 지도 / 장소 / 피드 / 코스
 - `GET /api/bootstrap`
 - `GET /api/map-bootstrap`
+- `GET /api/review-feed`
 - `GET /api/reviews`
 - `POST /api/reviews/upload`
 - `POST /api/reviews`
@@ -117,8 +144,14 @@ JamIssue는 대전 장소를 지도에서 탐색하고, 스탬프를 찍은 뒤 
 ### 마이 / 부가 데이터
 - `GET /api/my/routes`
 - `GET /api/my/summary`
+- `GET /api/my/comments`
 - `GET /api/banner/events`
 - `GET /api/festivals`
+
+### 관리자
+- `GET /api/admin/summary`
+- `PATCH /api/admin/places/:id`
+- `POST /api/admin/import/public-data`
 
 ## 데이터 구조 기준
 
@@ -140,18 +173,80 @@ JamIssue는 대전 장소를 지도에서 탐색하고, 스탬프를 찍은 뒤 
 
 ### 장소 이미지
 - `map.image_url` 사용
+- `map.image_storage_path`로 스토리지 원본 경로를 함께 관리
 - live DB가 과거 상태여도 worker는 null 허용으로 처리
 
+## 비기능 요구사항 대응 현황
+
+### 레이턴시
+- 탭별 API 분리로 초기 eager load 축소
+- 피드/내 댓글 페이지네이션 적용
+- 공용 GET 요청은 캐시 및 중복 요청 방지 흐름 유지
+
+### 렌더링 안정성
+- 프론트 자산은 해시 파일명으로 배포되어 브라우저 캐시 오염을 줄임
+- 비지도 탭의 백그라운드 로더 실패가 전역 배너로 새지 않도록 분리
+
+### 상호작용
+- 지도 바텀시트, 댓글 시트, 마이페이지 deep link는 브라우저 뒤로가기와 앱 내부 복귀 흐름을 함께 고려
+- 댓글 깊이는 `부모 0 / 자식 1`로 제한
+
 ## Supabase SQL 적용 순서
+
+### 기본 스키마 / 스토리지
 
 신규 프로젝트 기준 SQL 실행 순서는 아래와 같습니다.
 
 1. [supabase_schema.sql](/D:/Code305/JamIssue/backend/sql/supabase_schema.sql)
 2. [supabase_storage.sql](/D:/Code305/JamIssue/backend/sql/supabase_storage.sql)
-3. [20260318_seed_daejeon_places_50.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_places_50.sql)
-4. [20260318_seed_daejeon_activity.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_activity.sql)
-5. [20260318_normalize_place_categories.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_normalize_place_categories.sql)
-6. [20260319_map_image_and_unique_nickname.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260319_map_image_and_unique_nickname.sql)
+3. [20260319_map_image_and_unique_nickname.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260319_map_image_and_unique_nickname.sql)
+4. [20260323_add_map_image_storage_path.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260323_add_map_image_storage_path.sql)
+
+### 샘플 장소 데이터로 완전 초기화하는 현재 기준 절차
+
+샘플 디렉터리와 이미지 매핑을 기준으로 장소/이미지 정본을 다시 넣으려면 아래 순서로 진행합니다.
+
+1. [20260323_reset_all_app_data.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260323_reset_all_app_data.sql)
+2. [20260323_add_place_images_bucket.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260323_add_place_images_bucket.sql)
+3. [20260323_seed_sample_places.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260323_seed_sample_places.sql)
+
+위 절차는 기존 스탬프/피드/댓글/코스/사용자까지 전부 비우고 다시 넣는 흐름입니다.
+개별 좌표 보정이 이미 반영된 최신 정본은 `20260323_seed_sample_places.sql`입니다.
+
+### 레거시 테스트 시드
+
+초기 대전 테스트 시드는 아직 저장소에 남아 있지만, 현재 샘플 정본 재구성 흐름의 기본 절차는 아닙니다.
+
+1. [20260318_seed_daejeon_places_50.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_places_50.sql)
+2. [20260318_seed_daejeon_activity.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_seed_daejeon_activity.sql)
+3. [20260318_normalize_place_categories.sql](/D:/Code305/JamIssue/backend/sql/migrations/20260318_normalize_place_categories.sql)
+
+## 샘플 장소 이미지 업로드
+
+샘플 데이터와 이미지 파일은 `sample/` 디렉터리를 기준으로 관리합니다.
+
+`sample/`은 로컬 전용 입력 데이터이며 Git 추적 대상이 아닙니다.
+PR에는 생성된 migration / script / 코드 변경만 포함하고, 실제 샘플 원본 파일은 각자 로컬에 보관합니다.
+
+정본 JSON 생성:
+
+```powershell
+cd D:/Code305/JamIssue
+node scripts/generate-sample-place-data.mjs
+```
+
+스토리지 업로드 및 `map.image_url` / `image_storage_path` 반영:
+
+```powershell
+cd D:/Code305/JamIssue
+$env:APP_SUPABASE_SERVICE_ROLE_KEY='<SUPABASE_SERVICE_ROLE_KEY>'
+node scripts/upload-sample-place-images.mjs
+```
+
+업로드 결과:
+- 버킷: `place-images`
+- 경로 형식: `places/001/hero.png`
+- DB 반영 컬럼: `map.image_url`, `map.image_storage_path`
 
 ## Cloudflare Pages 환경변수
 
@@ -218,3 +313,4 @@ cd D:/Code305/JamIssue/backend
 - [docs/community-routes.md](/D:/Code305/JamIssue/docs/community-routes.md)
 - [docs/account-identity-schema.md](/D:/Code305/JamIssue/docs/account-identity-schema.md)
 - [docs/growgardens-deploy-runbook.md](/D:/Code305/JamIssue/docs/growgardens-deploy-runbook.md)
+- [docs/data-operations-runbook.md](/D:/Code305/JamIssue/docs/data-operations-runbook.md)

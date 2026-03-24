@@ -12,8 +12,12 @@
   - Supabase SQL 적용 순서
   - Pages / Worker 환경변수와 시크릿
   - 운영 도메인 기준 배포 메모
+- [data-operations-runbook.md](/D:/Code305/JamIssue/docs/data-operations-runbook.md)
+  - 장소/이미지/공공데이터 운영 수정 절차
+  - 전체 리셋 및 재적재 절차
 
 ## 세부 설계 문서
 - [screen-spec.md](/D:/Code305/JamIssue/docs/screen-spec.md)
 - [community-routes.md](/D:/Code305/JamIssue/docs/community-routes.md)
 - [account-identity-schema.md](/D:/Code305/JamIssue/docs/account-identity-schema.md)
+- [code-flow-diagrams.md](/D:/Code305/JamIssue/docs/code-flow-diagrams.md)

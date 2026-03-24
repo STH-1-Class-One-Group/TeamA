@@ -8,6 +8,7 @@ from app.config import Settings
 from app.db import Base
 from app.db_models import Feed, FeedLike, TravelSession, User, UserComment, UserIdentity, UserRoute, UserStamp
 from app.models import CommentCreate, ProfileUpdateRequest, ReviewCreate, UserRouteCreate
+from app.repository import to_seoul_date, toggle_stamp as legacy_toggle_stamp
 from app.repository_normalized import (
     create_comment,
     create_review,
@@ -81,6 +82,34 @@ def test_review_comment_and_my_page_flow(tmp_path: Path):
     assert my_page.stats.review_count == 1
     assert my_page.stats.unique_place_count == 1
     assert my_page.stamp_logs[0].place_id == 'hanbat-forest'
+
+
+def test_review_is_limited_to_one_per_day(tmp_path: Path):
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    first_stamp_state = claim_stamp_for(session, 'user-1', 'hanbat-forest')
+    create_review(
+        session,
+        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(first_stamp_state, 'hanbat-forest'), body='?? ? ????.', mood='??', imageUrl=None),
+        'user-1',
+        '??',
+    )
+
+    second_stamp_state = claim_stamp_for(session, 'user-1', 'expo-bridge')
+
+    blocked = False
+    try:
+        create_review(
+            session,
+            ReviewCreate(placeId='expo-bridge', stampId=stamp_id_for_place(second_stamp_state, 'expo-bridge'), body='?? ? ?? ????.', mood='???', imageUrl=None),
+            'user-1',
+            '??',
+        )
+    except ValueError:
+        blocked = True
+
+    assert blocked is True
 
 
 def test_stamp_requires_real_distance_and_same_day_dedup(tmp_path: Path):
@@ -325,3 +354,45 @@ def test_social_signup_generates_distinct_duplicate_nickname(tmp_path: Path):
     assert first.nickname == '민서'
     assert second.nickname != '민서'
     assert second.nickname.startswith('민서')
+
+
+def test_legacy_stamp_allows_revisit_after_previous_day(tmp_path: Path):
+    """Case A: 어제 스탬프를 찍은 사용자가 오늘 같은 장소에서 다시 찍을 때 성공합니다."""
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    # Stamp the place and backdate it to yesterday
+    legacy_toggle_stamp(session, 'user-1', 'hanbat-forest', 36.3671, 127.3886, 120)
+    stamp = session.scalars(select(UserStamp).where(UserStamp.user_id == 'user-1')).one()
+    yesterday = to_seoul_date(utcnow_naive()) - timedelta(days=1)
+    stamp.stamp_date = yesterday
+    stamp.created_at = utcnow_naive() - timedelta(days=1)
+    session.commit()
+
+    # Should succeed today (not blocked by yesterday's stamp)
+    state = legacy_toggle_stamp(session, 'user-1', 'hanbat-forest', 36.3671, 127.3886, 120)
+    assert 'hanbat-forest' in state.collected_place_ids
+
+
+def test_legacy_stamp_blocks_same_day_duplicate(tmp_path: Path):
+    """Case B: 오늘 이미 찍은 사용자가 같은 장소를 다시 시도할 때 중복 생성이 차단됩니다."""
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    legacy_toggle_stamp(session, 'user-1', 'hanbat-forest', 36.3671, 127.3886, 120)
+
+    blocked = False
+    try:
+        legacy_toggle_stamp(session, 'user-1', 'hanbat-forest', 36.3671, 127.3886, 120)
+    except ValueError as exc:
+        blocked = '이미 오늘 스탬프를 획득했습니다.' in str(exc)
+
+    today = to_seoul_date()
+    today_stamp_count = session.scalar(
+        select(func.count()).select_from(UserStamp).where(
+            UserStamp.user_id == 'user-1',
+            UserStamp.stamp_date == today,
+        )
+    )
+    assert blocked is True
+    assert today_stamp_count == 1

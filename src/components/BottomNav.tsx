@@ -7,6 +7,7 @@ interface BottomNavProps {
 
 const items: Array<{ key: Tab; label: string }> = [
   { key: 'map', label: '지도' },
+  { key: 'event', label: '행사' },
   { key: 'feed', label: '피드' },
   { key: 'course', label: '코스' },
   { key: 'my', label: '마이' },
