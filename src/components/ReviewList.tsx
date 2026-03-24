@@ -55,19 +55,22 @@ function CommentIcon() {
 function ReviewImageFrame({ src, alt }: { src: string; alt: string }) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [isTall, setIsTall] = useState(false);
-  const [frameHeight, setFrameHeight] = useState(220);
+  const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    const updateFrameHeight = () => {
+    const updateFrameSize = () => {
       if (frameRef.current) {
-        setFrameHeight(frameRef.current.clientHeight || 220);
+        setFrameSize({
+          width: frameRef.current.clientWidth || 0,
+          height: frameRef.current.clientHeight || 0,
+        });
       }
     };
 
-    updateFrameHeight();
-    window.addEventListener('resize', updateFrameHeight);
+    updateFrameSize();
+    window.addEventListener('resize', updateFrameSize);
     return () => {
-      window.removeEventListener('resize', updateFrameHeight);
+      window.removeEventListener('resize', updateFrameSize);
     };
   }, []);
 
@@ -87,41 +90,73 @@ function ReviewImageFrame({ src, alt }: { src: string; alt: string }) {
         position: 'relative',
       }}
     >
-      <img
-        className="review-card__image"
-        src={src}
-        alt={alt}
-        loading="lazy"
-        decoding="async"
-        onLoad={(event) => {
-          const target = event.currentTarget;
-          setIsTall(target.naturalHeight > target.naturalWidth * 1.12);
-        }}
-        style={
-          isTall
-            ? {
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                width: `${frameHeight}px`,
-                height: 'auto',
-                maxWidth: 'none',
-                transform: 'translate(-50%, -50%) rotate(-90deg)',
-                transformOrigin: 'center center',
-                borderRadius: '14px',
-                display: 'block',
-                margin: 0,
+      {isTall ? (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: `${Math.max(frameSize.height, 1)}px`,
+            height: `${Math.max(frameSize.width, 1)}px`,
+            transform: 'translate(-50%, -50%) rotate(-90deg)',
+            transformOrigin: 'center center',
+            overflow: 'hidden',
+            borderRadius: '14px',
+          }}
+        >
+          <img
+            className="review-card__image"
+            src={src}
+            alt={alt}
+            loading="lazy"
+            decoding="async"
+            onLoad={(event) => {
+              const target = event.currentTarget;
+              setIsTall(target.naturalHeight > target.naturalWidth * 1.12);
+              if (frameRef.current) {
+                setFrameSize({
+                  width: frameRef.current.clientWidth || 0,
+                  height: frameRef.current.clientHeight || 0,
+                });
               }
-            : {
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                borderRadius: '14px',
-                display: 'block',
-                margin: 0,
-              }
-        }
-      />
+            }}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: '14px',
+              display: 'block',
+              margin: 0,
+            }}
+          />
+        </div>
+      ) : (
+        <img
+          className="review-card__image"
+          src={src}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          onLoad={(event) => {
+            const target = event.currentTarget;
+            setIsTall(target.naturalHeight > target.naturalWidth * 1.12);
+            if (frameRef.current) {
+              setFrameSize({
+                width: frameRef.current.clientWidth || 0,
+                height: frameRef.current.clientHeight || 0,
+              });
+            }
+          }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            borderRadius: '14px',
+            display: 'block',
+            margin: 0,
+          }}
+        />
+      )}
     </div>
   );
 }
