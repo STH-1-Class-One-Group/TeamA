@@ -140,13 +140,33 @@ export function ReviewList({
           <p className="review-card__body">{review.body}</p>
 
           {review.imageUrl && (
-            <div className="review-card__image-frame">
+            <div
+              className="review-card__image-frame"
+              style={{
+                width: '100%',
+                height: 'min(280px, 64vw)',
+                maxHeight: '280px',
+                borderRadius: '20px',
+                overflow: 'hidden',
+                background: 'rgba(255, 250, 252, 0.96)',
+                border: '1px solid rgba(255, 176, 201, 0.16)',
+                padding: '6px',
+              }}
+            >
               <img
                 className="review-card__image"
                 src={review.imageUrl}
                 alt={`${review.placeName} 후기 이미지`}
                 loading="lazy"
                 decoding="async"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  borderRadius: '14px',
+                  display: 'block',
+                  margin: 0,
+                }}
               />
             </div>
           )}
@@ -213,3 +233,4 @@ export function ReviewList({
     </div>
   );
 }
+
