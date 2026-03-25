@@ -6,6 +6,7 @@ import {
   deleteComment,
   deleteReview,
   createReview,
+  updateReview,
   createUserRoute,
   getAuthSession,
   getFestivals,
@@ -733,6 +734,39 @@ export default function App() {
     }
   }
 
+  async function handleUpdateReview(reviewId: string, payload: { body: string; mood: ReviewMood }) {
+    if (!sessionUser) {
+      goToTab('my');
+      setNotice('피드를 수정하려면 먼저 로그인해 주세요.');
+      return;
+    }
+
+    try {
+      const updatedReview = await updateReview(reviewId, {
+        body: payload.body.trim(),
+        mood: payload.mood,
+      });
+      patchReviewCollections(reviewId, () => updatedReview);
+      setMyPage((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          reviews: current.reviews.map((review) => (review.id === reviewId ? updatedReview : review)),
+          comments: current.comments.map((comment) => (
+            comment.reviewId === reviewId
+              ? { ...comment, reviewBody: updatedReview.body }
+              : comment
+          )),
+        };
+      });
+      setNotice('피드를 수정했어요.');
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async function handleCreateComment(reviewId: string, body: string, parentId?: string) {
     if (!sessionUser) {
       goToTab('my');
@@ -1339,6 +1373,7 @@ export default function App() {
                 onOpenPlace={handleOpenPlaceWithReturn}
                 onOpenComment={(reviewId, commentId) => handleOpenCommentWithReturn(reviewId, commentId)}
                 onOpenReview={handleOpenReviewWithReturn}
+                onUpdateReview={handleUpdateReview}
                 onDeleteReview={handleDeleteReview}
                 commentsHasMore={myCommentsHasMore}
                 commentsLoadingMore={myCommentsLoadingMore}

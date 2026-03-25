@@ -22,6 +22,7 @@ import type {
   ReviewCreateRequest,
   ReviewFeedPageResponse,
   ReviewLikeResponse,
+  ReviewUpdateRequest,
   StampClaimRequest,
   StampState,
   UploadResponse,
@@ -309,6 +310,15 @@ export async function createReview(payload: ReviewCreateRequest) {
     body: JSON.stringify(payload),
   });
   invalidateApiCache(['/api/reviews', '/api/my/summary']);
+  return response;
+}
+
+export async function updateReview(reviewId: string, payload: ReviewUpdateRequest) {
+  const response = await fetchJson<Review>(`/api/reviews/${reviewId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  invalidateApiCache(['/api/reviews', `/api/reviews/${reviewId}`, '/api/my/summary']);
   return response;
 }
 

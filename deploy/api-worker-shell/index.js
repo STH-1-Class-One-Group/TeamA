@@ -2777,6 +2777,46 @@ async function handleCreateReview(request, env) {
   const createdReview = await loadSingleReview(env, insertedRows?.[0]?.feed_id, sessionResult.sessionUser.id);
   return jsonResponse(201, createdReview, env, request);
 }
+
+async function handleUpdateReview(request, env, reviewId) {
+  const sessionResult = await requireSessionUser(request, env);
+  if (sessionResult.response) {
+    return sessionResult.response;
+  }
+
+  const reviewRow = await readFeedRow(env, reviewId);
+  if (!reviewRow) {
+    return jsonResponse(404, { detail: '?꾧린瑜?李얠? 紐삵뻽?댁슂.' }, env, request);
+  }
+  if (reviewRow.user_id !== sessionResult.sessionUser.id) {
+    return jsonResponse(403, { detail: '?닿? ?묒꽦???쇰뱶留? ?섏젙?????덉뼱??' }, env, request);
+  }
+
+  const payload = await readJsonBody(request);
+  const body = String(payload.body ?? '').trim();
+  const mood = String(payload.mood ?? '').trim();
+
+  if (!body) {
+    return jsonResponse(400, { detail: '?꾧린瑜?議곌툑 ???곸뼱 二쇱꽭??' }, env, request);
+  }
+  if (!mood) {
+    return jsonResponse(400, { detail: '?붾뱶 湲곕텇???좏깮?댁＜?몄슂.' }, env, request);
+  }
+
+  await supabaseRequest(env, `feed?feed_id=eq.${encodeFilterValue(reviewId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      body,
+      mood,
+      badge: BADGE_BY_MOOD[mood] ?? '?꾩옣 諛⑸Ц',
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  const updatedReview = await loadSingleReview(env, reviewId, sessionResult.sessionUser.id);
+  return jsonResponse(200, updatedReview, env, request);
+}
+
 async function handleCreateComment(request, env, reviewId) {
   const sessionResult = await requireSessionUser(request, env);
   if (sessionResult.response) {
@@ -3300,6 +3340,9 @@ async function routeRequest(request, env) {
   }
   if (request.method === "GET" && reviewDetailMatch) {
     return handleReviewDetail(request, env, reviewDetailMatch[1]);
+  }
+  if (request.method === "PATCH" && reviewDetailMatch) {
+    return handleUpdateReview(request, env, reviewDetailMatch[1]);
   }
   if (request.method === "GET" && reviewCommentMatch) {
     const sessionUser = await readSessionUser(request, env);

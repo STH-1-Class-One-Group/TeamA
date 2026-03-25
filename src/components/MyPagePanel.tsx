@@ -2,7 +2,7 @@
 import { useScrollRestoration } from '../hooks/useScrollRestoration';
 import { useAutoLoadMore } from '../hooks/useAutoLoadMore';
 import { ProviderButtons } from './ProviderButtons';
-import type { AdminSummaryResponse, AuthProvider, CourseMood, MyPageResponse, MyPageTabKey, SessionUser, TravelSession } from '../types';
+import type { AdminSummaryResponse, AuthProvider, CourseMood, MyPageResponse, MyPageTabKey, ReviewMood, SessionUser, TravelSession } from '../types';
 
 interface MyPagePanelProps {
   sessionUser: SessionUser | null;
@@ -27,6 +27,7 @@ interface MyPagePanelProps {
   onOpenPlace: (placeId: string) => void;
   onOpenComment: (reviewId: string, commentId: string) => void;
   onOpenReview: (reviewId: string) => void;
+  onUpdateReview: (reviewId: string, payload: { body: string; mood: ReviewMood }) => Promise<void>;
   onDeleteReview: (reviewId: string) => Promise<void>;
   commentsHasMore: boolean;
   commentsLoadingMore: boolean;
@@ -39,6 +40,7 @@ interface MyPagePanelProps {
 const AdminPanel = lazy(() => import('./AdminPanel').then((module) => ({ default: module.AdminPanel })));
 
 const routeMoodOptions: CourseMood[] = ['데이트', '사진', '힐링', '비 오는 날'];
+const reviewMoodOptions: ReviewMood[] = ['혼자서', '친구랑', '데이트', '야경 맛집'];
 
 interface DraftState {
   title: string;
@@ -93,6 +95,7 @@ export function MyPagePanel({
   onOpenPlace,
   onOpenComment,
   onOpenReview,
+  onUpdateReview,
   onDeleteReview,
   commentsHasMore,
   commentsLoadingMore,
@@ -105,6 +108,11 @@ export function MyPagePanel({
   const [showVisitedDetail, setShowVisitedDetail] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [editingReviewBody, setEditingReviewBody] = useState('');
+  const [editingReviewMood, setEditingReviewMood] = useState<ReviewMood>('혼자서');
+  const [reviewUpdatingId, setReviewUpdatingId] = useState<string | null>(null);
+  const [reviewEditError, setReviewEditError] = useState<string | null>(null);
   const scrollRef = useScrollRestoration<HTMLElement>(`my:${activeTab}`);
   const commentsLoadMoreRef = useAutoLoadMore({
     enabled: activeTab === 'comments' && commentsHasMore,
@@ -119,6 +127,20 @@ export function MyPagePanel({
       setShowSettings(true);
     }
   }, [sessionUser?.nickname, sessionUser?.profileCompletedAt]);
+
+  function startEditingReview(review: NonNullable<MyPageResponse>['reviews'][number]) {
+    setEditingReviewId(review.id);
+    setEditingReviewBody(review.body);
+    setEditingReviewMood(review.mood);
+    setReviewEditError(null);
+  }
+
+  function cancelEditingReview() {
+    setEditingReviewId(null);
+    setEditingReviewBody('');
+    setEditingReviewMood('혼자서');
+    setReviewEditError(null);
+  }
 
   const unpublishedSessions = useMemo(
     () => myPage?.travelSessions.filter((session) => session.canPublish && !session.publishedRouteId) ?? [],
@@ -362,11 +384,76 @@ export function MyPagePanel({
                       {review.travelSessionId && <span className="soft-tag">연속 여행 기록</span>}
                       <span className="soft-tag">{review.badge}</span>
                     </div>
-                    <p className="review-card__body">{review.body}</p>
-                    <div className="review-card__actions review-card__actions--my-feed">
-                      <button type="button" className="review-card__place-link" onClick={() => onOpenReview(review.id)}>내 피드 보기</button>
-                      <button type="button" className="review-card__place-link review-card__place-link--danger" onClick={() => void onDeleteReview(review.id)}>삭제</button>
-                    </div>
+                    {editingReviewId === review.id ? (
+                      <div className="route-builder-form review-edit-form">
+                        <div className="chip-row compact-gap">
+                          {reviewMoodOptions.map((mood) => (
+                            <button
+                              key={review.id + '-' + mood}
+                              type="button"
+                              className={editingReviewMood === mood ? 'chip is-active' : 'chip'}
+                              onClick={() => setEditingReviewMood(mood)}
+                              disabled={reviewUpdatingId === review.id}
+                            >
+                              {mood}
+                            </button>
+                          ))}
+                        </div>
+                        <label className="route-builder-field">
+                          <span>피드 내용</span>
+                          <textarea
+                            rows={4}
+                            value={editingReviewBody}
+                            onChange={(event) => setEditingReviewBody(event.target.value)}
+                            disabled={reviewUpdatingId === review.id}
+                          />
+                        </label>
+                        {reviewEditError ? <p className="form-error-copy">{reviewEditError}</p> : null}
+                        <div className="review-card__actions review-card__actions--my-feed">
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={cancelEditingReview}
+                            disabled={reviewUpdatingId === review.id}
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            disabled={reviewUpdatingId === review.id || editingReviewBody.trim().length < 4}
+                            onClick={() => {
+                              setReviewUpdatingId(review.id);
+                              setReviewEditError(null);
+                              void onUpdateReview(review.id, {
+                                body: editingReviewBody.trim(),
+                                mood: editingReviewMood,
+                              })
+                                .then(() => {
+                                  cancelEditingReview();
+                                })
+                                .catch((error) => {
+                                  setReviewEditError(error instanceof Error ? error.message : '피드를 수정하지 못했어요.');
+                                })
+                                .finally(() => {
+                                  setReviewUpdatingId(null);
+                                });
+                            }}
+                          >
+                            {reviewUpdatingId === review.id ? '저장 중' : '수정 저장'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="review-card__body">{review.body}</p>
+                        <div className="review-card__actions review-card__actions--my-feed">
+                          <button type="button" className="review-card__place-link" onClick={() => onOpenReview(review.id)}>내 피드 보기</button>
+                          <button type="button" className="review-card__place-link" onClick={() => startEditingReview(review)}>수정</button>
+                          <button type="button" className="review-card__place-link review-card__place-link--danger" onClick={() => void onDeleteReview(review.id)}>삭제</button>
+                        </div>
+                      </>
+                    )}
                   </article>
                 ))}
                 {myPage.reviews.length === 0 && <p className="empty-copy">아직 작성한 피드가 없어요.</p>}

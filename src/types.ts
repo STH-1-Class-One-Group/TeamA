@@ -210,6 +210,11 @@ export interface ReviewCreateRequest {
   imageUrl?: string | null;
 }
 
+export interface ReviewUpdateRequest {
+  body: string;
+  mood: ReviewMood;
+}
+
 export interface CommentCreateRequest {
   body: string;
   parentId?: string | null;
