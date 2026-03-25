@@ -1152,6 +1152,13 @@ async function handleHealth(request, env) {
     storageBackend: env.APP_STORAGE_BACKEND ?? 'supabase',
     storagePath: env.APP_SUPABASE_STORAGE_BUCKET ? `supabase://${env.APP_SUPABASE_STORAGE_BUCKET}` : '',
     supabaseConfigured: Boolean(env.APP_SUPABASE_URL && getSupabaseKey(env)),
+    frontendUrlConfigured: Boolean(env.APP_FRONTEND_URL),
+    corsOriginsConfigured: Boolean(env.APP_CORS_ORIGINS),
+    naverLoginConfigured: naverConfigured(env),
+    naverLoginClientIdConfigured: Boolean(env.APP_NAVER_LOGIN_CLIENT_ID),
+    naverLoginClientSecretConfigured: Boolean(env.APP_NAVER_LOGIN_CLIENT_SECRET),
+    naverLoginCallbackUrlConfigured: Boolean(env.APP_NAVER_LOGIN_CALLBACK_URL),
+    naverLoginCallbackUrl: env.APP_NAVER_LOGIN_CALLBACK_URL ?? '',
   }, env, request);
 }
 
