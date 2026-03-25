@@ -190,8 +190,8 @@ textarea {
   background: linear-gradient(180deg, rgba(255, 248, 251, 0.92), rgba(255, 253, 248, 0.96));
 }
 
-.page-stage--with-banner {
-  padding-top: 74px;
+.page-stage--with-banner .page-panel {
+  inset: 86px 12px calc(76px + env(safe-area-inset-bottom)) 12px;
 }
 
 .global-status-banner {
@@ -214,7 +214,7 @@ textarea {
 }
 
 .global-status-banner--map {
-  top: 118px;
+  top: 158px;
 }
 
 .global-status-banner--error {
