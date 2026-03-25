@@ -309,18 +309,6 @@ export function MyPagePanel({
           <h2>{sessionUser.nickname}님의 기록</h2>
           <p>스탬프를 모으고 피드를 남기고, 하나의 여행 세션을 코스로 발행할 수 있어요.</p>
         </div>
-        <div className="panel-header__actions">
-          <button
-            type="button"
-            className={showNotifications ? 'secondary-button icon-button notification-bell is-complete' : 'secondary-button icon-button notification-bell'}
-            onClick={() => setShowNotifications((current) => !current)}
-            aria-label="알림 열기"
-            disabled={!myPage}
-          >
-            <BellIcon />
-            {unreadNotificationCount > 0 && <span className="notification-bell__dot" aria-hidden="true" />}
-          </button>
-        </div>
       </header>
 
       {!myPage && myPageError && (
@@ -339,9 +327,8 @@ export function MyPagePanel({
         <div className="section-title-row section-title-row--tight">
           <div>
             <p className="eyebrow">ACCOUNT</p>
-            <h3>계정과 알림 관리</h3>
+            <h3>계정 관리</h3>
           </div>
-          {myPage && <span className={unreadNotificationCount > 0 ? 'counter-pill' : 'counter-pill counter-pill--muted'}>{unreadNotificationCount}개</span>}
         </div>
         <div className="account-action-row">
           <button type="button" className={showSettings ? 'secondary-button is-complete' : 'secondary-button'} onClick={() => setShowSettings((current) => !current)}>
@@ -352,55 +339,6 @@ export function MyPagePanel({
           </button>
         </div>
       </section>
-      {showNotifications && myPage && (
-        <section className="sheet-card stack-gap notification-panel">
-          <div className="notification-panel__header">
-            <div>
-              <p className="eyebrow">ALERT</p>
-              <h3>새로운 인터랙션</h3>
-              <p className="section-copy">피드, 댓글, 코스 발행 같은 사용자 활동을 여기서 바로 확인해요.</p>
-            </div>
-            <button type="button" className="secondary-button notification-panel__mark-all" onClick={() => void handleMarkAllNotifications()} disabled={notificationsBusy || unreadNotificationCount === 0}>
-              {notificationsBusy ? '처리 중' : '모두 읽음'}
-            </button>
-          </div>
-          {notificationError && <p className="form-error-copy">{notificationError}</p>}
-          <div className="notification-list">
-            {myPage.notifications.map((notification) => (
-              <article
-                key={notification.id}
-                className={notification.isRead ? 'notification-item' : 'notification-item is-unread'}
-              >
-                <button
-                  type="button"
-                  className="notification-item__content"
-                  onClick={() => void handleOpenNotification(notification)}
-                  disabled={notificationBusyId === notification.id}
-                >
-                  <div className="notification-item__top">
-                    <span className="soft-tag">{getNotificationLabel(notification)}</span>
-                    <span className="notification-item__time">
-                      {notification.actorName ? `${notification.actorName} · ${notification.createdAt}` : notification.createdAt}
-                    </span>
-                  </div>
-                  <strong>{notification.title}</strong>
-                  <p>{notification.body}</p>
-                </button>
-                <button
-                  type="button"
-                  className="notification-item__delete"
-                  aria-label="알림 삭제"
-                  onClick={(event) => void handleDeleteNotificationClick(event, notification.id)}
-                  disabled={notificationBusyId === notification.id}
-                >
-                  ×
-                </button>
-              </article>
-            ))}
-            {myPage.notifications.length === 0 && <p className="empty-copy">새로운 알림이 아직 없어요.</p>}
-          </div>
-        </section>
-      )}
       {(showSettings || !sessionUser.profileCompletedAt) && (
         <section className="sheet-card stack-gap settings-card">
           <div className="settings-card__header">
