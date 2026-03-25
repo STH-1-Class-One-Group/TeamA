@@ -161,3 +161,7 @@ python -m pytest tests
 - [docs/README.md](/D:/JamIssue/docs/README.md)
 - [docs/growgardens-deploy-runbook.md](/D:/JamIssue/docs/growgardens-deploy-runbook.md)
 - [backend/README.md](/D:/JamIssue/backend/README.md)
+
+## CI 메모
+
+- 문서만 수정해서 `main`에 바로 반영할 때는 커밋 메시지에 `[skip ci]`를 포함해 GitHub Actions를 건너뛸 수 있습니다.
