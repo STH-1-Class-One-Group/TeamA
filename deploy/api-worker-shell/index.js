@@ -2283,14 +2283,13 @@ async function upsertImportedFestivalItems(env, items, options = {}) {
   const source = await ensureImportedFestivalSource(env, requestUrl, sourceName);
   const sourceId = source.source_id;
   const existingRows = await supabaseRequest(env, `public_event?select=public_event_id,external_id&source_id=eq.${encodeFilterValue(sourceId)}`);
-  const existingByExternalId = new Map((existingRows || []).map((row) => [String(row.external_id), row]));
   const seenExternalIds = new Set();
   const nowIso = new Date().toISOString();
+  const upsertRows = [];
 
   for (const item of normalizedItems) {
     seenExternalIds.add(item.externalId);
-    const existing = existingByExternalId.get(item.externalId);
-    const body = {
+    upsertRows.push({
       source_id: sourceId,
       external_id: item.externalId,
       title: item.title,
@@ -2320,19 +2319,16 @@ async function upsertImportedFestivalItems(env, items, options = {}) {
         longitude: item.longitude,
       },
       updated_at: nowIso,
-    };
+      created_at: nowIso,
+    });
+  }
 
-    if (existing) {
-      await supabaseRequest(env, `public_event?public_event_id=eq.${encodeFilterValue(existing.public_event_id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify(body),
-      });
-    } else {
-      await supabaseRequest(env, 'public_event', {
-        method: 'POST',
-        body: JSON.stringify({ ...body, created_at: nowIso }),
-      });
-    }
+  if (upsertRows.length > 0) {
+    await supabaseRequest(env, 'public_event?on_conflict=source_id,external_id', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(upsertRows),
+    });
   }
 
   const staleIds = (existingRows || [])
