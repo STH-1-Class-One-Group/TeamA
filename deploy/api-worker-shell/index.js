@@ -2401,7 +2401,7 @@ async function handleFestivalImport(request, env) {
   }, env, request);
 }
 
-async function handleFestivals(request, env) {
+async function handleFestivalsLegacy(request, env) {
   const now = Date.now();
   if (festivalsCache.value && festivalsCache.expiresAt > now) {
     return jsonResponse(200, festivalsCache.value, env, request);
@@ -2443,7 +2443,7 @@ async function handleFestivals(request, env) {
   return jsonResponse(200, festivals, env, request);
 }
 
-async function handleBannerEvents(request, env) {
+async function handleBannerEventsLegacy(request, env) {
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
   const windowEndIso = getFestivalWindowEnd(now).toISOString();
