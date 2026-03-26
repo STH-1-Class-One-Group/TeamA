@@ -2,7 +2,8 @@
 
 const BUTTON_SIZE = 46;
 const EDGE_PADDING = 12;
-const BOTTOM_PADDING = 110;
+const DESKTOP_BOTTOM_PADDING = 150;
+const MOBILE_BOTTOM_PADDING = 250;
 const TOUCH_DRAG_DELAY_MS = 260;
 
 interface Position {
@@ -15,9 +16,11 @@ function getDefaultPosition(): Position {
     return { x: EDGE_PADDING, y: EDGE_PADDING };
   }
 
+  const isMobileViewport = window.innerWidth <= 640;
+  const bottomPadding = isMobileViewport ? MOBILE_BOTTOM_PADDING : DESKTOP_BOTTOM_PADDING;
   return clampPosition({
-    x: EDGE_PADDING,
-    y: window.innerHeight - BUTTON_SIZE - BOTTOM_PADDING,
+    x: window.innerWidth - BUTTON_SIZE - EDGE_PADDING,
+    y: window.innerHeight - BUTTON_SIZE - bottomPadding,
   });
 }
 
@@ -27,7 +30,9 @@ function clampPosition(position: Position) {
   }
 
   const maxX = Math.max(EDGE_PADDING, window.innerWidth - BUTTON_SIZE - EDGE_PADDING);
-  const maxY = Math.max(EDGE_PADDING, window.innerHeight - BUTTON_SIZE - BOTTOM_PADDING);
+  const isMobileViewport = window.innerWidth <= 640;
+  const bottomPadding = isMobileViewport ? MOBILE_BOTTOM_PADDING : DESKTOP_BOTTOM_PADDING;
+  const maxY = Math.max(EDGE_PADDING, window.innerHeight - BUTTON_SIZE - bottomPadding);
 
   return {
     x: Math.min(Math.max(position.x, EDGE_PADDING), maxX),

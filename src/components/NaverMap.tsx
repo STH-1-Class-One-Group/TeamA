@@ -107,13 +107,23 @@ function routeStepMarkerContent(step: number) {
 
 function getSelectionVerticalOffset(mapElement: HTMLDivElement | null, targetType: 'place' | 'festival') {
   const mapHeight = mapElement?.clientHeight ?? 0;
+  const isMobileViewport = typeof window !== 'undefined' && window.innerWidth <= 640;
   if (mapHeight <= 0) {
-    return targetType === 'place' ? 225 : 170;
+    if (targetType === 'place') {
+      return isMobileViewport ? 310 : 235;
+    }
+    return isMobileViewport ? 240 : 180;
   }
 
-  const ratio = targetType === 'place' ? 0.34 : 0.26;
-  const minOffset = targetType === 'place' ? 210 : 155;
-  const maxOffset = targetType === 'place' ? 280 : 215;
+  const ratio = targetType === 'place'
+    ? (isMobileViewport ? 0.46 : 0.36)
+    : (isMobileViewport ? 0.34 : 0.27);
+  const minOffset = targetType === 'place'
+    ? (isMobileViewport ? 290 : 220)
+    : (isMobileViewport ? 220 : 160);
+  const maxOffset = targetType === 'place'
+    ? (isMobileViewport ? 360 : 290)
+    : (isMobileViewport ? 280 : 220);
   return Math.min(maxOffset, Math.max(minOffset, Math.round(mapHeight * ratio)));
 }
 
