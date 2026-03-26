@@ -65,33 +65,30 @@ export function EventTab({ festivals }: EventTabProps) {
               const locationLines = getFestivalLocationLines(festival);
               return (
                 <article key={festival.id} className="community-route-card community-route-card--curated festival-card">
-                  <div className="festival-card__top">
-                    <div className="festival-card__status-row">
-                      {festival.isOngoing ? <span className="soft-tag festival-card__status-chip">진행 중</span> : null}
+                  <div className="festival-card__content">
+                    <div className="festival-card__meta-row">
                       <span className="festival-card__date">{formatFestivalPeriod(festival)}</span>
+                      {festival.isOngoing ? <span className="soft-tag festival-card__status-chip">진행 중</span> : null}
                     </div>
-                    {festival.homepageUrl ? (
+
+                    <h4 className="festival-card__title">{formatFestivalTitle(festival.title)}</h4>
+
+                    <div className="festival-card__location">
+                      {locationLines.map((line, index) => (
+                        <p key={`${festival.id}-${index}`} className={index === 0 ? 'festival-card__location-primary' : 'festival-card__location-secondary'}>
+                          {line}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+
+                  {festival.homepageUrl ? (
+                    <div className="festival-card__footer">
                       <a className="festival-card__link" href={festival.homepageUrl} target="_blank" rel="noreferrer">
                         홈페이지 열기
                       </a>
-                    ) : null}
-                  </div>
-
-                  <div className="festival-card__content">
-                    <h4 className="festival-card__title">{formatFestivalTitle(festival.title)}</h4>
-                    <div className="festival-card__meta">
-                      <div className="festival-card__meta-item">
-                        <span className="festival-card__meta-label">장소</span>
-                        <div className="festival-card__location">
-                          {locationLines.map((line, index) => (
-                            <p key={`${festival.id}-${index}`} className={index === 0 ? 'festival-card__location-primary' : 'festival-card__location-secondary'}>
-                              {line}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </article>
               );
             })}
