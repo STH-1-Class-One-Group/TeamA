@@ -22,6 +22,7 @@
 
 - [screen-spec.md](/D:/JamIssue/docs/screen-spec.md)
 - [community-routes.md](/D:/JamIssue/docs/community-routes.md)
+- [notification-sse-architecture.md](/C:/Users/C21/Desktop/JamIssue/docs/notification-sse-architecture.md)
 - [account-identity-schema.md](/D:/JamIssue/docs/account-identity-schema.md)
 - [code-flow-diagrams.md](/D:/JamIssue/docs/code-flow-diagrams.md)
 - [operations-refactor-roadmap.md](/D:/JamIssue/docs/operations-refactor-roadmap.md)

@@ -8,13 +8,10 @@ import {
   createReview,
   updateReview,
   createUserRoute,
-  deleteNotification,
   getAuthSession,
   getFestivals,
   getMapBootstrap,
   getMyCommentsPage,
-  markAllNotificationsRead,
-  markNotificationRead,
   getProviderLoginUrl,
   getReviewDetail,
   getReviewFeedPage,
@@ -47,6 +44,7 @@ import {
 import { useAppDataState } from './hooks/useAppDataState';
 import { useAppTabDataLoaders } from './hooks/useAppTabDataLoaders';
 import { getCurrentDevicePosition } from './lib/geolocation';
+import { useNotificationStore } from './store/notification-store';
 import {
   calculateDistanceMeters,
   formatDistanceMeters,
@@ -66,6 +64,7 @@ import type {
   RoutePreview,
   SessionUser,
   Tab,
+  UserNotification,
 } from './types';
 
 const STAMP_UNLOCK_RADIUS_METERS = 120;
@@ -101,6 +100,15 @@ function TabPanelFallback() {
 }
 
 export default function App() {
+  const notifications = useNotificationStore((state) => state.notifications);
+  const unreadNotificationCount = useNotificationStore((state) => state.unreadCount);
+  const fetchNotifications = useNotificationStore((state) => state.fetchNotifications);
+  const connectNotifications = useNotificationStore((state) => state.connect);
+  const disconnectNotifications = useNotificationStore((state) => state.disconnect);
+  const hydrateNotifications = useNotificationStore((state) => state.hydrate);
+  const markNotificationReadInStore = useNotificationStore((state) => state.markRead);
+  const markAllNotificationsReadInStore = useNotificationStore((state) => state.markAllRead);
+  const deleteNotificationInStore = useNotificationStore((state) => state.deleteNotification);
   const {
     activeTab,
     drawerState,
@@ -211,6 +219,13 @@ export default function App() {
   } = useAppDataState(selectedPlaceId);
 
   const filteredPlaces = useMemo(() => filterPlacesByCategory(places, activeCategory), [places, activeCategory]);
+  const hydratedMyPage = useMemo(() => (
+    myPage ? {
+      ...myPage,
+      notifications,
+      unreadNotificationCount,
+    } : myPage
+  ), [myPage, notifications, unreadNotificationCount]);
   const selectedPlace = useMemo(() => {
     if (!selectedPlaceId) {
       return null;
@@ -281,6 +296,34 @@ export default function App() {
     }
     return null;
   }, [notice, bootstrapStatus, bootstrapError, mapLocationMessage, mapLocationStatus]);
+
+  useEffect(() => {
+    if (!sessionUser) {
+      disconnectNotifications();
+      return;
+    }
+
+    connectNotifications(sessionUser);
+    if (!myPage) {
+      void fetchNotifications();
+    }
+
+    return () => {
+      disconnectNotifications();
+    };
+  }, [
+    connectNotifications,
+    disconnectNotifications,
+    fetchNotifications,
+    sessionUser,
+  ]);
+
+  useEffect(() => {
+    if (!sessionUser || !myPage) {
+      return;
+    }
+    hydrateNotifications(myPage.notifications, myPage.unreadNotificationCount);
+  }, [hydrateNotifications, myPage, sessionUser]);
   const {
     fetchCommunityRoutes,
     ensureFeedReviews,
@@ -1048,56 +1091,18 @@ export default function App() {
   }
 
   async function handleMarkNotificationRead(notificationId: string) {
-    await markNotificationRead(notificationId);
-    setMyPage((current) => {
-      if (!current) {
-        return current;
-      }
-      return {
-        ...current,
-        notifications: current.notifications.map((notification) => (
-          notification.id === notificationId
-            ? { ...notification, isRead: true }
-            : notification
-        )),
-        unreadNotificationCount: Math.max(
-          0,
-          current.notifications.filter((notification) => !notification.isRead && notification.id !== notificationId).length,
-        ),
-      };
-    });
+    await markNotificationReadInStore(notificationId);
   }
 
   async function handleMarkAllNotificationsRead() {
-    await markAllNotificationsRead();
-    setMyPage((current) => {
-      if (!current) {
-        return current;
-      }
-      return {
-        ...current,
-        notifications: current.notifications.map((notification) => ({ ...notification, isRead: true })),
-        unreadNotificationCount: 0,
-      };
-    });
+    await markAllNotificationsReadInStore();
   }
 
   async function handleDeleteNotification(notificationId: string) {
-    await deleteNotification(notificationId);
-    setMyPage((current) => {
-      if (!current) {
-        return current;
-      }
-      const nextNotifications = current.notifications.filter((notification) => notification.id !== notificationId);
-      return {
-        ...current,
-        notifications: nextNotifications,
-        unreadNotificationCount: nextNotifications.filter((notification) => !notification.isRead).length,
-      };
-    });
+    await deleteNotificationInStore(notificationId);
   }
 
-  async function handleOpenGlobalNotification(notification: NonNullable<typeof myPage>['notifications'][number]) {
+  async function handleOpenGlobalNotification(notification: UserNotification) {
     if (!notification.isRead) {
       await handleMarkNotificationRead(notification.id);
     }
@@ -1332,12 +1337,12 @@ export default function App() {
             <GlobalStatusBanner tone={globalStatus.tone} message={globalStatus.message} layout={activeTab === 'map' ? 'map' : 'page'} />
           </div>
         )}
-        {sessionUser && myPage && (
+        {sessionUser && hydratedMyPage && (
           <div className="phone-shell__utility-slot">
             <GlobalNotificationCenter
               sessionUserName={sessionUser.nickname}
-              notifications={myPage.notifications}
-              unreadCount={myPage.unreadNotificationCount}
+              notifications={hydratedMyPage.notifications}
+              unreadCount={hydratedMyPage.unreadNotificationCount}
               onOpenNotification={handleOpenGlobalNotification}
               onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
               onDeleteNotification={handleDeleteNotification}
@@ -1470,7 +1475,7 @@ export default function App() {
               {activeTab === 'my' && (
                 <MyPagePanel
                   sessionUser={sessionUser}
-                  myPage={myPage}
+                  myPage={hydratedMyPage}
                   providers={providers}
                   myPageError={myPageError}
                   activeTab={myPageTab}

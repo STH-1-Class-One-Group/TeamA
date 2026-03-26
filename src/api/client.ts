@@ -16,6 +16,7 @@ import type {
   MyPageResponse,
   NotificationDeleteResponse,
   NotificationReadResponse,
+  UserNotification,
   PlaceVisibilityRequest,
   ProfileUpdateRequest,
   ProviderKey,
@@ -193,6 +194,10 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function getApiBaseUrl() {
   return getClientConfig().apiBaseUrl;
+}
+
+export function getNotificationStreamUrl() {
+  return `${getApiBaseUrl()}/api/my/notifications/stream`;
 }
 
 export function getProviderLoginUrl(provider: ProviderKey, nextUrl: string, mode: 'login' | 'link' = 'login') {
@@ -382,6 +387,10 @@ export async function uploadReviewImage(file: File) {
 
 export function getMySummary() {
   return fetchJson<MyPageResponse>('/api/my/summary');
+}
+
+export function getMyNotifications() {
+  return fetchJson<UserNotification[]>('/api/my/notifications');
 }
 
 export async function markNotificationRead(notificationId: string) {

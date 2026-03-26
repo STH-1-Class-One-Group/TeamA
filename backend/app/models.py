@@ -213,6 +213,30 @@ class MyCommentOut(ApiModel):
     created_at: str = Field(alias='createdAt')
     review_body: str = Field(alias='reviewBody')
 
+
+class UserNotificationOut(ApiModel):
+    id: str
+    type: str
+    title: str
+    body: str
+    created_at: str = Field(alias='createdAt')
+    is_read: bool = Field(alias='isRead')
+    review_id: str | None = Field(default=None, alias='reviewId')
+    comment_id: str | None = Field(default=None, alias='commentId')
+    route_id: str | None = Field(default=None, alias='routeId')
+    actor_name: str | None = Field(default=None, alias='actorName')
+
+
+class NotificationReadResponse(ApiModel):
+    notification_id: str = Field(alias='notificationId')
+    read: bool
+
+
+class NotificationDeleteResponse(ApiModel):
+    notification_id: str = Field(alias='notificationId')
+    deleted: bool
+
+
 class MyStatsOut(ApiModel):
     review_count: int = Field(alias='reviewCount')
     stamp_count: int = Field(alias='stampCount')
@@ -226,6 +250,8 @@ class MyPageResponse(ApiModel):
     stats: MyStatsOut
     reviews: list[ReviewOut]
     comments: list[MyCommentOut] = Field(default_factory=list)
+    notifications: list[UserNotificationOut] = Field(default_factory=list)
+    unread_notification_count: int = Field(default=0, alias='unreadNotificationCount')
     stamp_logs: list[StampLogOut] = Field(default_factory=list, alias='stampLogs')
     travel_sessions: list[TravelSessionOut] = Field(default_factory=list, alias='travelSessions')
     visited_places: list[PlaceOut] = Field(default_factory=list, alias='visitedPlaces')
