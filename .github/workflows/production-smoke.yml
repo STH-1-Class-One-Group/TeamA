@@ -1,0 +1,25 @@
+name: production-smoke
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      SMOKE_BASE_URL: https://daejeon.jamissue.com
+      SMOKE_API_BASE_URL: https://api.daejeon.jamissue.com
+      SMOKE_DEPLOY_WAIT_MS: 180000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run production smoke checks
+        run: node scripts/run-smoke-checks.mjs
