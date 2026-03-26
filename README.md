@@ -29,6 +29,55 @@
 - 프런트/백엔드 검증
 - `daejeon-jamissue-pages` production 배포
 - `daejeon-jamissue-api` production 배포
+- `production-smoke.yml`로 운영 스모크 체크 실행
+
+## 런타임 호출 경계
+
+이 저장소는 Pages + Worker + Supabase 조합을 기본 운영 경계로 사용합니다.
+
+### 진입점
+
+- 브라우저 사용자는 `https://daejeon.jamissue.com` Pages 프런트에 접속합니다.
+- 프런트는 공개 API를 `https://api.daejeon.jamissue.com` Worker 경유로만 호출합니다.
+- 프런트는 운영 기준으로 FastAPI origin을 직접 호출하지 않습니다.
+
+### 책임 분리
+
+- Pages
+  - 정적 프런트 번들 제공
+  - `app-config.js`로 런타임 환경값 주입
+- Worker
+  - 공개 API의 단일 진입점
+  - 인증, 리뷰/댓글/좋아요/스탬프, 공공행사, 알림, 마이페이지 API 처리
+  - 필요 시에만 origin API로 프록시
+- FastAPI origin
+  - 로컬 개발용 앱서버
+  - Worker에서 아직 직접 처리하지 않은 경로의 보조 origin
+  - 프런트의 운영 호출 대상은 아님
+- Supabase
+  - 운영 DB / Storage / Realtime
+
+### 호출 규칙
+
+- 프런트 코드에서는 `PUBLIC_APP_BASE_URL`에 들어간 Worker API 주소만 사용합니다.
+- 공개 계약의 기준은 Worker가 실제로 노출하는 경로입니다.
+- Worker가 직접 처리하지 않는 API만 선택적으로 origin으로 넘길 수 있습니다.
+- 새 API를 추가할 때는
+  1. 프런트가 호출할 공개 경로를 먼저 정하고
+  2. Worker 직접 처리인지 origin 프록시인지 결정한 뒤
+  3. README와 배포/스모크 경로를 같이 갱신합니다.
+
+### 운영 체크 포인트
+
+- 배포 성공만으로 서비스 정상 동작으로 보지 않습니다.
+- `production-smoke.yml`이 Pages/Worker 배포 이후 핵심 공개 API와 프런트 진입점을 다시 확인합니다.
+- 최소 스모크 경로:
+  - `GET /api/health`
+  - `GET /api/auth/providers`
+  - `GET /api/map-bootstrap`
+  - `GET /api/review-feed`
+  - `GET /api/community-routes`
+  - `GET /api/festivals`
 
 ### 주간 행사 동기화
 

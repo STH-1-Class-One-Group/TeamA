@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "build": "node scripts/build-frontend.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/run-smoke-checks.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
