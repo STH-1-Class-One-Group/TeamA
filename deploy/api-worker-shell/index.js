@@ -2687,6 +2687,136 @@ async function loadUserNotifications(env, userId, limit = 30) {
   }));
 }
 
+function buildNotificationSnapshot(notifications) {
+  return {
+    unreadCount: notifications.filter((notification) => !notification.isRead).length,
+    ids: notifications.map((notification) => notification.id),
+    byId: new Map(notifications.map((notification) => [notification.id, notification])),
+  };
+}
+
+function formatSseEvent(eventName, payload) {
+  return `event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`;
+}
+
+async function handleMyNotifications(request, env) {
+  const sessionResult = await requireSessionUser(request, env);
+  if (sessionResult.response) {
+    return sessionResult.response;
+  }
+
+  const notifications = await loadUserNotifications(env, sessionResult.sessionUser.id, 50);
+  return jsonResponse(200, notifications, env, request);
+}
+
+async function handleNotificationStream(request, env) {
+  const sessionResult = await requireSessionUser(request, env);
+  if (sessionResult.response) {
+    return sessionResult.response;
+  }
+
+  const { sessionUser } = sessionResult;
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      let closed = false;
+      let previousSnapshot = buildNotificationSnapshot(await loadUserNotifications(env, sessionUser.id, 50));
+
+      const close = () => {
+        if (closed) {
+          return;
+        }
+        closed = true;
+        try {
+          controller.close();
+        } catch {}
+      };
+
+      request.signal?.addEventListener('abort', close);
+
+      controller.enqueue(encoder.encode(formatSseEvent('connected', { connected: true })));
+
+      while (!closed) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        if (closed) {
+          break;
+        }
+
+        try {
+          const notifications = await loadUserNotifications(env, sessionUser.id, 50);
+          const nextSnapshot = buildNotificationSnapshot(notifications);
+          const previousIds = previousSnapshot.ids;
+          const nextIds = nextSnapshot.ids;
+
+          for (const notificationId of nextIds) {
+            if (!previousSnapshot.byId.has(notificationId)) {
+              controller.enqueue(encoder.encode(formatSseEvent('notification.created', {
+                notification: nextSnapshot.byId.get(notificationId),
+                unreadCount: nextSnapshot.unreadCount,
+              })));
+            }
+          }
+
+          const readTransitions = [];
+          for (const notificationId of nextIds) {
+            const previous = previousSnapshot.byId.get(notificationId);
+            const current = nextSnapshot.byId.get(notificationId);
+            if (previous && current && !previous.isRead && current.isRead) {
+              readTransitions.push(notificationId);
+            }
+          }
+
+          if (readTransitions.length > 1 && nextSnapshot.unreadCount === 0) {
+            controller.enqueue(encoder.encode(formatSseEvent('notification.all-read', {
+              unreadCount: 0,
+              updated: readTransitions.length,
+            })));
+          } else {
+            for (const notificationId of readTransitions) {
+              controller.enqueue(encoder.encode(formatSseEvent('notification.read', {
+                notificationId,
+                unreadCount: nextSnapshot.unreadCount,
+              })));
+            }
+          }
+
+          for (const notificationId of previousIds) {
+            if (!nextSnapshot.byId.has(notificationId)) {
+              controller.enqueue(encoder.encode(formatSseEvent('notification.deleted', {
+                notificationId,
+                unreadCount: nextSnapshot.unreadCount,
+              })));
+            }
+          }
+
+          if (
+            previousSnapshot.ids.join(',') === nextSnapshot.ids.join(',')
+            && previousSnapshot.unreadCount === nextSnapshot.unreadCount
+          ) {
+            controller.enqueue(encoder.encode(formatSseEvent('heartbeat', { ok: true })));
+          }
+
+          previousSnapshot = nextSnapshot;
+        } catch (error) {
+          controller.enqueue(encoder.encode(formatSseEvent('heartbeat', {
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          })));
+        }
+      }
+    },
+    cancel() {},
+  });
+
+  const headers = new Headers({
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-cache, no-transform',
+    connection: 'keep-alive',
+  });
+  applyCorsHeaders(headers, env, request);
+  return new Response(stream, { headers });
+}
+
 async function loadSingleReview(env, reviewId, sessionUserId = null) {
   const reviewRows = await supabaseRequest(
     env,
@@ -3599,6 +3729,12 @@ async function routeRequest(request, env) {
   }
   if (request.method === "GET" && url.pathname === "/api/my/summary") {
     return handleMySummary(request, env);
+  }
+  if (request.method === "GET" && url.pathname === "/api/my/notifications") {
+    return handleMyNotifications(request, env);
+  }
+  if (request.method === "GET" && url.pathname === "/api/my/notifications/stream") {
+    return handleNotificationStream(request, env);
   }
   if (request.method === "GET" && url.pathname === "/api/my/comments") {
     return handleMyComments(request, env, url);
