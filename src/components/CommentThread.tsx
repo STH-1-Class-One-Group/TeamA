@@ -30,6 +30,24 @@ interface CommentItemProps {
   isReply?: boolean;
 }
 
+function normalizeRenderableComments(comments: Comment[]): Comment[] {
+  return comments.flatMap((comment) => {
+    const replies = normalizeRenderableComments(comment.replies);
+    if (comment.isDeleted) {
+      return replies.map((reply) => ({
+        ...reply,
+        parentId: null,
+      }));
+    }
+    return [
+      {
+        ...comment,
+        replies,
+      },
+    ];
+  });
+}
+
 function CommentItem({
   comment,
   reviewId,
@@ -219,6 +237,7 @@ export function CommentThread({
   onRequestLogin,
 }: CommentThreadProps) {
   const [commentBody, setCommentBody] = useState('');
+  const renderableComments = normalizeRenderableComments(comments);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -242,9 +261,9 @@ export function CommentThread({
         </button>
       </form>
 
-      {comments.length > 0 && (
+      {renderableComments.length > 0 && (
         <ul className="comment-thread__list">
-          {comments.map((comment) => (
+          {renderableComments.map((comment) => (
             <CommentItem
               key={comment.id}
               comment={comment}
