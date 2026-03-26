@@ -119,7 +119,6 @@ function buildSeriesGroupingKey(item) {
   return [
     normalizeSeriesKeyPart(item.title),
     normalizeSeriesKeyPart(item.venueName || item.roadAddress || ''),
-    normalizeSeriesKeyPart(item.homepageUrl || ''),
   ].join('|');
 }
 
@@ -132,6 +131,20 @@ function areSeriesDatesAdjacent(leftEnd, rightStart) {
   const nextDate = parseSeoulDateKey(leftKey);
   nextDate.setDate(nextDate.getDate() + 1);
   return parseSeoulDateKey(rightKey).getTime() <= nextDate.getTime();
+}
+
+function areSeriesPeriodsMergeable(left, right) {
+  const leftStartTime = new Date(left.startsAt).getTime();
+  const leftEndTime = new Date(left.endsAt).getTime();
+  const rightStartTime = new Date(right.startsAt).getTime();
+  const rightEndTime = new Date(right.endsAt).getTime();
+  if (!Number.isFinite(leftStartTime) || !Number.isFinite(leftEndTime) || !Number.isFinite(rightStartTime) || !Number.isFinite(rightEndTime)) {
+    return false;
+  }
+  if (rightStartTime <= leftEndTime && rightEndTime >= leftStartTime) {
+    return true;
+  }
+  return areSeriesDatesAdjacent(left.endsAt, right.startsAt);
 }
 
 function mergeEventSeries(items) {
@@ -149,7 +162,7 @@ function mergeEventSeries(items) {
     if (
       previous &&
       buildSeriesGroupingKey(previous) === buildSeriesGroupingKey(item) &&
-      areSeriesDatesAdjacent(previous.endsAt, item.startsAt)
+      areSeriesPeriodsMergeable(previous, item)
     ) {
       if (new Date(item.endsAt).getTime() > new Date(previous.endsAt).getTime()) {
         previous.endsAt = item.endsAt;

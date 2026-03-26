@@ -209,7 +209,6 @@ function buildFestivalSeriesKey(row) {
   return [
     normalizeFestivalSeriesKeyPart(row.title),
     normalizeFestivalSeriesKeyPart(row.venue_name ?? row.road_address ?? row.address ?? ""),
-    normalizeFestivalSeriesKeyPart(row.source_page_url ?? ""),
   ].join("|");
 }
 
@@ -228,13 +227,27 @@ function areFestivalSeriesDatesAdjacent(leftEnd, rightStart) {
   return parseSeoulDateKey(rightKey).getTime() <= nextDate.getTime();
 }
 
+function areFestivalSeriesPeriodsMergeable(leftRow, rightRow) {
+  const leftStartTime = new Date(leftRow.starts_at).getTime();
+  const leftEndTime = new Date(leftRow.ends_at).getTime();
+  const rightStartTime = new Date(rightRow.starts_at).getTime();
+  const rightEndTime = new Date(rightRow.ends_at).getTime();
+  if (!Number.isFinite(leftStartTime) || !Number.isFinite(leftEndTime) || !Number.isFinite(rightStartTime) || !Number.isFinite(rightEndTime)) {
+    return false;
+  }
+  if (rightStartTime <= leftEndTime && rightEndTime >= leftStartTime) {
+    return true;
+  }
+  return areFestivalSeriesDatesAdjacent(leftRow.ends_at, rightRow.starts_at);
+}
+
 function groupFestivalRowsBySeries(rows) {
   return rows.reduce((acc, row) => {
     const previous = acc[acc.length - 1];
     if (
       previous &&
       buildFestivalSeriesKey(previous) === buildFestivalSeriesKey(row) &&
-      areFestivalSeriesDatesAdjacent(previous.ends_at, row.starts_at)
+      areFestivalSeriesPeriodsMergeable(previous, row)
     ) {
       if (new Date(row.ends_at).getTime() > new Date(previous.ends_at).getTime()) {
         previous.ends_at = row.ends_at;
