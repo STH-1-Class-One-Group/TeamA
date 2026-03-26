@@ -241,6 +241,91 @@ function areFestivalSeriesPeriodsMergeable(leftRow, rightRow) {
   return areFestivalSeriesDatesAdjacent(leftRow.ends_at, rightRow.starts_at);
 }
 
+function buildImportedFestivalSeriesKey(item) {
+  return [
+    normalizeFestivalSeriesKeyPart(item.title),
+    normalizeFestivalSeriesKeyPart(item.venueName ?? item.roadAddress ?? item.address ?? ""),
+  ].join("|");
+}
+
+function areImportedFestivalSeriesPeriodsMergeable(leftItem, rightItem) {
+  const leftStartTime = new Date(leftItem.startsAt).getTime();
+  const leftEndTime = new Date(leftItem.endsAt).getTime();
+  const rightStartTime = new Date(rightItem.startsAt).getTime();
+  const rightEndTime = new Date(rightItem.endsAt).getTime();
+  if (!Number.isFinite(leftStartTime) || !Number.isFinite(leftEndTime) || !Number.isFinite(rightStartTime) || !Number.isFinite(rightEndTime)) {
+    return false;
+  }
+  if (rightStartTime <= leftEndTime && rightEndTime >= leftStartTime) {
+    return true;
+  }
+  return areFestivalSeriesDatesAdjacent(leftItem.endsAt, rightItem.startsAt);
+}
+
+function mergeImportedFestivalItems(items) {
+  const sorted = [...items].sort((left, right) => {
+    const startDiff = new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime();
+    if (startDiff !== 0) {
+      return startDiff;
+    }
+    return String(left.title || "").localeCompare(String(right.title || ""), "ko");
+  });
+
+  return sorted.reduce((acc, item) => {
+    const previous = acc[acc.length - 1];
+    if (
+      previous &&
+      buildImportedFestivalSeriesKey(previous) === buildImportedFestivalSeriesKey(item) &&
+      areImportedFestivalSeriesPeriodsMergeable(previous, item)
+    ) {
+      if (new Date(item.endsAt).getTime() > new Date(previous.endsAt).getTime()) {
+        previous.endsAt = item.endsAt;
+      }
+      if (!previous.summary && item.summary) {
+        previous.summary = item.summary;
+      }
+      if (!previous.homepageUrl && item.homepageUrl) {
+        previous.homepageUrl = item.homepageUrl;
+      }
+      if (!previous.roadAddress && item.roadAddress) {
+        previous.roadAddress = item.roadAddress;
+      }
+      if (!previous.address && item.address) {
+        previous.address = item.address;
+      }
+      if ((!Number.isFinite(Number(previous.latitude)) || !Number.isFinite(Number(previous.longitude))) && Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))) {
+        previous.latitude = item.latitude;
+        previous.longitude = item.longitude;
+      }
+      previous.rawPayload = {
+        ...(previous.rawPayload || {}),
+        mergedExternalIds: [...new Set([...(previous.rawPayload?.mergedExternalIds || [previous.externalId].filter(Boolean)), item.externalId].filter(Boolean))],
+      };
+      previous.externalId = createFestivalExternalId(
+        previous.title,
+        new Date(previous.startsAt),
+        previous.venueName ?? null,
+        previous.roadAddress ?? previous.address ?? null,
+      );
+      return acc;
+    }
+    acc.push({
+      ...item,
+      externalId: createFestivalExternalId(
+        item.title,
+        new Date(item.startsAt),
+        item.venueName ?? null,
+        item.roadAddress ?? item.address ?? null,
+      ),
+      rawPayload: {
+        ...(item.rawPayload || {}),
+        mergedExternalIds: [item.externalId].filter(Boolean),
+      },
+    });
+    return acc;
+  }, []);
+}
+
 function groupFestivalRowsBySeries(rows) {
   return rows.reduce((acc, row) => {
     const previous = acc[acc.length - 1];
@@ -2409,9 +2494,9 @@ async function ensureImportedFestivalSource(env, requestUrl, sourceName) {
 
 async function upsertImportedFestivalItems(env, items, options = {}) {
   const cityKeyword = getTargetFestivalCityKeyword(env);
-  const normalizedItems = (items || [])
+  const normalizedItems = mergeImportedFestivalItems((items || [])
     .map((item) => normalizeFestivalImportItem(item, cityKeyword))
-    .filter(Boolean);
+    .filter(Boolean));
   if (normalizedItems.length === 0) {
     throw new Error('No valid festival items were provided for import.');
   }

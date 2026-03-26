@@ -147,6 +147,11 @@ function areSeriesPeriodsMergeable(left, right) {
   return areSeriesDatesAdjacent(left.endsAt, right.startsAt);
 }
 
+function createSeriesExternalId(title, startsAt, venueName, roadAddress) {
+  const seed = `${normalizeSeriesKeyPart(title)}|${toSeoulDateKey(startsAt)}|${normalizeSeriesKeyPart(venueName || roadAddress || '')}`;
+  return `festival-${Buffer.from(seed).toString('base64url').slice(0, 22)}`;
+}
+
 function mergeEventSeries(items) {
   const sorted = [...items].sort((left, right) => {
     const startDiff = new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime();
@@ -172,10 +177,17 @@ function mergeEventSeries(items) {
         ...(previous.rawPayload || {}),
         mergedEventSeqs: [...new Set([...(previous.rawPayload?.mergedEventSeqs || [previous.rawPayload?.eventSeq].filter(Boolean)), item.rawPayload?.eventSeq].filter(Boolean))],
       };
+      previous.externalId = createSeriesExternalId(
+        previous.title,
+        previous.startsAt,
+        previous.venueName || null,
+        previous.roadAddress || null,
+      );
       continue;
     }
     merged.push({
       ...item,
+      externalId: createSeriesExternalId(item.title, item.startsAt, item.venueName || null, item.roadAddress || null),
       rawPayload: {
         ...(item.rawPayload || {}),
         mergedEventSeqs: [item.rawPayload?.eventSeq].filter(Boolean),
