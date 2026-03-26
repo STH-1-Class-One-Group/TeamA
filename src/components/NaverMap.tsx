@@ -105,6 +105,18 @@ function routeStepMarkerContent(step: number) {
   `;
 }
 
+function getSelectionVerticalOffset(mapElement: HTMLDivElement | null, targetType: 'place' | 'festival') {
+  const mapHeight = mapElement?.clientHeight ?? 0;
+  if (mapHeight <= 0) {
+    return targetType === 'place' ? 150 : 120;
+  }
+
+  const ratio = targetType === 'place' ? 0.22 : 0.16;
+  const minOffset = targetType === 'place' ? 135 : 105;
+  const maxOffset = targetType === 'place' ? 190 : 150;
+  return Math.min(maxOffset, Math.max(minOffset, Math.round(mapHeight * ratio)));
+}
+
 interface NaverMapProps {
   places: Place[];
   festivals: FestivalItem[];
@@ -396,13 +408,14 @@ export function NaverMap({
 
     const selectedPlace = selectedPlaceId ? places.find((place) => place.id === selectedPlaceId) : null;
     const selectedFestival = selectedFestivalId ? festivals.find((festival) => festival.id === selectedFestivalId) : null;
+    const targetType = selectedPlace ? 'place' : selectedFestival ? 'festival' : null;
     const target = selectedPlace
       ? { latitude: selectedPlace.latitude, longitude: selectedPlace.longitude }
       : selectedFestival && hasFestivalCoordinates(selectedFestival)
         ? { latitude: selectedFestival.latitude, longitude: selectedFestival.longitude }
         : null;
 
-    if (!target) {
+    if (!target || !targetType) {
       return;
     }
 
@@ -424,7 +437,7 @@ export function NaverMap({
     if (typeof map.panBy === 'function') {
       window.setTimeout(() => {
         if (mapRef.current === map) {
-          map.panBy(0, -110);
+          map.panBy(0, -getSelectionVerticalOffset(mapElementRef.current, targetType));
         }
       }, 180);
     }
