@@ -1305,6 +1305,19 @@ body {
   box-shadow: none !important;
 }
 
+.review-card__tag-row .review-card__visit-pill,
+.review-card__tag-row .soft-tag {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 32px !important;
+  padding: 6px 12px !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
 .secondary-button,
 .review-link-button,
 .review-card__place-link,
