@@ -242,7 +242,7 @@ export function ReviewList({
 
           <div className="review-card__tag-row">
             <span className="review-card__visit-pill">{review.visitLabel}</span>
-            {review.travelSessionId && <span className="soft-tag">연속 여행 기록</span>}
+            {review.hasPublishedRoute && <span className="soft-tag">연속 여행 기록</span>}
             <span className="soft-tag">{review.badge}</span>
           </div>
 

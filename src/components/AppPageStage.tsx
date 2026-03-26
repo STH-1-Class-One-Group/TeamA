@@ -184,7 +184,7 @@ export function AppPageStage({
 
       {activeTab === 'course' && (
         <CourseTab
-          curatedCourses={courses}
+          courses={courses}
           communityRoutes={communityRoutes}
           sort={communityRouteSort}
           sessionUser={sessionUser}

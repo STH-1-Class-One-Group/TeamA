@@ -942,13 +942,13 @@ textarea {
 }
 
 .comment-thread {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .comment-thread__form,
 .comment-thread__reply-form {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
@@ -956,12 +956,12 @@ textarea {
 .comment-thread__reply-form input {
   flex: 1 1 0;
   min-width: 0;
-  padding: 10px 14px;
+  padding: 9px 12px;
 }
 
 .comment-thread__submit {
   flex-shrink: 0;
-  padding: 10px 14px;
+  padding: 9px 12px;
   border: 0;
   border-radius: 18px;
   background: linear-gradient(135deg, var(--pink), var(--pink-deep));
@@ -977,7 +977,7 @@ textarea {
 
 .comment-thread__reply-toggle {
   display: inline-block;
-  margin-top: 6px;
+  margin-top: 4px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -993,13 +993,13 @@ textarea {
 .comment-thread__children .comment-thread__item {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 4px;
 }
 
 .comment-thread__reply-indent {
   flex-shrink: 0;
-  width: 16px;
-  padding-top: 12px;
+  width: 14px;
+  padding-top: 10px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
@@ -1008,9 +1008,9 @@ textarea {
 
 .comment-thread__children {
   display: grid;
-  gap: 8px;
-  margin: 8px 0 0 0;
-  padding: 0 0 0 10px;
+  gap: 6px;
+  margin: 6px 0 0 0;
+  padding: 0 0 0 8px;
   list-style: none;
   border-left: 2px solid rgba(255, 127, 168, 0.18);
 }
@@ -1021,10 +1021,10 @@ textarea {
 
 .comment-thread__list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   list-style: none;
   padding: 0;
-  margin: 12px 0 0;
+  margin: 10px 0 0;
 }
 
 .comment-thread__list.is-nested {
@@ -1032,8 +1032,8 @@ textarea {
 }
 
 .comment-thread__bubble {
-  padding: 12px 14px;
-  border-radius: 18px;
+  padding: 10px 12px;
+  border-radius: 16px;
   background: rgba(249, 249, 252, 0.94);
 }
 

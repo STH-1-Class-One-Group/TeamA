@@ -228,6 +228,25 @@ def test_delete_comment_keeps_reply_tree(tmp_path: Path):
     assert updated_tree[0].replies[0].body == '대댓글'
 
 
+def test_delete_comment_without_reply_disappears_from_tree(tmp_path: Path):
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    stamp_state = claim_stamp_for(session, 'user-owner', 'hanbat-forest')
+    review = create_review(
+        session,
+        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(stamp_state, 'hanbat-forest'), body='단독 댓글 테스트', mood='설렘', imageUrl=None),
+        'user-owner',
+        '소희',
+    )
+    create_comment(session, review.id, CommentCreate(body='혼자 있는 댓글', parentId=None), 'user-owner', '소희')
+    comment = session.scalars(select(UserComment).where(UserComment.body == '혼자 있는 댓글')).one()
+
+    updated_tree = delete_comment(session, review.id, str(comment.comment_id), 'user-owner')
+
+    assert updated_tree == []
+
+
 def test_reply_of_reply_is_flattened_to_depth_one(tmp_path: Path):
     """대댓글의 답글은 2단계 깊이를 초과하지 않고 부모 댓글의 자식으로 귀속됩니다."""
     session = build_session(tmp_path)
@@ -280,6 +299,63 @@ def test_my_page_includes_my_comments(tmp_path: Path):
     assert len(my_page.comments) == 2
     assert my_page.comments[0].place_name == '한밭수목원 잼가든'
     assert my_page.comments[0].review_body == '댓글 목록 테스트 후기'
+
+
+def test_my_page_excludes_deleted_comments(tmp_path: Path):
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    stamp_state = claim_stamp_for(session, 'user-owner', 'hanbat-forest')
+    review = create_review(
+        session,
+        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(stamp_state, 'hanbat-forest'), body='삭제 댓글 숨김 테스트', mood='설렘', imageUrl=None),
+        'user-owner',
+        '소희',
+    )
+    create_comment(session, review.id, CommentCreate(body='남아있는 댓글', parentId=None), 'user-owner', '소희')
+    create_comment(session, review.id, CommentCreate(body='삭제할 댓글', parentId=None), 'user-owner', '소희')
+    deleted_comment = session.scalars(select(UserComment).where(UserComment.body == '삭제할 댓글')).one()
+    delete_comment(session, review.id, str(deleted_comment.comment_id), 'user-owner')
+
+    my_page = get_my_page(session, 'user-owner', False)
+
+    assert len(my_page.comments) == 1
+    assert my_page.comments[0].body == '남아있는 댓글'
+
+
+def test_review_marks_continuous_trip_only_after_route_publish(tmp_path: Path):
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    claim_stamp_for(session, 'user-owner', 'hanbat-forest')
+    second_stamp_state = claim_stamp_for(session, 'user-owner', 'expo-bridge')
+    review = create_review(
+        session,
+        ReviewCreate(placeId='expo-bridge', stampId=stamp_id_for_place(second_stamp_state, 'expo-bridge'), body='연속 여행 기록 후보', mood='설렘', imageUrl=None),
+        'user-owner',
+        '소희',
+    )
+
+    before_publish = list_reviews(session, user_id='user-owner', current_user_id='user-owner')
+    assert before_publish[0].id == review.id
+    assert before_publish[0].has_published_route is False
+
+    travel_session_id = get_my_page(session, 'user-owner', False).travel_sessions[0].id
+    create_user_route(
+        session,
+        UserRouteCreate(
+            title='연속 코스',
+            description='두 장소를 이어 만든 공개 코스예요.',
+            mood='데이트',
+            travelSessionId=travel_session_id,
+            isPublic=True,
+        ),
+        'user-owner',
+        '소희',
+    )
+
+    after_publish = list_reviews(session, user_id='user-owner', current_user_id='user-owner')
+    assert after_publish[0].has_published_route is True
 
 def test_delete_review_removes_comments_and_likes(tmp_path: Path):
     session = build_session(tmp_path)

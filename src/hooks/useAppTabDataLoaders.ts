@@ -1,6 +1,6 @@
 ﻿import { useCallback } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import { getAdminSummary, getCommunityRoutes, getCuratedCourses, getMySummary, getReviewFeedPage } from '../api/client';
+import { getAdminSummary, getCommunityRoutes, getMySummary, getReviewFeedPage } from '../api/client';
 import type {
   AdminSummaryResponse,
   CommunityRouteSort,
@@ -82,8 +82,7 @@ export function useAppTabDataLoaders({
       return;
     }
 
-    const response = await getCuratedCourses();
-    setCourses(response.courses);
+    setCourses((current) => current);
     coursesLoadedRef.current = true;
   }, [coursesLoadedRef, setCourses]);
 

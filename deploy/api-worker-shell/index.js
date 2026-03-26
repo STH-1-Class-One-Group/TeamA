@@ -750,11 +750,19 @@ function buildCommentTree(commentRows, usersById) {
     }
   }
 
-  return roots;
+  const pruneDeletedNodes = (nodes) => nodes
+    .map((node) => ({
+      ...node,
+      replies: pruneDeletedNodes(node.replies),
+    }))
+    .filter((node) => !(node.isDeleted && node.replies.length === 0));
+
+  return pruneDeletedNodes(roots);
 }
 
 function buildMyComments(commentRows, reviewsById) {
   return [...commentRows]
+    .filter((row) => !row.is_deleted)
     .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
     .map((row) => {
       const review = reviewsById.get(String(row.feed_id));
@@ -776,7 +784,7 @@ function buildMyComments(commentRows, reviewsById) {
     .filter(Boolean);
 }
 
-function mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, likedFeedIds = new Set()) {
+function mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, routeRows = [], likedFeedIds = new Set()) {
   const commentsByFeedId = new Map();
   for (const row of commentRows) {
     const feedId = String(row.feed_id);
@@ -792,11 +800,18 @@ function mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPosit
     likesByFeedId.set(feedId, (likesByFeedId.get(feedId) ?? 0) + 1);
   }
 
+  const publishedRouteIdBySession = new Map(
+    routeRows
+      .filter((row) => row.travel_session_id)
+      .map((row) => [String(row.travel_session_id), String(row.route_id)]),
+  );
+
   return feedRows.map((row) => {
     const place = placesByPositionId.get(String(row.position_id));
     const stamp = row.stamp_id ? stampRowsById.get(String(row.stamp_id)) : null;
     const reviewComments = buildCommentTree(commentsByFeedId.get(String(row.feed_id)) ?? [], usersById);
     const visitNumber = stamp?.visit_ordinal ?? 1;
+    const travelSessionId = stamp?.travel_session_id ? String(stamp.travel_session_id) : null;
     return {
       id: String(row.feed_id),
       userId: row.user_id,
@@ -814,7 +829,8 @@ function mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPosit
       stampId: row.stamp_id ? String(row.stamp_id) : null,
       visitNumber,
       visitLabel: formatVisitLabel(visitNumber),
-      travelSessionId: stamp?.travel_session_id ? String(stamp.travel_session_id) : null,
+      travelSessionId,
+      hasPublishedRoute: travelSessionId ? publishedRouteIdBySession.has(travelSessionId) : false,
       comments: reviewComments,
     };
   });
@@ -917,6 +933,10 @@ async function loadBaseData(env, sessionUserId = null) {
       ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&user_id=eq.${encodeFilterValue(sessionUserId)}&order=created_at.desc`)
       : Promise.resolve([]),
   ]);
+  const reviewTravelSessionIds = [...new Set((reviewStampRows ?? []).map((row) => row.travel_session_id).filter(Boolean).map((value) => String(value)))];
+  const reviewRouteRows = reviewTravelSessionIds.length > 0
+    ? await supabaseRequest(env, `user_route?select=route_id,travel_session_id&travel_session_id=${buildInFilter(reviewTravelSessionIds)}`)
+    : [];
 
   const userIdsFilter = buildInFilter([
     ...feedRows.map((row) => row.user_id),
@@ -940,7 +960,7 @@ async function loadBaseData(env, sessionUserId = null) {
   return {
     places,
     placesByPositionId,
-    reviews: mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, likedFeedIds),
+    reviews: mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, reviewRouteRows, likedFeedIds),
     courses: mapCourses(courseRows, coursePlaceRows, placesByPositionId),
     collectedPlaceIds,
     stampLogs,
@@ -1057,6 +1077,10 @@ async function loadReviewData(env, sessionUserId = null, filters = {}) {
       ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=${feedIdsFilter}`)
       : Promise.resolve([]),
   ]);
+  const reviewTravelSessionIds = [...new Set((reviewStampRows ?? []).map((row) => row.travel_session_id).filter(Boolean).map((value) => String(value)))];
+  const reviewRouteRows = reviewTravelSessionIds.length > 0
+    ? await supabaseRequest(env, `user_route?select=route_id,travel_session_id&travel_session_id=${buildInFilter(reviewTravelSessionIds)}`)
+    : [];
 
   const userIdsFilter = buildInFilter([
     ...feedRows.map((row) => row.user_id),
@@ -1069,7 +1093,7 @@ async function loadReviewData(env, sessionUserId = null, filters = {}) {
   const usersById = new Map(userRows.map((row) => [row.user_id, row]));
   const stampRowsById = new Map((reviewStampRows ?? []).map((row) => [String(row.stamp_id), row]));
   const likedFeedIds = new Set((userFeedLikeRows ?? []).map((row) => String(row.feed_id)));
-  return mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, likedFeedIds);
+  return mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, reviewRouteRows, likedFeedIds);
 }
 
 async function loadReviewPageData(env, sessionUserId = null, options = {}) {
@@ -1106,6 +1130,10 @@ async function loadReviewPageData(env, sessionUserId = null, options = {}) {
       ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=${feedIdsFilter}`)
       : Promise.resolve([]),
   ]);
+  const reviewTravelSessionIds = [...new Set((reviewStampRows ?? []).map((row) => row.travel_session_id).filter(Boolean).map((value) => String(value)))];
+  const reviewRouteRows = reviewTravelSessionIds.length > 0
+    ? await supabaseRequest(env, `user_route?select=route_id,travel_session_id&travel_session_id=${buildInFilter(reviewTravelSessionIds)}`)
+    : [];
 
   const userIdsFilter = buildInFilter([
     ...pageRows.map((row) => row.user_id),
@@ -1119,7 +1147,7 @@ async function loadReviewPageData(env, sessionUserId = null, options = {}) {
   const stampRowsById = new Map((reviewStampRows ?? []).map((row) => [String(row.stamp_id), row]));
   const likedFeedIds = new Set((userFeedLikeRows ?? []).map((row) => String(row.feed_id)));
   return {
-    items: mapReviewRows(pageRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, likedFeedIds),
+    items: mapReviewRows(pageRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, reviewRouteRows, likedFeedIds),
     nextCursor,
   };
 }
@@ -1376,7 +1404,7 @@ async function handleMyRoutes(request, env) {
 
 function mapMyComments(commentRows, feedRows, placesByPositionId) {
   const feedById = new Map(feedRows.map((row) => [String(row.feed_id), row]));
-  return commentRows.map((row) => {
+  return commentRows.filter((row) => !row.is_deleted).map((row) => {
     const feed = feedById.get(String(row.feed_id));
     const place = feed ? placesByPositionId.get(String(feed.position_id)) : null;
     return {
@@ -2812,6 +2840,10 @@ async function loadSingleReview(env, reviewId, sessionUserId = null) {
       ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=eq.${encodeFilterValue(reviewId)}&limit=1`)
       : Promise.resolve([]),
   ]);
+  const reviewTravelSessionIds = [...new Set((stampRows ?? []).map((row) => row.travel_session_id).filter(Boolean).map((value) => String(value)))];
+  const reviewRouteRows = reviewTravelSessionIds.length > 0
+    ? await supabaseRequest(env, `user_route?select=route_id,travel_session_id&travel_session_id=${buildInFilter(reviewTravelSessionIds)}`)
+    : [];
 
   const userIdsFilter = buildInFilter([reviewRow.user_id, ...commentRows.map((row) => row.user_id)]);
   const userRows = userIdsFilter
@@ -2825,7 +2857,7 @@ async function loadSingleReview(env, reviewId, sessionUserId = null) {
   const likedFeedIds = new Set((userFeedLikeRows ?? []).map((row) => String(row.feed_id)));
 
   return (
-    mapReviewRows([reviewRow], commentRows ?? [], likeRows ?? [], usersById, placesByPositionId, stampRowsById, likedFeedIds)[0] ??
+    mapReviewRows([reviewRow], commentRows ?? [], likeRows ?? [], usersById, placesByPositionId, stampRowsById, reviewRouteRows, likedFeedIds)[0] ??
     null
   );
 }

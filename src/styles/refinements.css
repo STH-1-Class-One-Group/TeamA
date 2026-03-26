@@ -222,25 +222,25 @@ input.visually-hidden[type='file'] {
 /* 2026-03-19 comment thread and feed sheet fixes */
 .comment-thread {
   display: grid !important;
-  gap: 12px !important;
+  gap: 10px !important;
 }
 
 .comment-thread__list,
 .comment-thread__children {
   display: flex !important;
   flex-direction: column !important;
-  gap: 10px !important;
+  gap: 8px !important;
   list-style: none !important;
 }
 
 .comment-thread__list {
-  margin: 12px 0 0 !important;
+  margin: 10px 0 0 !important;
   padding: 0 !important;
 }
 
 .comment-thread__children {
-  margin: 8px 0 0 !important;
-  padding: 0 0 0 12px !important;
+  margin: 6px 0 0 !important;
+  padding: 0 0 0 10px !important;
   border-left: 2px solid rgba(255, 127, 168, 0.18) !important;
 }
 
@@ -250,9 +250,9 @@ input.visually-hidden[type='file'] {
 
 .comment-thread__item--reply {
   display: grid !important;
-  grid-template-columns: 14px minmax(0, 1fr) !important;
+  grid-template-columns: 12px minmax(0, 1fr) !important;
   align-items: start !important;
-  column-gap: 8px !important;
+  column-gap: 6px !important;
 }
 
 .comment-thread__main,
@@ -262,7 +262,7 @@ input.visually-hidden[type='file'] {
 
 .comment-thread__bubble {
   width: 100% !important;
-  padding: 14px 16px !important;
+  padding: 10px 12px !important;
 }
 
 .comment-thread__meta {
@@ -283,13 +283,13 @@ input.visually-hidden[type='file'] {
 }
 
 .comment-thread__reply-indent {
-  width: 14px !important;
-  padding-top: 12px !important;
+  width: 12px !important;
+  padding-top: 10px !important;
 }
 
 .comment-thread__reply-form {
-  margin-top: 8px !important;
-  margin-left: 22px !important;
+  margin-top: 6px !important;
+  margin-left: 18px !important;
 }
 
 .feed-comment-sheet {
@@ -1398,6 +1398,22 @@ body {
 .review-card--comment-log .section-copy,
 .review-card--comment-log .review-card__body {
   margin: 0 !important;
+}
+
+.review-card--comment-log {
+  gap: 10px !important;
+}
+
+.review-card--comment-log .review-card__body--comment-log {
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+}
+
+.review-card--comment-log .review-card__context-line {
+  margin: 0 !important;
+  color: var(--muted) !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
 }
 
 .review-card--stamp-log .soft-tag.is-complete {

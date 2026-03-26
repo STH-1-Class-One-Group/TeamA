@@ -151,7 +151,6 @@ export function useAppBootstrapLifecycle({
     }
 
     if (activeTab === 'course') {
-      void ensureCuratedCourses().catch(reportBackgroundError);
       void fetchCommunityRoutes(communityRouteSort).catch(reportBackgroundError);
       return;
     }

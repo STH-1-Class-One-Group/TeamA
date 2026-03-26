@@ -82,6 +82,7 @@ export interface Review {
   visitNumber: number;
   visitLabel: string;
   travelSessionId: string | null;
+  hasPublishedRoute: boolean;
   comments: Comment[];
 }
 

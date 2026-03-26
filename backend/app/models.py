@@ -91,6 +91,7 @@ class ReviewOut(ApiModel):
     visit_number: int = Field(default=1, alias='visitNumber')
     visit_label: str = Field(alias='visitLabel')
     travel_session_id: str | None = Field(default=None, alias='travelSessionId')
+    has_published_route: bool = Field(default=False, alias='hasPublishedRoute')
     comments: list[CommentOut] = Field(default_factory=list)
 
 

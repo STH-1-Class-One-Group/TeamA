@@ -202,4 +202,13 @@ def build_comment_tree(comments: list[UserComment]) -> list[CommentOut]:
         else:
             roots.append(node)
 
-    return roots
+    def prune_deleted_nodes(comment_nodes: list[CommentOut]) -> list[CommentOut]:
+        visible_nodes: list[CommentOut] = []
+        for node in comment_nodes:
+            node.replies = prune_deleted_nodes(node.replies)
+            if node.is_deleted and not node.replies:
+                continue
+            visible_nodes.append(node)
+        return visible_nodes
+
+    return prune_deleted_nodes(roots)

@@ -411,6 +411,11 @@ def to_review_out(feed: Feed, current_user_id: str | None = None) -> ReviewOut:
     likes = list(feed.likes or [])
     liked_by_me = any(like.user_id == current_user_id for like in likes) if current_user_id else False
     visit_number = feed.stamp.visit_ordinal if feed.stamp else 1
+    has_published_route = bool(
+        feed.stamp
+        and feed.stamp.travel_session
+        and any(route.route_id for route in (feed.stamp.travel_session.routes or []))
+    )
     return ReviewOut(
         id=str(feed.feed_id),
         userId=feed.user_id,
@@ -429,6 +434,7 @@ def to_review_out(feed: Feed, current_user_id: str | None = None) -> ReviewOut:
         visitNumber=visit_number,
         visitLabel=format_visit_label(visit_number),
         travelSessionId=str(feed.stamp.travel_session_id) if feed.stamp and feed.stamp.travel_session_id else None,
+        hasPublishedRoute=has_published_route,
         comments=build_comment_tree(comments),
     )
 
@@ -471,7 +477,7 @@ def list_reviews(
         .options(
             joinedload(Feed.user),
             joinedload(Feed.place),
-            joinedload(Feed.stamp),
+            joinedload(Feed.stamp).joinedload(UserStamp.travel_session).joinedload(TravelSession.routes),
             joinedload(Feed.likes),
             joinedload(Feed.comments).joinedload(UserComment.user),
         )
@@ -549,7 +555,7 @@ def create_review(db: Session, payload: ReviewCreate, user_id: str, nickname: st
         .options(
             joinedload(Feed.user),
             joinedload(Feed.place),
-            joinedload(Feed.stamp),
+            joinedload(Feed.stamp).joinedload(UserStamp.travel_session).joinedload(TravelSession.routes),
             joinedload(Feed.likes),
             joinedload(Feed.comments).joinedload(UserComment.user),
         )
@@ -836,7 +842,7 @@ def build_my_comments(db: Session, user_id: str) -> list[MyCommentOut]:
             reviewBody=comment.feed.body,
         )
         for comment in comment_rows
-        if comment.feed and comment.feed.place
+        if comment.feed and comment.feed.place and not comment.is_deleted
     ]
 
 

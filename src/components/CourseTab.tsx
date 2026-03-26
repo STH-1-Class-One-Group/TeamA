@@ -17,7 +17,7 @@ function HeartIcon({ filled }: { filled: boolean }) {
 }
 
 interface CourseTabProps {
-  curatedCourses: Course[];
+  courses: Course[];
   communityRoutes: UserRoute[];
   sort: CommunityRouteSort;
   sessionUser: SessionUser | null;
@@ -31,7 +31,7 @@ interface CourseTabProps {
 }
 
 export function CourseTab({
-  curatedCourses,
+  courses,
   communityRoutes,
   sort,
   sessionUser,
@@ -44,13 +44,15 @@ export function CourseTab({
   onRequestLogin,
 }: CourseTabProps) {
   const scrollRef = useScrollRestoration<HTMLElement>('course');
+  void courses;
+  void placeNameById;
 
   return (
     <section ref={scrollRef} className="page-panel page-panel--scrollable">
       <header className="panel-header">
         <p className="eyebrow">COURSE</p>
         <h2>{'\uCF54\uC2A4'}</h2>
-        <p>{'\uCC98\uC74C\uC5D0\uB294 \uAC1C\uBC1C\uC790 \uD050\uB808\uC774\uC158\uC744 \uBCF4\uACE0, \uC774\uD6C4\uC5D0\uB294 \uC2A4\uD0EC\uD504 \uC774\uB825\uC73C\uB85C \uBB36\uC778 \uC0AC\uC6A9\uC790 \uACBD\uB85C\uB97C \uB530\uB77C\uAC00 \uBCF4\uC138\uC694.'}</p>
+        <p>{'\uC2A4\uD0EC\uD504 \uC774\uB825\uC73C\uB85C \uBC1C\uD589\uB41C \uACF5\uAC1C \uCF54\uC2A4\uB97C \uD6D1\uC5B4\uBCF4\uACE0, \uB9C8\uC74C\uC5D0 \uB4DC\uB294 \uB3D9\uC120\uC744 \uB2E4\uC2DC \uB530\uB77C\uAC00 \uBCF4\uC138\uC694.'}</p>
       </header>
 
       <section className="sheet-card stack-gap">
@@ -120,52 +122,6 @@ export function CourseTab({
         </div>
       </section>
 
-      <section className="sheet-card stack-gap">
-        <div className="section-title-row section-title-row--tight">
-          <div>
-            <p className="eyebrow">CURATION</p>
-            <h3>{'\uCC98\uC74C \uB458\uB7EC\uBCF4\uAE30 \uC88B\uC740 \uD050\uB808\uC774\uC158 \uCF54\uC2A4'}</h3>
-          </div>
-          <span className="counter-pill">{curatedCourses.length}{'\uAC1C'}</span>
-        </div>
-        {curatedCourses.map((course) => (
-          <article key={course.id} className="community-route-card community-route-card--curated">
-            <div className="community-route-card__header community-route-card__header--feedlike">
-              <div className="community-route-card__title-block">
-                <div className="community-route-card__tag-row">
-                  <span className="soft-tag">{course.mood}</span>
-                </div>
-                <h4>{course.title}</h4>
-                <p className="community-route-meta community-route-meta--inline">{'\uCD94\uCC9C \uCF54\uC2A4'} / {course.duration}</p>
-              </div>
-            </div>
-            <p>{course.note}</p>
-            <div className="course-card__places community-route-places">
-              {course.placeIds.map((placeId, index) => (
-                <button key={course.id + '-' + placeId} type="button" className="soft-tag soft-tag--button course-card__place" onClick={() => onOpenPlace(placeId)}>
-                  {index + 1}. {placeNameById[placeId] ?? placeId}
-                </button>
-              ))}
-            </div>
-            <div className="review-card__actions review-card__actions--course">
-              <button
-                type="button"
-                className="review-link-button"
-                onClick={() => onOpenRoutePreview({
-                  id: course.id,
-                  title: course.title,
-                  subtitle: course.mood + ' / ' + course.duration,
-                  mood: course.mood,
-                  placeIds: course.placeIds,
-                  placeNames: course.placeIds.map((placeId) => placeNameById[placeId] ?? placeId),
-                })}
-              >
-                {'\uC9C0\uB3C4\uC5D0\uC11C \uBCF4\uAE30'}
-              </button>
-            </div>
-          </article>
-        ))}
-      </section>
     </section>
   );
 }
