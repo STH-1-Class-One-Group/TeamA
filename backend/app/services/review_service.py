@@ -1,13 +1,16 @@
-﻿from fastapi import HTTPException, status
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..models import CommentCreate, ReviewCreate, ReviewLikeResponse, ReviewOut, SessionUser
+from ..notification_broker import notification_broker
 from ..repository_normalized import (
     create_comment,
+    create_comment_with_notifications,
     create_review,
     delete_comment,
     delete_review,
     get_review_comments,
+    get_unread_notification_count,
     toggle_review_like,
 )
 
@@ -52,7 +55,17 @@ def read_review_comments_service(db: Session, review_id: str):
 
 def create_comment_service(db: Session, review_id: str, payload: CommentCreate, session_user: SessionUser):
     try:
-        return create_comment(db, review_id, payload, session_user.id, session_user.nickname)
+        comments, notifications = create_comment_with_notifications(db, review_id, payload, session_user.id, session_user.nickname)
+        for recipient_user_id, notification in notifications:
+            notification_broker.publish(
+                recipient_user_id,
+                {
+                    "event": "notification.created",
+                    "notification": notification.model_dump(by_alias=True),
+                    "unreadCount": get_unread_notification_count(db, recipient_user_id),
+                },
+            )
+        return comments
     except ValueError as error:
         detail = str(error)
         status_code = status.HTTP_400_BAD_REQUEST

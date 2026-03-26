@@ -1,5 +1,4 @@
 from datetime import UTC, date, datetime
-
 from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,7 +16,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=True)
     nickname: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     provider: Mapped[str] = mapped_column(String(50), default="demo", nullable=False)
-    profile_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    profile_completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
@@ -61,6 +60,17 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    notifications: Mapped[list["UserNotification"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys="UserNotification.user_id",
+    )
+    acted_notifications: Mapped[list["UserNotification"]] = relationship(
+        back_populates="actor",
+        passive_deletes=True,
+        foreign_keys="UserNotification.actor_user_id",
+    )
 
 
 class UserIdentity(Base):
@@ -94,8 +104,8 @@ class MapPlace(Base):
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
     summary: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    image_storage_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    image_url: Mapped[str] = mapped_column(String(255), nullable=True)
+    image_storage_path: Mapped[str] = mapped_column(String(255), nullable=True)
     vibe_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     visit_time: Mapped[str] = mapped_column(String(50), nullable=False)
     route_hint: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -285,6 +295,39 @@ class UserComment(Base):
     user: Mapped["User"] = relationship(back_populates="comments")
     parent: Mapped["UserComment"] = relationship(remote_side=[comment_id], back_populates="replies")
     replies: Mapped[list["UserComment"]] = relationship(back_populates="parent", passive_deletes=True)
+    notifications: Mapped[list["UserNotification"]] = relationship(back_populates="comment")
+
+
+class UserNotification(Base):
+    __tablename__ = "user_notification"
+
+    notification_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("user.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    actor_user_id: Mapped[str] = mapped_column(
+        ForeignKey("user.user_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    type: Mapped[str] = mapped_column(String(30), nullable=False)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    body: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    review_id: Mapped[int] = mapped_column(ForeignKey("feed.feed_id", ondelete="CASCADE"), nullable=True, index=True)
+    comment_id: Mapped[int] = mapped_column(
+        ForeignKey("user_comment.comment_id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    route_id: Mapped[int] = mapped_column(Integer, nullable=True, index=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    read_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    payload_metadata: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
+
+    user: Mapped["User"] = relationship(back_populates="notifications", foreign_keys=[user_id])
+    actor: Mapped["User"] = relationship(back_populates="acted_notifications", foreign_keys=[actor_user_id])
+    comment: Mapped["UserComment"] = relationship(back_populates="notifications")
+    review: Mapped["Feed"] = relationship()
 
 
 class Course(Base):
@@ -339,7 +382,7 @@ class UserStamp(Base):
     stamp_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("user.user_id", ondelete="CASCADE"), nullable=False, index=True)
     position_id: Mapped[int] = mapped_column(ForeignKey("map.position_id"), nullable=False, index=True)
-    travel_session_id: Mapped[int | None] = mapped_column(ForeignKey("travel_session.travel_session_id", ondelete="SET NULL"), nullable=True, index=True)
+    travel_session_id: Mapped[int] = mapped_column(ForeignKey("travel_session.travel_session_id", ondelete="SET NULL"), nullable=True, index=True)
     stamp_date: Mapped[date] = mapped_column(Date, nullable=False)
     visit_ordinal: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
@@ -355,7 +398,7 @@ class UserRoute(Base):
 
     route_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("user.user_id", ondelete="CASCADE"), nullable=False, index=True)
-    travel_session_id: Mapped[int | None] = mapped_column(ForeignKey("travel_session.travel_session_id", ondelete="SET NULL"), nullable=True, index=True)
+    travel_session_id: Mapped[int] = mapped_column(ForeignKey("travel_session.travel_session_id", ondelete="SET NULL"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     mood: Mapped[str] = mapped_column(String(20), nullable=False)

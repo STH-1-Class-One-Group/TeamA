@@ -20,6 +20,7 @@ from .db_models import (
     User,
     UserComment,
     UserIdentity,
+    UserNotification,
     UserRoute,
     UserStamp,
 )
@@ -35,6 +36,8 @@ from .models import (
     MyCommentOut,
     MyPageResponse,
     MyStatsOut,
+    NotificationDeleteResponse,
+    NotificationReadResponse,
     PlaceOut,
     ProfileUpdateRequest,
     PublicImportResponse,
@@ -45,6 +48,7 @@ from .models import (
     StampLogOut,
     StampState,
     TravelSessionOut,
+    UserNotificationOut,
 )
 from .naver_oauth import NaverProfile
 from .public_data import import_public_bundle as sync_public_bundle
@@ -576,7 +580,13 @@ def toggle_review_like(db: Session, review_id: str, user_id: str, nickname: str)
     like_count = db.scalar(select(func.count()).select_from(FeedLike).where(FeedLike.feed_id == feed.feed_id)) or 0
     return ReviewLikeResponse(reviewId=str(feed.feed_id), likeCount=int(like_count), likedByMe=liked_by_me)
 
-def create_comment(db: Session, review_id: str, payload: CommentCreate, user_id: str, nickname: str) -> list[CommentOut]:
+def create_comment_with_notifications(
+    db: Session,
+    review_id: str,
+    payload: CommentCreate,
+    user_id: str,
+    nickname: str,
+) -> tuple[list[CommentOut], list[tuple[str, UserNotificationOut]]]:
     body = payload.body.strip()
     if not body:
         raise ValueError("댓글 내용을 적어 주세요.")
@@ -587,30 +597,74 @@ def create_comment(db: Session, review_id: str, payload: CommentCreate, user_id:
         raise ValueError("리뷰를 찾을 수 없어요.")
 
     parent_id: int | None = None
+    parent_comment: UserComment | None = None
     if payload.parent_id:
         parent_id = parse_comment_id(payload.parent_id)
-        parent = db.get(UserComment, parent_id)
-        if not parent or parent.feed_id != review_key:
+        parent_comment = db.get(UserComment, parent_id)
+        if not parent_comment or parent_comment.feed_id != review_key:
             raise ValueError("같은 리뷰의 댓글에만 답글을 달 수 있어요.")
         # Enforce 2-level depth: if parent is itself a reply, use its root comment instead
-        if parent.parent_id is not None:
-            parent_id = parent.parent_id
+        if parent_comment.parent_id is not None:
+            parent_id = parent_comment.parent_id
+            parent_comment = db.get(UserComment, parent_comment.parent_id)
 
     user = get_or_create_user(db, user_id, nickname)
     now = utcnow_naive()
-    db.add(
-        UserComment(
-            feed_id=review_key,
-            user_id=user.user_id,
-            parent_id=parent_id,
-            body=body,
-            is_deleted=False,
-            created_at=now,
-            updated_at=now,
-        )
+    comment = UserComment(
+        feed_id=review_key,
+        user_id=user.user_id,
+        parent_id=parent_id,
+        body=body,
+        is_deleted=False,
+        created_at=now,
+        updated_at=now,
     )
+    db.add(comment)
+    db.flush()
+
+    notifications: list[tuple[str, UserNotificationOut]] = []
+    if parent_comment and parent_comment.user_id != user.user_id:
+        notification = create_user_notification(
+            db,
+            user_id=parent_comment.user_id,
+            actor_user_id=user.user_id,
+            notification_type="comment-reply",
+            title=f"{user.nickname}님이 내 댓글에 답글을 남겼어요.",
+            body=body[:255],
+            review_id=feed.feed_id,
+            comment_id=comment.comment_id,
+            payload_metadata={"reviewId": str(feed.feed_id), "commentId": str(comment.comment_id)},
+        )
+        if notification:
+            notifications.append((parent_comment.user_id, notification))
+
+    if feed.user_id != user.user_id and feed.user_id != (parent_comment.user_id if parent_comment else None):
+        notification = create_user_notification(
+            db,
+            user_id=feed.user_id,
+            actor_user_id=user.user_id,
+            notification_type="review-comment",
+            title=f"{user.nickname}님이 내 피드에 댓글을 남겼어요.",
+            body=body[:255],
+            review_id=feed.feed_id,
+            comment_id=comment.comment_id,
+            payload_metadata={"reviewId": str(feed.feed_id), "commentId": str(comment.comment_id)},
+        )
+        if notification:
+            notifications.append((feed.user_id, notification))
     db.commit()
-    return get_review_comments(db, review_id)
+    return get_review_comments(db, review_id), notifications
+
+
+def create_comment(
+    db: Session,
+    review_id: str,
+    payload: CommentCreate,
+    user_id: str,
+    nickname: str,
+) -> list[CommentOut]:
+    comments, _ = create_comment_with_notifications(db, review_id, payload, user_id, nickname)
+    return comments
 
 
 def delete_comment(
@@ -785,6 +839,141 @@ def build_my_comments(db: Session, user_id: str) -> list[MyCommentOut]:
         if comment.feed and comment.feed.place
     ]
 
+
+def to_notification_out(notification: UserNotification) -> UserNotificationOut:
+    return UserNotificationOut(
+        id=str(notification.notification_id),
+        type=notification.type,
+        title=notification.title,
+        body=notification.body,
+        createdAt=format_datetime(notification.created_at),
+        isRead=notification.is_read,
+        reviewId=str(notification.review_id) if notification.review_id else None,
+        commentId=str(notification.comment_id) if notification.comment_id else None,
+        routeId=str(notification.route_id) if notification.route_id else None,
+        actorName=notification.actor.nickname if notification.actor else None,
+    )
+
+
+def list_user_notifications(db: Session, user_id: str, *, limit: int = 50) -> list[UserNotificationOut]:
+    notifications = db.scalars(
+        select(UserNotification)
+        .options(joinedload(UserNotification.actor))
+        .where(UserNotification.user_id == user_id)
+        .order_by(UserNotification.created_at.desc(), UserNotification.notification_id.desc())
+        .limit(limit)
+    ).unique().all()
+    return [to_notification_out(notification) for notification in notifications]
+
+
+def get_unread_notification_count(db: Session, user_id: str) -> int:
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(UserNotification)
+            .where(UserNotification.user_id == user_id, UserNotification.is_read.is_(False))
+        )
+        or 0
+    )
+
+
+def create_user_notification(
+    db: Session,
+    *,
+    user_id: str,
+    actor_user_id: str | None,
+    notification_type: str,
+    title: str,
+    body: str,
+    review_id: int | None = None,
+    comment_id: int | None = None,
+    route_id: int | None = None,
+    payload_metadata: dict | None = None,
+) -> UserNotificationOut | None:
+    if user_id == actor_user_id:
+        return None
+
+    now = utcnow_naive()
+    notification = UserNotification(
+        user_id=user_id,
+        actor_user_id=actor_user_id,
+        type=notification_type,
+        title=title,
+        body=body,
+        review_id=review_id,
+        comment_id=comment_id,
+        route_id=route_id,
+        is_read=False,
+        read_at=None,
+        payload_metadata=payload_metadata or {},
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(notification)
+    db.flush()
+    stored_notification = db.scalars(
+        select(UserNotification)
+        .options(joinedload(UserNotification.actor))
+        .where(UserNotification.notification_id == notification.notification_id)
+    ).unique().one()
+    return to_notification_out(stored_notification)
+
+
+def mark_notification_read(db: Session, notification_id: str, user_id: str) -> NotificationReadResponse:
+    try:
+        notification_key = int(notification_id)
+    except ValueError as error:
+        raise ValueError("알림 ID 형식이 올바르지 않아요.") from error
+
+    notification = db.scalars(
+        select(UserNotification).where(
+            UserNotification.notification_id == notification_key,
+            UserNotification.user_id == user_id,
+        )
+    ).first()
+    if not notification:
+        raise ValueError("알림을 찾지 못했어요.")
+    if not notification.is_read:
+        notification.is_read = True
+        notification.read_at = utcnow_naive()
+        notification.updated_at = utcnow_naive()
+        db.commit()
+    return NotificationReadResponse(notificationId=str(notification.notification_id), read=True)
+
+
+def mark_all_notifications_read(db: Session, user_id: str) -> int:
+    notifications = db.scalars(
+        select(UserNotification).where(UserNotification.user_id == user_id, UserNotification.is_read.is_(False))
+    ).all()
+    if not notifications:
+        return 0
+    now = utcnow_naive()
+    for notification in notifications:
+        notification.is_read = True
+        notification.read_at = now
+        notification.updated_at = now
+    db.commit()
+    return len(notifications)
+
+
+def delete_notification(db: Session, notification_id: str, user_id: str) -> NotificationDeleteResponse:
+    try:
+        notification_key = int(notification_id)
+    except ValueError as error:
+        raise ValueError("알림 ID 형식이 올바르지 않아요.") from error
+
+    notification = db.scalars(
+        select(UserNotification).where(
+            UserNotification.notification_id == notification_key,
+            UserNotification.user_id == user_id,
+        )
+    ).first()
+    if not notification:
+        raise ValueError("알림을 찾지 못했어요.")
+    db.delete(notification)
+    db.commit()
+    return NotificationDeleteResponse(notificationId=str(notification_key), deleted=True)
+
 def get_my_page(db: Session, user_id: str, is_admin: bool) -> MyPageResponse:
     user = db.get(User, user_id)
     if not user:
@@ -801,6 +990,7 @@ def get_my_page(db: Session, user_id: str, is_admin: bool) -> MyPageResponse:
 
     routes = list_user_routes_for_owner(db, user_id)
     comments = build_my_comments(db, user_id)
+    notifications = list_user_notifications(db, user_id)
     return MyPageResponse(
         user=to_session_user(user, is_admin),
         stats=MyStatsOut(
@@ -812,6 +1002,8 @@ def get_my_page(db: Session, user_id: str, is_admin: bool) -> MyPageResponse:
         ),
         reviews=reviews,
         comments=comments,
+        notifications=notifications,
+        unreadNotificationCount=get_unread_notification_count(db, user_id),
         stampLogs=stamp_state.logs,
         travelSessions=stamp_state.travel_sessions,
         visitedPlaces=visited_places,

@@ -1,11 +1,13 @@
-"""JamIssue FastAPI ?좏뵆由ъ??댁뀡 吏꾩엯?먯엯?덈떎."""
+﻿"""JamIssue FastAPI ?醫뤿탣?귐???곷?筌욊쑴??癒?뿯??덈뼄."""
 
+import asyncio
+import json
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
@@ -26,6 +28,8 @@ from .models import (
     CourseOut,
     HealthResponse,
     MyPageResponse,
+    NotificationDeleteResponse,
+    NotificationReadResponse,
     PlaceOut,
     PlaceVisibilityUpdate,
     ProfileUpdateRequest,
@@ -39,9 +43,11 @@ from .models import (
     StampToggleRequest,
     UploadResponse,
     UserRouteCreate,
+    UserNotificationOut,
     UserRouteLikeResponse,
     UserRouteOut,
 )
+from .notification_broker import notification_broker
 from .naver_oauth import build_naver_login_url, generate_oauth_state
 from .public_event_api import router as public_event_router
 from .repository_normalized import (
@@ -83,6 +89,12 @@ from .services.page_service import (
     read_stamps_service,
     toggle_stamp_service,
 )
+from .services.notification_service import (
+    delete_notification_service,
+    mark_all_notifications_read_service,
+    mark_notification_read_service,
+    read_notifications_service,
+)
 from .services.review_service import (
     create_comment_service,
     create_review_service,
@@ -104,7 +116,7 @@ settings = get_settings()
 app = FastAPI(
     title="JamIssue API",
     version="1.0.0",
-    summary="??꾩쓣 ???낆뿉 怨좊Ⅴ??紐⑤컮???ы뻾 ??,
+    summary="JamIssue API server.",
 )
 
 app.add_middleware(
@@ -129,6 +141,15 @@ if settings.storage_backend == "local":
 app.include_router(public_event_router)
 
 
+def format_sse_event(event_name: str, payload: dict, *, event_id: str | None = None) -> str:
+    lines: list[str] = []
+    if event_id:
+        lines.append(f"id: {event_id}")
+    lines.append(f"event: {event_name}")
+    lines.append(f"data: {json.dumps(payload, ensure_ascii=False)}")
+    return "\n".join(lines) + "\n\n"
+
+
 @app.exception_handler(InvalidFileTypeError)
 async def handle_invalid_file_type(_: Request, exc: InvalidFileTypeError) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
@@ -145,15 +166,15 @@ async def handle_storage_errors(_: Request, exc: ValueError) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content={"detail": str(exc)})
 
 PROVIDER_LABELS = {
-    "naver": "?ㅼ씠踰?,
-    "kakao": "移댁뭅??,
+    "naver": "네이버",
+    "kakao": "카카오",
 }
 SUPPORTED_PROVIDERS = tuple(PROVIDER_LABELS.keys())
 
 
 @app.on_event("startup")
 def on_startup() -> None:
-    """濡쒖뺄 媛쒕컻?섍꼍?먯꽌???낅줈???붾젆?곕━? 湲곕낯 DB瑜?以鍮꾪빀?덈떎."""
+    """嚥≪뮇類?揶쏆뮆而??띻펾?癒?퐣????낆쨮???遺얠젂?怨뺚봺?? 疫꿸퀡??DB??餓Β??쑵鍮??덈뼄."""
 
     if settings.storage_backend == "local":
         settings.upload_path.mkdir(parents=True, exist_ok=True)
@@ -178,7 +199,7 @@ def get_session_user(request: Request, app_settings: Settings = Depends(get_sett
 
 def require_session_user(session_user: SessionUser | None = Depends(get_session_user)) -> SessionUser:
     if not session_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="濡쒓렇?몄씠 ?꾩슂?댁슂.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="嚥≪뮄??紐꾩뵠 ?袁⑹뒄??곸뒄.")
     return session_user
 
 
@@ -187,7 +208,7 @@ def require_admin_user(
     app_settings: Settings = Depends(get_settings),
 ) -> SessionUser:
     if not app_settings.is_admin(session_user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="愿由ъ옄 沅뚰븳???꾩슂?댁슂.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="?온?귐딆쁽 亦낅슦釉???袁⑹뒄??곸뒄.")
     return session_user.model_copy(update={"is_admin": True})
 
 
@@ -250,7 +271,7 @@ def start_login(
     app_settings: Settings = Depends(get_settings),
 ) -> RedirectResponse:
     if provider not in SUPPORTED_PROVIDERS:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="吏?먰븯吏 ?딅뒗 濡쒓렇???쒓났?먯삁??")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="筌왖?癒곕릭筌왖 ??낅뮉 嚥≪뮄?????볥궗?癒?굙??")
 
     request.session["post_login_redirect"] = next or app_settings.frontend_url
     request.session.pop("oauth_link_user_id", None)
@@ -260,11 +281,11 @@ def start_login(
         if not app_settings.provider_enabled(provider):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"{PROVIDER_LABELS[provider]} 濡쒓렇???ㅼ젙??鍮꾩뼱 ?덉뼱??",
+                detail=f"{PROVIDER_LABELS[provider]} 嚥≪뮄?????쇱젟????쑴堉???됰선??",
             )
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"{PROVIDER_LABELS[provider]} 濡쒓렇???곌껐? ?섍꼍 蹂?섎쭔 以鍮꾨맂 ?곹깭?덉슂.",
+            detail=f"{PROVIDER_LABELS[provider]} 嚥≪뮄????怨뚭퍙?? ??띻펾 癰궰??롮춸 餓Β??쑬留??怨밴묶??됱뒄.",
         )
 
     state = generate_oauth_state()
@@ -281,7 +302,7 @@ def start_link_login(
     app_settings: Settings = Depends(get_settings),
 ) -> RedirectResponse:
     if provider not in SUPPORTED_PROVIDERS:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="吏?먰븯吏 ?딅뒗 濡쒓렇???쒓났?먯삁??")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="筌왖?癒곕릭筌왖 ??낅뮉 嚥≪뮄?????볥궗?癒?굙??")
 
     request.session["post_login_redirect"] = next or app_settings.frontend_url
     request.session["oauth_link_user_id"] = session_user.id
@@ -291,11 +312,11 @@ def start_link_login(
         if not app_settings.provider_enabled(provider):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"{PROVIDER_LABELS[provider]} 濡쒓렇???ㅼ젙??鍮꾩뼱 ?덉뼱??",
+                detail=f"{PROVIDER_LABELS[provider]} 嚥≪뮄?????쇱젟????쑴堉???됰선??",
             )
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"{PROVIDER_LABELS[provider]} 怨꾩젙 ?곌껐? ?섍꼍 蹂?섎쭔 以鍮꾨맂 ?곹깭?덉슂.",
+            detail=f"{PROVIDER_LABELS[provider]} ?④쑴???怨뚭퍙?? ??띻펾 癰궰??롮춸 餓Β??쑬留??怨밴묶??됱뒄.",
         )
 
     state = generate_oauth_state()
@@ -483,6 +504,74 @@ def read_my_summary(
 ) -> MyPageResponse:
     return read_my_page_service(db, session_user, app_settings)
 
+
+@app.get("/api/my/notifications", response_model=list[UserNotificationOut], tags=["my"])
+def read_my_notifications(
+    db: Session = Depends(get_db),
+    session_user: SessionUser = Depends(require_session_user),
+) -> list[UserNotificationOut]:
+    return read_notifications_service(db, session_user)
+
+
+@app.get("/api/my/notifications/stream", tags=["my"])
+async def stream_my_notifications(
+    request: Request,
+    session_user: SessionUser = Depends(require_session_user),
+) -> StreamingResponse:
+    subscription = await notification_broker.subscribe(session_user.id)
+
+    async def event_generator():
+        try:
+            yield format_sse_event("connected", {"connected": True}, event_id=str(uuid4()))
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(subscription.queue.get(), timeout=15)
+                    event_name = str(event.get("event", "message"))
+                    payload = {key: value for key, value in event.items() if key != "event"}
+                    yield format_sse_event(event_name, payload, event_id=str(uuid4()))
+                except TimeoutError:
+                    yield format_sse_event("heartbeat", {"ok": True}, event_id=str(uuid4()))
+        finally:
+            await notification_broker.unsubscribe(session_user.id, subscription)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.patch("/api/notifications/{notification_id}/read", response_model=NotificationReadResponse, tags=["my"])
+def read_notification(
+    notification_id: str,
+    db: Session = Depends(get_db),
+    session_user: SessionUser = Depends(require_session_user),
+) -> NotificationReadResponse:
+    return mark_notification_read_service(db, notification_id, session_user)
+
+
+@app.patch("/api/notifications/read-all", tags=["my"])
+def read_all_notifications(
+    db: Session = Depends(get_db),
+    session_user: SessionUser = Depends(require_session_user),
+) -> dict[str, int]:
+    return mark_all_notifications_read_service(db, session_user)
+
+
+@app.delete("/api/notifications/{notification_id}", response_model=NotificationDeleteResponse, tags=["my"])
+def remove_notification(
+    notification_id: str,
+    db: Session = Depends(get_db),
+    session_user: SessionUser = Depends(require_session_user),
+) -> NotificationDeleteResponse:
+    return delete_notification_service(db, notification_id, session_user)
+
 @app.delete("/api/my/account", status_code=status.HTTP_204_NO_CONTENT, tags=["my"])
 def remove_my_account(
     response: Response,
@@ -538,4 +627,5 @@ def import_public_data(
     app_settings: Settings = Depends(get_settings),
 ) -> PublicImportResponse:
     return import_public_data_service(db, app_settings)
+
 
