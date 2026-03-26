@@ -396,3 +396,112 @@ def test_legacy_stamp_blocks_same_day_duplicate(tmp_path: Path):
     )
     assert blocked is True
     assert today_stamp_count == 1
+
+def test_notification_created_on_comment(tmp_path):
+    """댓글 작성 시 리뷰 작성자에게 알림이 생성되어야 합니다."""
+    from app.repository_normalized import get_user_notifications, mark_notification_read, delete_notification
+
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    stamp_state = claim_stamp_for(session, 'user-1', 'hanbat-forest')
+    review = create_review(
+        session,
+        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(stamp_state, 'hanbat-forest'), body='멋진 곳이에요.', mood='설렘', imageUrl=None),
+        'user-1',
+        '민서',
+    )
+
+    # user-2 leaves a comment on user-1's review
+    create_comment(session, review.id, CommentCreate(body='저도 가고 싶어요!', parentId=None), 'user-2', '가은')
+
+    notifications = get_user_notifications(session, 'user-1')
+    assert len(notifications) == 1
+    assert notifications[0].type == 'review-comment'
+    assert notifications[0].is_read is False
+    assert notifications[0].actor_name == '가은'
+
+    # Mark as read
+    mark_notification_read(session, notifications[0].id, 'user-1')
+    notifications_after_read = get_user_notifications(session, 'user-1')
+    assert notifications_after_read[0].is_read is True
+
+    # No self-notification: user-1 comments on their own review
+    create_comment(session, review.id, CommentCreate(body='감사해요!', parentId=None), 'user-1', '민서')
+    notifications_after_self = get_user_notifications(session, 'user-1')
+    assert len(notifications_after_self) == 1  # count stays the same
+
+    # Delete notification
+    delete_notification(session, notifications[0].id, 'user-1')
+    notifications_after_delete = get_user_notifications(session, 'user-1')
+    assert len(notifications_after_delete) == 0
+
+
+def test_notification_created_on_reply(tmp_path):
+    """대댓글 작성 시 원 댓글 작성자에게 알림이 생성되어야 합니다."""
+    from app.repository_normalized import get_user_notifications
+
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    stamp_state = claim_stamp_for(session, 'user-1', 'hanbat-forest')
+    review = create_review(
+        session,
+        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(stamp_state, 'hanbat-forest'), body='예쁜 곳이에요.', mood='설렘', imageUrl=None),
+        'user-1',
+        '민서',
+    )
+
+    comments = create_comment(session, review.id, CommentCreate(body='공감해요!', parentId=None), 'user-2', '가은')
+    parent_comment_id = comments[0].id
+
+    # user-3 replies to user-2's comment
+    create_comment(session, review.id, CommentCreate(body='저도요!', parentId=parent_comment_id), 'user-3', '지수')
+
+    # user-2 should get a reply notification
+    notifications_user2 = get_user_notifications(session, 'user-2')
+    assert any(n.type == 'comment-reply' for n in notifications_user2)
+
+
+def test_mark_all_notifications_read(tmp_path):
+    """모든 알림 읽음 처리가 올바르게 동작해야 합니다."""
+    from app.repository_normalized import get_user_notifications, mark_all_notifications_read
+
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    stamp_state = claim_stamp_for(session, 'user-1', 'hanbat-forest')
+    review = create_review(
+        session,
+        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(stamp_state, 'hanbat-forest'), body='정말 좋아요.', mood='설렘', imageUrl=None),
+        'user-1',
+        '민서',
+    )
+
+    create_comment(session, review.id, CommentCreate(body='저도요!', parentId=None), 'user-2', '가은')
+
+    updated_count = mark_all_notifications_read(session, 'user-1')
+    assert updated_count == 1
+
+    notifications = get_user_notifications(session, 'user-1')
+    assert all(n.is_read for n in notifications)
+
+
+def test_my_page_includes_notifications(tmp_path):
+    """마이페이지 응답에 알림 목록이 포함되어야 합니다."""
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    stamp_state = claim_stamp_for(session, 'user-1', 'hanbat-forest')
+    review = create_review(
+        session,
+        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(stamp_state, 'hanbat-forest'), body='좋은 하루였어요.', mood='설렘', imageUrl=None),
+        'user-1',
+        '민서',
+    )
+
+    create_comment(session, review.id, CommentCreate(body='멋지네요!', parentId=None), 'user-2', '가은')
+
+    my_page = get_my_page(session, 'user-1', False)
+    assert len(my_page.notifications) == 1
+    assert my_page.unread_notification_count == 1

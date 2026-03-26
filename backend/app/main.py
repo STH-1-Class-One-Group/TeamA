@@ -26,6 +26,8 @@ from .models import (
     CourseOut,
     HealthResponse,
     MyPageResponse,
+    NotificationDeleteResponse,
+    NotificationReadResponse,
     PlaceOut,
     PlaceVisibilityUpdate,
     ProfileUpdateRequest,
@@ -38,6 +40,7 @@ from .models import (
     StampState,
     StampToggleRequest,
     UploadResponse,
+    UserNotificationOut,
     UserRouteCreate,
     UserRouteLikeResponse,
     UserRouteOut,
@@ -49,14 +52,18 @@ from .repository_normalized import (
     create_review,
     delete_comment,
     delete_review,
+    delete_notification,
     get_bootstrap,
     get_my_page,
     get_place,
     get_review_comments,
     get_stamps,
+    get_user_notifications,
     list_courses,
     list_places,
     list_reviews,
+    mark_all_notifications_read,
+    mark_notification_read,
     toggle_review_like,
     toggle_stamp,
 )
@@ -493,6 +500,49 @@ def remove_my_account(
     clear_auth_cookie(response)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
+
+
+@app.get("/api/my/notifications", response_model=list[UserNotificationOut], tags=["my"])
+def read_my_notifications(
+    db: Session = Depends(get_db),
+    session_user: SessionUser = Depends(require_session_user),
+) -> list[UserNotificationOut]:
+    return get_user_notifications(db, session_user.id)
+
+
+@app.patch("/api/notifications/{notification_id}/read", response_model=NotificationReadResponse, tags=["notifications"])
+def read_mark_notification(
+    notification_id: str,
+    db: Session = Depends(get_db),
+    session_user: SessionUser = Depends(require_session_user),
+) -> NotificationReadResponse:
+    try:
+        notification = mark_notification_read(db, notification_id, session_user.id)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    return NotificationReadResponse(notificationId=notification.id, read=notification.is_read)
+
+
+@app.patch("/api/notifications/read-all", response_model=dict, tags=["notifications"])
+def read_mark_all_notifications(
+    db: Session = Depends(get_db),
+    session_user: SessionUser = Depends(require_session_user),
+) -> dict:
+    updated = mark_all_notifications_read(db, session_user.id)
+    return {"updated": updated}
+
+
+@app.delete("/api/notifications/{notification_id}", response_model=NotificationDeleteResponse, tags=["notifications"])
+def remove_notification(
+    notification_id: str,
+    db: Session = Depends(get_db),
+    session_user: SessionUser = Depends(require_session_user),
+) -> NotificationDeleteResponse:
+    try:
+        delete_notification(db, notification_id, session_user.id)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    return NotificationDeleteResponse(notificationId=notification_id, deleted=True)
 
 
 @app.get("/api/stamps", response_model=StampState, tags=["stamps"])

@@ -398,4 +398,23 @@ class UserRouteLike(Base):
     user: Mapped["User"] = relationship(back_populates="route_likes")
 
 
+class UserNotification(Base):
+    __tablename__ = "user_notification"
+
+    notification_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    recipient_id: Mapped[str] = mapped_column(ForeignKey("user.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    actor_id: Mapped[str | None] = mapped_column(ForeignKey("user.user_id", ondelete="SET NULL"), nullable=True, index=True)
+    notification_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(String(500), nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    review_id: Mapped[int | None] = mapped_column(ForeignKey("feed.feed_id", ondelete="SET NULL"), nullable=True, index=True)
+    comment_id: Mapped[int | None] = mapped_column(ForeignKey("user_comment.comment_id", ondelete="SET NULL"), nullable=True, index=True)
+    route_id: Mapped[int | None] = mapped_column(ForeignKey("user_route.route_id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+    recipient: Mapped["User"] = relationship(foreign_keys=[recipient_id])
+    actor: Mapped["User"] = relationship(foreign_keys=[actor_id])
+
+
 

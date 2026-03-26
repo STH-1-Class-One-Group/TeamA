@@ -13,6 +13,7 @@ import {
   getFestivals,
   getMapBootstrap,
   getMyCommentsPage,
+  getMySummary,
   markAllNotificationsRead,
   markNotificationRead,
   getProviderLoginUrl,
@@ -54,6 +55,7 @@ import {
   getPlaceVisitCount,
   getTodayStampLog,
 } from './lib/visits';
+import { useNotificationStore } from './store/notification-store';
 import type {
   ApiStatus,
   Category,
@@ -558,6 +560,40 @@ export default function App() {
     const timer = setTimeout(() => setMapLocationMessage(null), NOTICE_DISMISS_DELAY_MS);
     return () => clearTimeout(timer);
   }, [mapLocationMessage]);
+
+  const NOTIFICATION_POLL_INTERVAL_MS = 30_000;
+  const { subscribe: subscribeNotifications } = useNotificationStore();
+
+  useEffect(() => {
+    if (!sessionUser) {
+      return;
+    }
+
+    async function pollNotifications() {
+      try {
+        const result = await getMySummary();
+        setMyPage((current) => {
+          if (!current) return result;
+          return {
+            ...current,
+            notifications: result.notifications,
+            unreadNotificationCount: result.unreadNotificationCount,
+          };
+        });
+        return result;
+      } catch {
+        // Silently ignore background polling errors
+        return null;
+      }
+    }
+
+    void pollNotifications();
+    const unsubscribe = subscribeNotifications(pollNotifications, NOTIFICATION_POLL_INTERVAL_MS);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [sessionUser?.id]);
 
   useEffect(() => {
     if (activeTab === 'feed') {

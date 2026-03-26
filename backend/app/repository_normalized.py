@@ -20,6 +20,7 @@ from .db_models import (
     User,
     UserComment,
     UserIdentity,
+    UserNotification,
     UserRoute,
     UserStamp,
 )
@@ -45,6 +46,7 @@ from .models import (
     StampLogOut,
     StampState,
     TravelSessionOut,
+    UserNotificationOut,
 )
 from .naver_oauth import NaverProfile
 from .public_data import import_public_bundle as sync_public_bundle
@@ -576,6 +578,109 @@ def toggle_review_like(db: Session, review_id: str, user_id: str, nickname: str)
     like_count = db.scalar(select(func.count()).select_from(FeedLike).where(FeedLike.feed_id == feed.feed_id)) or 0
     return ReviewLikeResponse(reviewId=str(feed.feed_id), likeCount=int(like_count), likedByMe=liked_by_me)
 
+
+def _to_notification_out(notification: UserNotification) -> UserNotificationOut:
+    actor_name = notification.actor.nickname if notification.actor else None
+    return UserNotificationOut(
+        id=str(notification.notification_id),
+        type=notification.notification_type,
+        title=notification.title,
+        body=notification.body,
+        createdAt=format_datetime(notification.created_at),
+        isRead=notification.is_read,
+        reviewId=str(notification.review_id) if notification.review_id else None,
+        commentId=str(notification.comment_id) if notification.comment_id else None,
+        routeId=str(notification.route_id) if notification.route_id else None,
+        actorName=actor_name,
+    )
+
+
+def _create_notification(
+    db: Session,
+    *,
+    recipient_id: str,
+    actor_id: str | None,
+    notification_type: str,
+    title: str,
+    body: str,
+    review_id: int | None = None,
+    comment_id: int | None = None,
+    route_id: int | None = None,
+) -> None:
+    """Insert a notification row without committing (caller commits)."""
+    if recipient_id == actor_id:
+        return
+    db.add(
+        UserNotification(
+            recipient_id=recipient_id,
+            actor_id=actor_id,
+            notification_type=notification_type,
+            title=title,
+            body=body,
+            is_read=False,
+            review_id=review_id,
+            comment_id=comment_id,
+            route_id=route_id,
+            created_at=utcnow_naive(),
+        )
+    )
+
+
+def get_user_notifications(db: Session, user_id: str) -> list[UserNotificationOut]:
+    from sqlalchemy.orm import joinedload as _joinedload
+    rows = db.scalars(
+        select(UserNotification)
+        .options(_joinedload(UserNotification.actor))
+        .where(UserNotification.recipient_id == user_id)
+        .order_by(UserNotification.created_at.desc(), UserNotification.notification_id.desc())
+        .limit(50)
+    ).unique().all()
+    return [_to_notification_out(row) for row in rows]
+
+
+def mark_notification_read(db: Session, notification_id: str, user_id: str) -> UserNotificationOut:
+    try:
+        nid = int(notification_id)
+    except ValueError as error:
+        raise ValueError("알림 ID 형식이 올바르지 않아요.") from error
+    notification = db.scalars(
+        select(UserNotification)
+        .where(UserNotification.notification_id == nid, UserNotification.recipient_id == user_id)
+    ).first()
+    if not notification:
+        raise ValueError("알림을 찾을 수 없어요.")
+    if not notification.is_read:
+        notification.is_read = True
+        db.commit()
+        db.refresh(notification)
+    return _to_notification_out(notification)
+
+
+def mark_all_notifications_read(db: Session, user_id: str) -> int:
+    from sqlalchemy import update as _update
+    result = db.execute(
+        _update(UserNotification)
+        .where(UserNotification.recipient_id == user_id, UserNotification.is_read.is_(False))
+        .values(is_read=True)
+    )
+    db.commit()
+    return result.rowcount
+
+
+def delete_notification(db: Session, notification_id: str, user_id: str) -> None:
+    try:
+        nid = int(notification_id)
+    except ValueError as error:
+        raise ValueError("알림 ID 형식이 올바르지 않아요.") from error
+    notification = db.scalars(
+        select(UserNotification).where(UserNotification.notification_id == nid, UserNotification.recipient_id == user_id)
+    ).first()
+    if not notification:
+        raise ValueError("알림을 찾을 수 없어요.")
+    db.delete(notification)
+    db.commit()
+
+
 def create_comment(db: Session, review_id: str, payload: CommentCreate, user_id: str, nickname: str) -> list[CommentOut]:
     body = payload.body.strip()
     if not body:
@@ -598,17 +703,47 @@ def create_comment(db: Session, review_id: str, payload: CommentCreate, user_id:
 
     user = get_or_create_user(db, user_id, nickname)
     now = utcnow_naive()
-    db.add(
-        UserComment(
-            feed_id=review_key,
-            user_id=user.user_id,
-            parent_id=parent_id,
-            body=body,
-            is_deleted=False,
-            created_at=now,
-            updated_at=now,
-        )
+    comment = UserComment(
+        feed_id=review_key,
+        user_id=user.user_id,
+        parent_id=parent_id,
+        body=body,
+        is_deleted=False,
+        created_at=now,
+        updated_at=now,
     )
+    db.add(comment)
+    db.flush()
+
+    # Trigger notification for the review author (댓글 알림)
+    if parent_id is None:
+        # Direct comment on a review
+        if feed.user_id != user.user_id:
+            _create_notification(
+                db,
+                recipient_id=feed.user_id,
+                actor_id=user.user_id,
+                notification_type="review-comment",
+                title=f"{user.nickname}님이 댓글을 남겼어요.",
+                body=body[:100],
+                review_id=feed.feed_id,
+                comment_id=comment.comment_id,
+            )
+    else:
+        # Reply to an existing comment — notify the parent comment author
+        parent_comment = db.get(UserComment, parent_id)
+        if parent_comment and parent_comment.user_id != user.user_id and not parent_comment.is_deleted:
+            _create_notification(
+                db,
+                recipient_id=parent_comment.user_id,
+                actor_id=user.user_id,
+                notification_type="comment-reply",
+                title=f"{user.nickname}님이 답글을 남겼어요.",
+                body=body[:100],
+                review_id=feed.feed_id,
+                comment_id=comment.comment_id,
+            )
+
     db.commit()
     return get_review_comments(db, review_id)
 
@@ -801,6 +936,8 @@ def get_my_page(db: Session, user_id: str, is_admin: bool) -> MyPageResponse:
 
     routes = list_user_routes_for_owner(db, user_id)
     comments = build_my_comments(db, user_id)
+    notifications = get_user_notifications(db, user_id)
+    unread_count = sum(1 for n in notifications if not n.is_read)
     return MyPageResponse(
         user=to_session_user(user, is_admin),
         stats=MyStatsOut(
@@ -812,6 +949,8 @@ def get_my_page(db: Session, user_id: str, is_admin: bool) -> MyPageResponse:
         ),
         reviews=reviews,
         comments=comments,
+        notifications=notifications,
+        unread_notification_count=unread_count,
         stampLogs=stamp_state.logs,
         travelSessions=stamp_state.travel_sessions,
         visitedPlaces=visited_places,
