@@ -69,6 +69,7 @@ import type {
 } from './types';
 
 const STAMP_UNLOCK_RADIUS_METERS = 120;
+const NOTICE_DISMISS_DELAY_MS = 4000;
 
 
 
@@ -545,6 +546,18 @@ export default function App() {
   useEffect(() => {
     void loadApp(true);
   }, []);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), NOTICE_DISMISS_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  useEffect(() => {
+    if (!mapLocationMessage) return;
+    const timer = setTimeout(() => setMapLocationMessage(null), NOTICE_DISMISS_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [mapLocationMessage]);
 
   useEffect(() => {
     if (activeTab === 'feed') {
