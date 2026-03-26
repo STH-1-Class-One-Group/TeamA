@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   claimStamp,
   createComment,
@@ -13,7 +13,6 @@ import {
   getFestivals,
   getMapBootstrap,
   getMyCommentsPage,
-  getMySummary,
   markAllNotificationsRead,
   markNotificationRead,
   getProviderLoginUrl,
@@ -27,6 +26,7 @@ import {
   updatePlaceVisibility,
   updateProfile,
   uploadReviewImage,
+  getApiBaseUrl,
 } from './api/client';
 import { BottomNav } from './components/BottomNav';
 import { CourseTab } from './components/CourseTab';
@@ -561,39 +561,43 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [mapLocationMessage]);
 
-  const NOTIFICATION_POLL_INTERVAL_MS = 30_000;
-  const { subscribe: subscribeNotifications } = useNotificationStore();
+  const { prependNotification } = useNotificationStore();
 
   useEffect(() => {
     if (!sessionUser) {
       return;
     }
 
-    async function pollNotifications() {
+    const source = new EventSource(
+      `${getApiBaseUrl()}/api/notifications/stream`,
+      { withCredentials: true },
+    );
+
+    source.addEventListener('message', (event: MessageEvent<string>) => {
       try {
-        const result = await getMySummary();
+        const data = JSON.parse(event.data) as Record<string, unknown>;
+        // Skip the initial handshake message
+        if (data['type'] === 'connected') return;
+        // data is a UserNotification-shaped object pushed by the server
+        const notification = data as unknown as import('./types').UserNotification;
+        prependNotification(notification);
         setMyPage((current) => {
-          if (!current) return result;
+          if (!current) return current;
           return {
             ...current,
-            notifications: result.notifications,
-            unreadNotificationCount: result.unreadNotificationCount,
+            notifications: [notification, ...current.notifications],
+            unreadNotificationCount: current.unreadNotificationCount + 1,
           };
         });
-        return result;
       } catch {
-        // Silently ignore background polling errors
-        return null;
+        // Ignore malformed SSE payloads
       }
-    }
-
-    void pollNotifications();
-    const unsubscribe = subscribeNotifications(pollNotifications, NOTIFICATION_POLL_INTERVAL_MS);
+    });
 
     return () => {
-      unsubscribe();
+      source.close();
     };
-  }, [sessionUser?.id, subscribeNotifications]);
+  }, [sessionUser?.id, prependNotification]);
 
   useEffect(() => {
     if (activeTab === 'feed') {

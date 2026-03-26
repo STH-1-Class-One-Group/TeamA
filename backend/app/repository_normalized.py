@@ -606,25 +606,46 @@ def _create_notification(
     review_id: int | None = None,
     comment_id: int | None = None,
     route_id: int | None = None,
-) -> None:
-    """Insert a notification row without committing (caller commits)."""
+) -> UserNotification | None:
+    """Insert a notification row without committing (caller commits).
+
+    Returns the pending ORM object so the caller can push an SSE event after
+    the surrounding ``db.commit()`` has been executed.  Returns ``None`` when
+    the notification is skipped (actor == recipient).
+    """
     if user_id == actor_user_id:
-        return
-    db.add(
-        UserNotification(
-            user_id=user_id,
-            actor_user_id=actor_user_id,
-            notification_type=notification_type,
-            title=title,
-            body=body,
-            is_read=False,
-            review_id=review_id,
-            comment_id=comment_id,
-            route_id=route_id,
-            created_at=utcnow_naive(),
-            updated_at=utcnow_naive(),
-        )
+        return None
+    notification = UserNotification(
+        user_id=user_id,
+        actor_user_id=actor_user_id,
+        notification_type=notification_type,
+        title=title,
+        body=body,
+        is_read=False,
+        review_id=review_id,
+        comment_id=comment_id,
+        route_id=route_id,
+        created_at=utcnow_naive(),
+        updated_at=utcnow_naive(),
     )
+    db.add(notification)
+    return notification
+
+
+def _push_notification_sse(db: Session, notification: UserNotification) -> None:
+    """Refresh the ORM object (to get the PK) and push to any open SSE streams."""
+    from . import notification_bus  # local import avoids circular dependency
+
+    try:
+        from sqlalchemy.orm import joinedload as _joinedload
+
+        db.refresh(notification)
+        # Eagerly load the actor so _to_notification_out works without lazy SQL
+        notification.actor  # noqa: B018 – triggers lazy load while session is open
+    except Exception:
+        return
+    payload = _to_notification_out(notification).model_dump(mode="json")
+    notification_bus.push(notification.user_id, payload)
 
 
 def get_user_notifications(db: Session, user_id: str) -> list[UserNotificationOut]:
@@ -720,10 +741,11 @@ def create_comment(db: Session, review_id: str, payload: CommentCreate, user_id:
     db.flush()
 
     # Trigger notification for the review author (댓글 알림)
+    pending_notification: UserNotification | None = None
     if parent_id is None:
         # Direct comment on a review
         if feed.user_id != user.user_id:
-            _create_notification(
+            pending_notification = _create_notification(
                 db,
                 user_id=feed.user_id,
                 actor_user_id=user.user_id,
@@ -737,7 +759,7 @@ def create_comment(db: Session, review_id: str, payload: CommentCreate, user_id:
         # Reply to an existing comment — notify the parent comment author
         parent_comment = db.get(UserComment, parent_id)
         if parent_comment and parent_comment.user_id != user.user_id and not parent_comment.is_deleted:
-            _create_notification(
+            pending_notification = _create_notification(
                 db,
                 user_id=parent_comment.user_id,
                 actor_user_id=user.user_id,
@@ -749,6 +771,11 @@ def create_comment(db: Session, review_id: str, payload: CommentCreate, user_id:
             )
 
     db.commit()
+
+    # Push to any open SSE streams *after* the commit so the PK is assigned
+    if pending_notification is not None:
+        _push_notification_sse(db, pending_notification)
+
     return get_review_comments(db, review_id)
 
 

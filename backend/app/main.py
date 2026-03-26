@@ -1,11 +1,12 @@
 """JamIssue FastAPI ?좏뵆由ъ??댁뀡 吏꾩엯?먯엯?덈떎."""
 
+import asyncio
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
@@ -45,6 +46,7 @@ from .models import (
     UserRouteLikeResponse,
     UserRouteOut,
 )
+from . import notification_bus
 from .naver_oauth import build_naver_login_url, generate_oauth_state
 from .public_event_api import router as public_event_router
 from .repository_normalized import (
@@ -208,6 +210,12 @@ def build_auth_response(session_user: SessionUser | None, app_settings: Settings
 
 def get_redirect_target(request: Request, app_settings: Settings) -> str:
     return request.session.get("post_login_redirect") or app_settings.frontend_url
+
+@app.on_event("startup")
+async def _on_startup_capture_loop() -> None:
+    """Capture the running event loop for the SSE notification bus."""
+    notification_bus.set_event_loop(asyncio.get_running_loop())
+
 
 
 @app.get("/api/health", response_model=HealthResponse, tags=["system"])
@@ -500,6 +508,45 @@ def remove_my_account(
     clear_auth_cookie(response)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
+
+
+@app.get("/api/notifications/stream", tags=["notifications"])
+async def notification_stream(
+    session_user: SessionUser = Depends(require_session_user),
+) -> StreamingResponse:
+    """Server-Sent Events stream that pushes new notifications in real time.
+
+    The client should open this endpoint with ``EventSource`` (withCredentials:
+    true).  The server emits:
+    * ``data: {"type":"connected"}`` once on successful handshake
+    * ``data: <UserNotificationOut JSON>`` whenever a new notification is created
+    * ``: heartbeat`` comment every 30 s to keep the connection alive
+    """
+    user_id = session_user.id
+    queue = notification_bus.register_stream(user_id)
+
+    async def event_generator():
+        import json as _json
+        try:
+            yield 'data: {"type":"connected"}\n\n'
+            while True:
+                try:
+                    data = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {data}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+        finally:
+            notification_bus.unregister_stream(user_id, queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/api/my/notifications", response_model=list[UserNotificationOut], tags=["my"])
