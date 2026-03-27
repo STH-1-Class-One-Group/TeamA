@@ -22,6 +22,20 @@ function calculateDistanceMeters(startLatitude, startLongitude, endLatitude, end
   return earthRadiusMeters * (2 * Math.asin(Math.sqrt(haversine)));
 }
 
+function formatDistanceMeters(distanceMeters) {
+  if (!Number.isFinite(distanceMeters)) {
+    return '알 수 없음';
+  }
+  if (distanceMeters >= 1000) {
+    return `${(distanceMeters / 1000).toFixed(1)}km`;
+  }
+  return `${Math.round(distanceMeters)}m`;
+}
+
+function buildNearPlaceMessage(placeName, distanceMeters, unlockRadius) {
+  return `${placeName}까지 ${formatDistanceMeters(distanceMeters)} 남아있어요. 반경 ${unlockRadius}m 안에 들어오면 열려요.`;
+}
+
 async function requireSessionUser(request, env) {
   const sessionUser = await readSessionUser(request, env);
   if (!sessionUser) {
@@ -38,7 +52,7 @@ async function readJsonBody(request) {
   }
 }
 
-export function createStampService({ buildNearPlaceMessage, loadBaseData }) {
+export function createStampService({ loadBaseData }) {
   async function handleToggleStamp(request, env) {
     const sessionResult = await requireSessionUser(request, env);
     if (sessionResult.response) {

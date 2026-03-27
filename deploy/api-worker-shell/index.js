@@ -271,7 +271,6 @@ const adminService = createAdminService({
 });
 
 const stampService = createStampService({
-  buildNearPlaceMessage,
   loadBaseData,
 });
 
