@@ -1,4 +1,5 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
+import { ReviewFormFields } from './ReviewFormFields';
 import type { ReviewMood } from '../types';
 
 type ReviewComposerStatus = 'login' | 'claim' | 'ready' | 'daily-limit';
@@ -66,46 +67,16 @@ export function ReviewComposer({
       </div>
 
       <form className="route-builder-form" onSubmit={handleSubmit}>
-        <div className="chip-row compact-gap">
-          {moodOptions.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className={option === mood ? 'chip is-active' : 'chip'}
-              onClick={() => setMood(option)}
-              disabled={fieldsDisabled}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-
-        <label className="route-builder-field">
-          <span>오늘의 기록</span>
-          <textarea
-            rows={4}
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            placeholder="오늘 분위기나 동선을 짧고 자연스럽게 적어 보세요."
-            disabled={fieldsDisabled}
-          />
-        </label>
-
-        <div className="route-builder-field">
-          <span>사진 첨부</span>
-          <label className={fieldsDisabled ? 'file-picker is-disabled' : 'file-picker'} htmlFor="review-image-input">
-            <span>{file ? file.name : '사진을 골라주세요'}</span>
-            <strong>{file ? '다시 선택' : '사진 선택'}</strong>
-          </label>
-          <input
-            id="review-image-input"
-            type="file"
-            accept="image/*"
-            className="visually-hidden"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            disabled={fieldsDisabled}
-          />
-        </div>
+        <ReviewFormFields
+          moodOptions={moodOptions}
+          mood={mood}
+          onMoodChange={setMood}
+          body={body}
+          onBodyChange={setBody}
+          file={file}
+          onFileChange={setFile}
+          disabled={fieldsDisabled}
+        />
 
         {errorMessage && <p className="form-error-copy">{errorMessage}</p>}
 
@@ -126,4 +97,3 @@ export function ReviewComposer({
     </section>
   );
 }
-
