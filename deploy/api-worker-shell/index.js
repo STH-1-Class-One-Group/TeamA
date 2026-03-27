@@ -37,6 +37,7 @@ import {
   loadUserNotifications,
   publishNotificationEvent,
 } from './services/notifications.js';
+import { createReviewReadService } from './services/reviews.js';
 import {
   buildInFilter,
   encodeFilterValue,
@@ -244,146 +245,12 @@ async function loadStaticBaseRows(env) {
   });
 }
 
-function countComments(comments) {
-  let total = 0;
-  for (const comment of comments) {
-    total += 1 + countComments(comment.replies);
-  }
-  return total;
-}
+const reviewReadService = createReviewReadService({
+  formatVisitLabel,
+  loadStaticBaseRows,
+  mapPlace,
+});
 
-function buildCommentTree(commentRows, usersById) {
-  const isDeletedCommentRow = (row) => {
-    const body = String(row?.body ?? '').trim();
-    return Boolean(row?.is_deleted) || body === '[deleted]' || body === '삭제된 댓글입니다.';
-  };
-  const commentsById = new Map();
-  const rowsById = new Map(commentRows.map((row) => [String(row.comment_id), row]));
-  const roots = [];
-
-  for (const row of commentRows) {
-    const comment = {
-      id: String(row.comment_id),
-      userId: row.user_id,
-      author: usersById.get(row.user_id)?.nickname ?? '이름 없음',
-      body: isDeletedCommentRow(row) ? '삭제된 댓글입니다.' : row.body,
-      parentId: row.parent_id ? String(row.parent_id) : null,
-      isDeleted: isDeletedCommentRow(row),
-      createdAt: formatDateTime(row.created_at),
-      replies: [],
-    };
-    commentsById.set(comment.id, comment);
-  }
-
-  for (const comment of commentsById.values()) {
-    const parentRow = comment.parentId ? rowsById.get(comment.parentId) : null;
-    const rootParentId = parentRow ? String(parentRow.parent_id ?? parentRow.comment_id) : null;
-    if (rootParentId && commentsById.has(rootParentId)) {
-      commentsById.get(rootParentId).replies.push(comment);
-    } else {
-      roots.push(comment);
-    }
-  }
-
-  const hasLiveDescendant = (node) => node.replies.some((reply) => !reply.isDeleted || hasLiveDescendant(reply));
-
-  const collapseDeletedNodes = (nodes) => nodes.reduce((acc, node) => {
-    const nextNode = {
-      ...node,
-      replies: collapseDeletedNodes(node.replies),
-    };
-    if (nextNode.isDeleted) {
-      if (hasLiveDescendant(nextNode)) {
-        acc.push(nextNode);
-      }
-      return acc;
-    }
-    acc.push(nextNode);
-    return acc;
-  }, []);
-
-  return collapseDeletedNodes(roots);
-}
-
-function buildMyComments(commentRows, reviewsById) {
-  const isDeletedCommentRow = (row) => {
-    const body = String(row?.body ?? '').trim();
-    return Boolean(row?.is_deleted) || body === '[deleted]' || body === '삭제된 댓글입니다.';
-  };
-  return [...commentRows]
-    .filter((row) => !isDeletedCommentRow(row))
-    .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
-    .map((row) => {
-      const review = reviewsById.get(String(row.feed_id));
-      if (!review) {
-        return null;
-      }
-      return {
-        id: String(row.comment_id),
-        reviewId: String(row.feed_id),
-        placeId: review.placeId,
-        placeName: review.placeName,
-        body: row.body,
-        isDeleted: false,
-        parentId: row.parent_id ? String(row.parent_id) : null,
-        createdAt: formatDateTime(row.created_at),
-        reviewBody: review.body,
-      };
-    })
-    .filter(Boolean);
-}
-
-function mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, routeRows = [], likedFeedIds = new Set()) {
-  const commentsByFeedId = new Map();
-  for (const row of commentRows) {
-    const feedId = String(row.feed_id);
-    if (!commentsByFeedId.has(feedId)) {
-      commentsByFeedId.set(feedId, []);
-    }
-    commentsByFeedId.get(feedId).push(row);
-  }
-
-  const likesByFeedId = new Map();
-  for (const row of likeRows) {
-    const feedId = String(row.feed_id);
-    likesByFeedId.set(feedId, (likesByFeedId.get(feedId) ?? 0) + 1);
-  }
-
-  const publishedRouteIdBySession = new Map(
-    routeRows
-      .filter((row) => row.travel_session_id)
-      .map((row) => [String(row.travel_session_id), String(row.route_id)]),
-  );
-
-  return feedRows.map((row) => {
-    const place = placesByPositionId.get(String(row.position_id));
-    const stamp = row.stamp_id ? stampRowsById.get(String(row.stamp_id)) : null;
-    const reviewComments = buildCommentTree(commentsByFeedId.get(String(row.feed_id)) ?? [], usersById);
-    const visitNumber = stamp?.visit_ordinal ?? 1;
-    const travelSessionId = stamp?.travel_session_id ? String(stamp.travel_session_id) : null;
-    return {
-      id: String(row.feed_id),
-      userId: row.user_id,
-      placeId: place?.id ?? String(row.position_id),
-      placeName: place?.name ?? "장소 정보 없음",
-      author: usersById.get(row.user_id)?.nickname ?? "이름 없음",
-      body: row.body,
-      mood: row.mood,
-      badge: row.badge,
-      visitedAt: formatDateTime(row.created_at),
-      imageUrl: row.image_url ?? null,
-      commentCount: countComments(reviewComments),
-      likeCount: likesByFeedId.get(String(row.feed_id)) ?? 0,
-      likedByMe: likedFeedIds.has(String(row.feed_id)),
-      stampId: row.stamp_id ? String(row.stamp_id) : null,
-      visitNumber,
-      visitLabel: formatVisitLabel(visitNumber),
-      travelSessionId,
-      hasPublishedRoute: travelSessionId ? publishedRouteIdBySession.has(travelSessionId) : false,
-      comments: reviewComments,
-    };
-  });
-}
 function mapCourses(courseRows, coursePlaceRows, placesByPositionId) {
   const placeIdsByCourseId = new Map();
   for (const row of coursePlaceRows) {
@@ -511,7 +378,7 @@ async function loadBaseData(env, sessionUserId = null) {
   return {
     places,
     placesByPositionId,
-    reviews: mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, reviewRouteRows, likedFeedIds),
+    reviews: reviewReadService.mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, reviewRouteRows, likedFeedIds),
     courses: mapCourses(courseRows, coursePlaceRows, placesByPositionId),
     collectedPlaceIds,
     stampLogs,
@@ -589,232 +456,6 @@ async function loadCuratedCourses(env) {
   const { placeRows, courseRows, coursePlaceRows } = await loadStaticBaseRows(env);
   const placesByPositionId = new Map(placeRows.map((row) => [String(row.position_id), mapPlace(row)]));
   return mapCourses(courseRows, coursePlaceRows, placesByPositionId);
-}
-
-async function loadReviewData(env, sessionUserId = null, filters = {}) {
-  const { placeRows } = await loadStaticBaseRows(env);
-  const places = placeRows.map(mapPlace);
-  const placesByPositionId = new Map(places.map((place) => [place.positionId, place]));
-  const placeIdToPositionId = new Map(places.map((place) => [place.id, place.positionId]));
-  const reviewQuery = [
-    'select=feed_id,position_id,user_id,stamp_id,body,mood,badge,image_url,created_at',
-    'order=created_at.desc',
-  ];
-
-  if (filters.placeId) {
-    const positionId = placeIdToPositionId.get(filters.placeId);
-    if (!positionId) {
-      return [];
-    }
-    reviewQuery.push(`position_id=eq.${encodeFilterValue(positionId)}`);
-  }
-
-  if (filters.userId) {
-    reviewQuery.push(`user_id=eq.${encodeFilterValue(filters.userId)}`);
-  }
-
-  const feedRows = await supabaseRequest(env, `feed?${reviewQuery.join('&')}`);
-  const feedIdsFilter = buildInFilter(feedRows.map((row) => row.feed_id));
-  const reviewStampIdsFilter = buildInFilter(feedRows.map((row) => row.stamp_id).filter(Boolean));
-  const [commentRows, likeRows, reviewStampRows, userFeedLikeRows = []] = await Promise.all([
-    feedIdsFilter
-      ? supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&feed_id=${feedIdsFilter}&order=created_at.asc`)
-      : Promise.resolve([]),
-    feedIdsFilter
-      ? supabaseRequest(env, `feed_like?select=feed_id,user_id&feed_id=${feedIdsFilter}`)
-      : Promise.resolve([]),
-    reviewStampIdsFilter
-      ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&stamp_id=${reviewStampIdsFilter}`)
-      : Promise.resolve([]),
-    sessionUserId && feedIdsFilter
-      ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=${feedIdsFilter}`)
-      : Promise.resolve([]),
-  ]);
-  const reviewTravelSessionIds = [...new Set((reviewStampRows ?? []).map((row) => row.travel_session_id).filter(Boolean).map((value) => String(value)))];
-  const reviewRouteRows = reviewTravelSessionIds.length > 0
-    ? await supabaseRequest(env, `user_route?select=route_id,travel_session_id&travel_session_id=${buildInFilter(reviewTravelSessionIds)}`)
-    : [];
-
-  const userIdsFilter = buildInFilter([
-    ...feedRows.map((row) => row.user_id),
-    ...commentRows.map((row) => row.user_id),
-  ]);
-  const userRows = userIdsFilter
-    ? await supabaseRequest(env, `user?select=user_id,nickname&user_id=${userIdsFilter}`)
-    : [];
-
-  const usersById = new Map(userRows.map((row) => [row.user_id, row]));
-  const stampRowsById = new Map((reviewStampRows ?? []).map((row) => [String(row.stamp_id), row]));
-  const likedFeedIds = new Set((userFeedLikeRows ?? []).map((row) => String(row.feed_id)));
-  return mapReviewRows(feedRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, reviewRouteRows, likedFeedIds);
-}
-
-async function loadReviewPageData(env, sessionUserId = null, options = {}) {
-  const { cursor = null, limit = 10 } = options;
-  const { placeRows } = await loadStaticBaseRows(env);
-  const places = placeRows.map(mapPlace);
-  const placesByPositionId = new Map(places.map((place) => [place.positionId, place]));
-  const reviewQuery = [
-    'select=feed_id,position_id,user_id,stamp_id,body,mood,badge,image_url,created_at',
-    'order=created_at.desc',
-    `limit=${limit + 1}`,
-  ];
-
-  if (cursor) {
-    reviewQuery.push(`created_at=lt.${encodeFilterValue(cursor)}`);
-  }
-
-  const feedRows = await supabaseRequest(env, `feed?${reviewQuery.join('&')}`);
-  const nextCursor = feedRows.length > limit ? String(feedRows[limit].created_at) : null;
-  const pageRows = feedRows.slice(0, limit);
-  const feedIdsFilter = buildInFilter(pageRows.map((row) => row.feed_id));
-  const reviewStampIdsFilter = buildInFilter(pageRows.map((row) => row.stamp_id).filter(Boolean));
-  const [commentRows, likeRows, reviewStampRows, userFeedLikeRows = []] = await Promise.all([
-    feedIdsFilter
-      ? supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&feed_id=${feedIdsFilter}&order=created_at.asc`)
-      : Promise.resolve([]),
-    feedIdsFilter
-      ? supabaseRequest(env, `feed_like?select=feed_id,user_id&feed_id=${feedIdsFilter}`)
-      : Promise.resolve([]),
-    reviewStampIdsFilter
-      ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&stamp_id=${reviewStampIdsFilter}`)
-      : Promise.resolve([]),
-    sessionUserId && feedIdsFilter
-      ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=${feedIdsFilter}`)
-      : Promise.resolve([]),
-  ]);
-  const reviewTravelSessionIds = [...new Set((reviewStampRows ?? []).map((row) => row.travel_session_id).filter(Boolean).map((value) => String(value)))];
-  const reviewRouteRows = reviewTravelSessionIds.length > 0
-    ? await supabaseRequest(env, `user_route?select=route_id,travel_session_id&travel_session_id=${buildInFilter(reviewTravelSessionIds)}`)
-    : [];
-
-  const userIdsFilter = buildInFilter([
-    ...pageRows.map((row) => row.user_id),
-    ...commentRows.map((row) => row.user_id),
-  ]);
-  const userRows = userIdsFilter
-    ? await supabaseRequest(env, `user?select=user_id,nickname&user_id=${userIdsFilter}`)
-    : [];
-
-  const usersById = new Map(userRows.map((row) => [row.user_id, row]));
-  const stampRowsById = new Map((reviewStampRows ?? []).map((row) => [String(row.stamp_id), row]));
-  const likedFeedIds = new Set((userFeedLikeRows ?? []).map((row) => String(row.feed_id)));
-  return {
-    items: mapReviewRows(pageRows, commentRows, likeRows, usersById, placesByPositionId, stampRowsById, reviewRouteRows, likedFeedIds),
-    nextCursor,
-  };
-}
-
-async function loadMyCommentPageData(env, userId, options = {}) {
-  const { cursor = null, limit = 10 } = options;
-  const query = [
-    'select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at',
-    `user_id=eq.${encodeFilterValue(userId)}`,
-    'order=created_at.desc',
-    `limit=${limit + 1}`,
-  ];
-  if (cursor) {
-    query.push(`created_at=lt.${encodeFilterValue(cursor)}`);
-  }
-
-  const commentRows = await supabaseRequest(env, `user_comment?${query.join('&')}`);
-  const nextCursor = commentRows.length > limit ? String(commentRows[limit].created_at) : null;
-  const pageRows = commentRows.slice(0, limit);
-  const feedIdsFilter = buildInFilter(pageRows.map((row) => row.feed_id));
-  if (!feedIdsFilter) {
-    return { items: [], nextCursor };
-  }
-
-  const [feedRows, { placeRows }] = await Promise.all([
-    supabaseRequest(env, `feed?select=feed_id,position_id,body&feed_id=${feedIdsFilter}`),
-    loadStaticBaseRows(env),
-  ]);
-  const placesByPositionId = new Map(placeRows.map((row) => [String(row.position_id), { id: row.slug, name: row.name }]));
-  return {
-    items: mapMyComments(pageRows, feedRows ?? [], placesByPositionId),
-    nextCursor,
-  };
-}
-
-async function handleHealth(request, env) {
-  return jsonResponse(200, {
-    status: 'ok',
-    env: 'worker-first',
-    databaseUrl: env.APP_SUPABASE_URL ?? '',
-    databaseProvider: 'supabase-rest',
-    storageBackend: env.APP_STORAGE_BACKEND ?? 'supabase',
-    storagePath: env.APP_SUPABASE_STORAGE_BUCKET ? `supabase://${env.APP_SUPABASE_STORAGE_BUCKET}` : '',
-    supabaseConfigured: Boolean(env.APP_SUPABASE_URL && getSupabaseKey(env)),
-    frontendUrlConfigured: Boolean(env.APP_FRONTEND_URL),
-    corsOriginsConfigured: Boolean(env.APP_CORS_ORIGINS),
-    naverLoginConfigured: naverConfigured(env),
-    naverLoginClientIdConfigured: Boolean(env.APP_NAVER_LOGIN_CLIENT_ID),
-    naverLoginClientSecretConfigured: Boolean(env.APP_NAVER_LOGIN_CLIENT_SECRET),
-    naverLoginCallbackUrlConfigured: Boolean(env.APP_NAVER_LOGIN_CALLBACK_URL),
-    naverLoginCallbackUrl: env.APP_NAVER_LOGIN_CALLBACK_URL ?? '',
-  }, env, request);
-}
-
-async function handleMapBootstrap(request, env) {
-  const sessionUser = await readSessionUser(request, env);
-  const mapData = await loadMapData(env, sessionUser?.id ?? null);
-  return jsonResponse(200, {
-    auth: createAuthResponse(sessionUser, env),
-    places: mapData.places.map(({ positionId, ...place }) => place),
-    stamps: {
-      collectedPlaceIds: mapData.collectedPlaceIds,
-      logs: mapData.stampLogs,
-      travelSessions: mapData.travelSessions,
-    },
-    hasRealData: mapData.places.length > 0,
-  }, env, request);
-}
-
-async function handleCuratedCourses(request, env) {
-  return jsonResponse(200, { courses: await loadCuratedCourses(env) }, env, request);
-}
-
-async function handleBootstrap(request, env) {
-  const sessionUser = await readSessionUser(request, env);
-  const baseData = await loadBaseData(env, sessionUser?.id ?? null);
-  return jsonResponse(200, {
-    auth: createAuthResponse(sessionUser, env),
-    places: baseData.places.map(({ positionId, ...place }) => place),
-    reviews: baseData.reviews,
-    courses: baseData.courses,
-    stamps: {
-      collectedPlaceIds: baseData.collectedPlaceIds,
-      logs: baseData.stampLogs,
-      travelSessions: baseData.travelSessions,
-    },
-    hasRealData: baseData.places.length > 0,
-  }, env, request);
-}
-async function handleReviews(request, env, url) {
-  const sessionUser = await readSessionUser(request, env);
-  const reviews = await loadReviewData(env, sessionUser?.id ?? null, {
-    placeId: url.searchParams.get('placeId') ?? undefined,
-    userId: url.searchParams.get('userId') ?? undefined,
-  });
-  return jsonResponse(200, reviews, env, request);
-}
-
-async function handleReviewFeed(request, env, url) {
-  const sessionUser = await readSessionUser(request, env);
-  const payload = await loadReviewPageData(env, sessionUser?.id ?? null, {
-    cursor: url.searchParams.get('cursor') ?? null,
-    limit: parseListLimit(url, 10, 20),
-  });
-  return jsonResponse(200, payload, env, request);
-}
-
-async function handleReviewDetail(request, env, reviewId) {
-  const sessionUser = await readSessionUser(request, env);
-  const review = await loadSingleReview(env, reviewId, sessionUser?.id ?? null);
-  if (!review) {
-    return jsonResponse(404, { detail: '??? ?? ? ???.' }, env, request);
-  }
-  return jsonResponse(200, review, env, request);
 }
 
 async function handleCommunityRoutes(request, env, url) {
@@ -1038,49 +679,6 @@ async function readRouteRow(env, routeId) {
   return rows?.[0] ?? null;
 }
 
-async function loadSingleReview(env, reviewId, sessionUserId = null) {
-  const reviewRows = await supabaseRequest(
-    env,
-    `feed?select=feed_id,position_id,user_id,stamp_id,body,mood,badge,image_url,created_at&feed_id=eq.${encodeFilterValue(reviewId)}&limit=1`,
-  );
-  const reviewRow = reviewRows?.[0] ?? null;
-  if (!reviewRow) {
-    return null;
-  }
-
-  const [commentRows, likeRows, placeRows, stampRows, userFeedLikeRows = []] = await Promise.all([
-    supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&feed_id=eq.${encodeFilterValue(reviewId)}&order=created_at.asc`),
-    supabaseRequest(env, `feed_like?select=feed_id,user_id&feed_id=eq.${encodeFilterValue(reviewId)}`),
-    supabaseRequest(env, `map?select=position_id,slug,name,district,category,latitude,longitude,summary,description,image_url,image_storage_path,vibe_tags,visit_time,route_hint,stamp_reward,hero_label,jam_color,accent_color,is_active&position_id=eq.${encodeFilterValue(reviewRow.position_id)}&limit=1`),
-    reviewRow.stamp_id
-      ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&stamp_id=eq.${encodeFilterValue(reviewRow.stamp_id)}&limit=1`)
-      : Promise.resolve([]),
-    sessionUserId
-      ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=eq.${encodeFilterValue(reviewId)}&limit=1`)
-      : Promise.resolve([]),
-  ]);
-  const reviewTravelSessionIds = [...new Set((stampRows ?? []).map((row) => row.travel_session_id).filter(Boolean).map((value) => String(value)))];
-  const reviewRouteRows = reviewTravelSessionIds.length > 0
-    ? await supabaseRequest(env, `user_route?select=route_id,travel_session_id&travel_session_id=${buildInFilter(reviewTravelSessionIds)}`)
-    : [];
-
-  const userIdsFilter = buildInFilter([reviewRow.user_id, ...commentRows.map((row) => row.user_id)]);
-  const userRows = userIdsFilter
-    ? await supabaseRequest(env, `user?select=user_id,nickname&user_id=${userIdsFilter}`)
-    : [];
-
-  const places = placeRows.map(mapPlace);
-  const placesByPositionId = new Map(places.map((place) => [place.positionId, place]));
-  const usersById = new Map(userRows.map((row) => [row.user_id, row]));
-  const stampRowsById = new Map((stampRows ?? []).map((row) => [String(row.stamp_id), row]));
-  const likedFeedIds = new Set((userFeedLikeRows ?? []).map((row) => String(row.feed_id)));
-
-  return (
-    mapReviewRows([reviewRow], commentRows ?? [], likeRows ?? [], usersById, placesByPositionId, stampRowsById, reviewRouteRows, likedFeedIds)[0] ??
-    null
-  );
-}
-
 function buildReviewInteractionDeps() {
   return {
     badgeByMood: BADGE_BY_MOOD,
@@ -1088,7 +686,7 @@ function buildReviewInteractionDeps() {
     createUserNotification,
     loadBaseData,
     loadNotificationById,
-    loadSingleReview,
+    loadSingleReview: reviewReadService.loadSingleReview,
     publishNotificationEvent,
     readSessionUser,
   };
@@ -1453,62 +1051,6 @@ async function requireSessionUser(request, env) {
 async function readRouteRow(env, routeId) {
   const rows = await supabaseRequest(env, `user_route?select=route_id,user_id,like_count&route_id=eq.${encodeFilterValue(routeId)}&limit=1`);
   return rows?.[0] ?? null;
-}
-
-async function loadSingleReview(env, reviewId, sessionUserId = null) {
-  const reviewRows = await supabaseRequest(
-    env,
-    `feed?select=feed_id,position_id,user_id,stamp_id,body,mood,badge,image_url,created_at&feed_id=eq.${encodeFilterValue(reviewId)}&limit=1`,
-  );
-  const reviewRow = reviewRows?.[0] ?? null;
-  if (!reviewRow) {
-    return null;
-  }
-
-  const [commentRows, likeRows, placeRows, stampRows, userFeedLikeRows = []] = await Promise.all([
-    supabaseRequest(env, `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&feed_id=eq.${encodeFilterValue(reviewId)}&order=created_at.asc`),
-    supabaseRequest(env, `feed_like?select=feed_id,user_id&feed_id=eq.${encodeFilterValue(reviewId)}`),
-    supabaseRequest(env, `map?select=position_id,slug,name,district,category,latitude,longitude,summary,description,image_url,image_storage_path,vibe_tags,visit_time,route_hint,stamp_reward,hero_label,jam_color,accent_color,is_active&position_id=eq.${encodeFilterValue(reviewRow.position_id)}&limit=1`),
-    reviewRow.stamp_id
-      ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&stamp_id=eq.${encodeFilterValue(reviewRow.stamp_id)}&limit=1`)
-      : Promise.resolve([]),
-    sessionUserId
-      ? supabaseRequest(env, `feed_like?select=feed_id&user_id=eq.${encodeFilterValue(sessionUserId)}&feed_id=eq.${encodeFilterValue(reviewId)}&limit=1`)
-      : Promise.resolve([]),
-  ]);
-  const reviewTravelSessionIds = [...new Set((stampRows ?? []).map((row) => row.travel_session_id).filter(Boolean).map((value) => String(value)))];
-  const reviewRouteRows = reviewTravelSessionIds.length > 0
-    ? await supabaseRequest(env, `user_route?select=route_id,travel_session_id&travel_session_id=${buildInFilter(reviewTravelSessionIds)}`)
-    : [];
-
-  const userIdsFilter = buildInFilter([reviewRow.user_id, ...commentRows.map((row) => row.user_id)]);
-  const userRows = userIdsFilter
-    ? await supabaseRequest(env, `user?select=user_id,nickname&user_id=${userIdsFilter}`)
-    : [];
-
-  const places = placeRows.map(mapPlace);
-  const placesByPositionId = new Map(places.map((place) => [place.positionId, place]));
-  const usersById = new Map(userRows.map((row) => [row.user_id, row]));
-  const stampRowsById = new Map((stampRows ?? []).map((row) => [String(row.stamp_id), row]));
-  const likedFeedIds = new Set((userFeedLikeRows ?? []).map((row) => String(row.feed_id)));
-
-  return (
-    mapReviewRows([reviewRow], commentRows ?? [], likeRows ?? [], usersById, placesByPositionId, stampRowsById, reviewRouteRows, likedFeedIds)[0] ??
-    null
-  );
-}
-
-function buildReviewInteractionDeps() {
-  return {
-    badgeByMood: BADGE_BY_MOOD,
-    countUnreadNotifications,
-    createUserNotification,
-    loadBaseData,
-    loadNotificationById,
-    loadSingleReview,
-    publishNotificationEvent,
-    readSessionUser,
-  };
 }
 
 async function handleToggleStamp(request, env) {
@@ -1867,10 +1409,10 @@ async function routeRequest(request, env) {
     return handleCuratedCourses(request, env);
   }
   if (request.method === "GET" && url.pathname === "/api/review-feed") {
-    return handleReviewFeed(request, env, url);
+    return reviewReadService.handleReviewFeed(request, env, url);
   }
   if (request.method === "GET" && url.pathname === "/api/reviews") {
-    return handleReviews(request, env, url);
+    return reviewReadService.handleReviews(request, env, url);
   }
   if (request.method === "POST" && url.pathname === "/api/reviews/upload") {
     return handleReviewUpload(request, env, buildReviewInteractionDeps());
@@ -1879,14 +1421,14 @@ async function routeRequest(request, env) {
     return handleCreateReview(request, env, buildReviewInteractionDeps());
   }
   if (request.method === "GET" && reviewDetailMatch) {
-    return handleReviewDetail(request, env, reviewDetailMatch[1]);
+    return reviewReadService.handleReviewDetail(request, env, reviewDetailMatch[1]);
   }
   if (request.method === "PATCH" && reviewDetailMatch) {
     return handleUpdateReview(request, env, reviewDetailMatch[1], buildReviewInteractionDeps());
   }
   if (request.method === "GET" && reviewCommentMatch) {
     const sessionUser = await readSessionUser(request, env);
-    const comments = (await loadSingleReview(env, reviewCommentMatch[1], sessionUser?.id ?? null))?.comments ?? [];
+    const comments = (await reviewReadService.loadSingleReview(env, reviewCommentMatch[1], sessionUser?.id ?? null))?.comments ?? [];
     return jsonResponse(200, comments, env, request);
   }
   if (request.method === "POST" && reviewCommentMatch) {
