@@ -368,6 +368,78 @@ async function loadBaseData(env, sessionUserId = null) {
     travelSessions,
   };
 }
+
+function buildReviewInteractionDeps() {
+  return {
+    badgeByMood: BADGE_BY_MOOD,
+    countUnreadNotifications,
+    createUserNotification,
+    loadBaseData,
+    loadNotificationById,
+    loadSingleReview: reviewReadService.loadSingleReview,
+    publishNotificationEvent,
+    readSessionUser,
+  };
+}
+
+async function handleHealth(request, env) {
+  return jsonResponse(200, {
+    status: 'ok',
+    env: env.APP_ENV ?? 'worker-first',
+    databaseUrl: env.APP_SUPABASE_URL ?? '',
+    databaseProvider: 'supabase-rest',
+    storageBackend: env.APP_STORAGE_BACKEND ?? 'supabase',
+    storagePath: env.APP_SUPABASE_STORAGE_BUCKET ? `supabase://${env.APP_SUPABASE_STORAGE_BUCKET}` : '',
+    supabaseConfigured: Boolean(env.APP_SUPABASE_URL && getSupabaseKey(env)),
+    frontendUrlConfigured: Boolean(env.APP_FRONTEND_URL),
+    corsOriginsConfigured: Boolean(env.APP_CORS_ORIGINS),
+    naverLoginConfigured: naverConfigured(env),
+    naverLoginClientIdConfigured: Boolean(env.APP_NAVER_LOGIN_CLIENT_ID),
+    naverLoginClientSecretConfigured: Boolean(env.APP_NAVER_LOGIN_CLIENT_SECRET),
+    naverLoginCallbackUrlConfigured: Boolean(env.APP_NAVER_LOGIN_CALLBACK_URL),
+    naverLoginCallbackUrl: env.APP_NAVER_LOGIN_CALLBACK_URL ?? '',
+  }, env, request);
+}
+
+async function handleMapBootstrap(request, env) {
+  const sessionUser = await readSessionUser(request, env);
+  const mapData = await loadBaseData(env, sessionUser?.id ?? null);
+  return jsonResponse(200, {
+    auth: createAuthResponse(sessionUser, env),
+    places: mapData.places.map(({ positionId, ...place }) => place),
+    stamps: {
+      collectedPlaceIds: mapData.collectedPlaceIds,
+      logs: mapData.stampLogs,
+      travelSessions: mapData.travelSessions,
+    },
+    hasRealData: mapData.places.length > 0,
+  }, env, request);
+}
+
+async function handleCuratedCourses(request, env) {
+  const { placeRows, courseRows, coursePlaceRows } = await loadStaticBaseRows(env);
+  const places = placeRows.map((row) => mapPlace(row));
+  const placesByPositionId = new Map(places.map((place) => [place.positionId, place]));
+  return jsonResponse(200, { courses: mapCourses(courseRows, coursePlaceRows, placesByPositionId) }, env, request);
+}
+
+async function handleBootstrap(request, env) {
+  const sessionUser = await readSessionUser(request, env);
+  const baseData = await loadBaseData(env, sessionUser?.id ?? null);
+  return jsonResponse(200, {
+    auth: createAuthResponse(sessionUser, env),
+    places: baseData.places.map(({ positionId, ...place }) => place),
+    reviews: baseData.reviews,
+    courses: baseData.courses,
+    stamps: {
+      collectedPlaceIds: baseData.collectedPlaceIds,
+      logs: baseData.stampLogs,
+      travelSessions: baseData.travelSessions,
+    },
+    hasRealData: baseData.places.length > 0,
+  }, env, request);
+}
+
 function resolveOriginUrl(request, env) {
   const originBaseUrl = (env.APP_ORIGIN_API_URL ?? '').trim();
   if (!originBaseUrl) {
