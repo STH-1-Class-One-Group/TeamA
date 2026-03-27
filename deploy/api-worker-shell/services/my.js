@@ -1,0 +1,130 @@
+import { formatDateTime } from '../lib/dates.js';
+import { jsonResponse } from '../lib/http.js';
+import { buildInFilter, encodeFilterValue, parseListLimit, supabaseRequest } from '../lib/supabase.js';
+import { readSessionUser } from './auth.js';
+
+export function createMyService({ communityRouteService, loadBaseData, loadStaticBaseRows, loadUserNotifications }) {
+  function mapMyComments(commentRows, feedRows, placesByPositionId) {
+    const isDeletedCommentRow = (row) => {
+      const body = String(row?.body ?? '').trim();
+      return Boolean(row?.is_deleted) || body === '[deleted]' || body === '삭제된 댓글입니다.';
+    };
+    const feedById =
+      feedRows instanceof Map
+        ? feedRows
+        : new Map((feedRows ?? []).map((row) => [String(row.feed_id ?? row.id), row]));
+    return commentRows
+      .filter((row) => !isDeletedCommentRow(row))
+      .map((row) => {
+        const feed = feedById.get(String(row.feed_id));
+        const place =
+          feed && feed.position_id
+            ? placesByPositionId.get(String(feed.position_id))
+            : feed?.placeId
+              ? { id: feed.placeId, name: feed.placeName ?? '장소 정보 없음' }
+              : null;
+        return {
+          id: String(row.comment_id),
+          reviewId: String(row.feed_id),
+          placeId: place?.id ?? String(feed?.position_id ?? feed?.placeId ?? ''),
+          placeName: place?.name ?? '장소 정보 없음',
+          body: row.body,
+          isDeleted: false,
+          parentId: row.parent_id ? String(row.parent_id) : null,
+          createdAt: formatDateTime(row.created_at),
+          reviewBody: feed?.body ?? '',
+        };
+      });
+  }
+
+  async function loadMyCommentPageData(env, userId, options = {}) {
+    const { cursor = null, limit = 10 } = options;
+    const query = [
+      'select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at',
+      `user_id=eq.${encodeFilterValue(userId)}`,
+      'order=created_at.desc',
+      `limit=${limit + 1}`,
+    ];
+    if (cursor) {
+      query.push(`created_at=lt.${encodeFilterValue(cursor)}`);
+    }
+
+    const commentRows = await supabaseRequest(env, `user_comment?${query.join('&')}`);
+    const nextCursor = commentRows.length > limit ? String(commentRows[limit].created_at) : null;
+    const pageRows = commentRows.slice(0, limit);
+    const feedIdsFilter = buildInFilter(pageRows.map((row) => row.feed_id));
+    if (!feedIdsFilter) {
+      return { items: [], nextCursor };
+    }
+
+    const [feedRows, { placeRows }] = await Promise.all([
+      supabaseRequest(env, `feed?select=feed_id,position_id,body&feed_id=${feedIdsFilter}`),
+      loadStaticBaseRows(env),
+    ]);
+    const placesByPositionId = new Map(placeRows.map((row) => [String(row.position_id), { id: row.slug, name: row.name }]));
+    return {
+      items: mapMyComments(pageRows, feedRows ?? [], placesByPositionId),
+      nextCursor,
+    };
+  }
+
+  async function handleMyComments(request, env, url) {
+    const sessionUser = await readSessionUser(request, env);
+    if (!sessionUser) {
+      return jsonResponse(401, { detail: '로그인이 필요해요.' }, env, request);
+    }
+
+    const payload = await loadMyCommentPageData(env, sessionUser.id, {
+      cursor: url.searchParams.get('cursor') ?? null,
+      limit: parseListLimit(url, 10, 20),
+    });
+    return jsonResponse(200, payload, env, request);
+  }
+
+  async function handleMySummary(request, env) {
+    const sessionUser = await readSessionUser(request, env);
+    if (!sessionUser) {
+      return jsonResponse(401, { detail: '로그인이 필요해요.' }, env, request);
+    }
+
+    const baseData = await loadBaseData(env, sessionUser.id);
+    const routes = await communityRouteService.loadCommunityRoutes(env, { ownerUserId: sessionUser.id, sessionUserId: sessionUser.id });
+    const reviewItems = baseData.reviews.filter((review) => review.userId === sessionUser.id);
+    const reviewById = new Map(baseData.reviews.map((review) => [String(review.id), review]));
+    const notifications = await loadUserNotifications(env, sessionUser.id);
+    const myCommentRows = await supabaseRequest(
+      env,
+      `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&user_id=eq.${encodeFilterValue(sessionUser.id)}&order=created_at.desc`,
+    );
+    const myComments = mapMyComments(myCommentRows ?? [], reviewById);
+    const collectedSet = new Set(baseData.collectedPlaceIds);
+    const visitedPlaces = baseData.places.filter((place) => collectedSet.has(place.id)).map(({ positionId, ...place }) => place);
+    const unvisitedPlaces = baseData.places.filter((place) => !collectedSet.has(place.id)).map(({ positionId, ...place }) => place);
+
+    return jsonResponse(200, {
+      user: sessionUser,
+      stats: {
+        reviewCount: reviewItems.length,
+        stampCount: baseData.stampLogs.length,
+        uniquePlaceCount: collectedSet.size,
+        totalPlaceCount: baseData.places.length,
+        routeCount: routes.length,
+      },
+      reviews: reviewItems,
+      comments: myComments,
+      notifications,
+      unreadNotificationCount: notifications.filter((notification) => !notification.isRead).length,
+      stampLogs: baseData.stampLogs,
+      travelSessions: baseData.travelSessions,
+      visitedPlaces,
+      unvisitedPlaces,
+      collectedPlaces: visitedPlaces,
+      routes,
+    }, env, request);
+  }
+
+  return {
+    handleMyComments,
+    handleMySummary,
+  };
+}
