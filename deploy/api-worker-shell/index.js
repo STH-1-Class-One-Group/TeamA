@@ -38,6 +38,7 @@ import {
   publishNotificationEvent,
 } from './services/notifications.js';
 import { createReviewReadService } from './services/reviews.js';
+import { createCommunityRouteService } from './services/community-routes.js';
 import {
   buildInFilter,
   encodeFilterValue,
@@ -251,6 +252,10 @@ const reviewReadService = createReviewReadService({
   mapPlace,
 });
 
+const communityRouteService = createCommunityRouteService({
+  loadStaticBaseRows,
+});
+
 function mapCourses(courseRows, coursePlaceRows, placesByPositionId) {
   const placeIdsByCourseId = new Map();
   for (const row of coursePlaceRows) {
@@ -277,46 +282,6 @@ function mapCourses(courseRows, coursePlaceRows, placesByPositionId) {
   }));
 }
 
-function mapCommunityRoutes(routeRows, routePlaceRows, usersById, placesByPositionId, likedRouteIds = new Set()) {
-  const placeRowsByRouteId = new Map();
-  for (const row of routePlaceRows) {
-    const routeId = String(row.route_id);
-    if (!placeRowsByRouteId.has(routeId)) {
-      placeRowsByRouteId.set(routeId, []);
-    }
-    placeRowsByRouteId.get(routeId).push({
-      stopOrder: row.stop_order,
-      placeId: placesByPositionId.get(String(row.position_id))?.id ?? String(row.position_id),
-    });
-  }
-
-  return routeRows.map((row) => {
-    const placeRows = (placeRowsByRouteId.get(String(row.route_id)) ?? []).sort((left, right) => left.stopOrder - right.stopOrder);
-    const placeIds = placeRows.map((item) => item.placeId);
-    return {
-      id: String(row.route_id),
-      authorId: row.user_id,
-      author: usersById.get(row.user_id)?.nickname ?? "이름 없음",
-      title: row.title,
-      description: row.description,
-      mood: row.mood,
-      likeCount: row.like_count ?? 0,
-      likedByMe: likedRouteIds.has(String(row.route_id)),
-      createdAt: formatDateTime(row.created_at),
-      placeIds,
-      placeNames: placeIds.map((placeId) => {
-        for (const place of placesByPositionId.values()) {
-          if (place.id === placeId) {
-            return place.name;
-          }
-        }
-        return placeId;
-      }),
-      isUserGenerated: row.is_user_generated ?? false,
-      travelSessionId: row.travel_session_id ? String(row.travel_session_id) : null,
-    };
-  });
-}
 async function loadBaseData(env, sessionUserId = null) {
   const [{ placeRows, courseRows, coursePlaceRows }, feedRows] = await Promise.all([
     loadStaticBaseRows(env),
@@ -385,94 +350,6 @@ async function loadBaseData(env, sessionUserId = null) {
     travelSessions,
   };
 }
-async function loadCommunityRoutes(env, options = {}) {
-  const { sort = "popular", sessionUserId = null, ownerUserId = null } = options;
-  const routeFilter = ownerUserId
-    ? `user_id=eq.${encodeFilterValue(ownerUserId)}&order=created_at.desc`
-    : `is_public=eq.true&order=${sort === "popular" ? "like_count.desc,created_at.desc" : "created_at.desc"}`;
-
-  const routeRows = await supabaseRequest(env, `user_route?select=route_id,user_id,travel_session_id,title,description,mood,like_count,created_at,is_public,is_user_generated&${routeFilter}`);
-  const routeIdsFilter = buildInFilter(routeRows.map((row) => row.route_id));
-  if (!routeIdsFilter) {
-    return [];
-  }
-
-  const [routePlaceRows, userRouteLikeRows = []] = await Promise.all([
-    supabaseRequest(env, `user_route_place?select=route_id,position_id,stop_order&route_id=${routeIdsFilter}&order=stop_order.asc`),
-    sessionUserId
-      ? supabaseRequest(env, `user_route_like?select=route_id&user_id=eq.${encodeFilterValue(sessionUserId)}&route_id=${routeIdsFilter}`)
-      : Promise.resolve([]),
-  ]);
-
-  const userIdsFilter = buildInFilter(routeRows.map((row) => row.user_id));
-  const [{ placeRows }, userRows] = await Promise.all([
-    loadStaticBaseRows(env),
-    userIdsFilter
-      ? supabaseRequest(env, `user?select=user_id,nickname&user_id=${userIdsFilter}`)
-      : Promise.resolve([]),
-  ]);
-
-  const neededPositionIds = new Set(routePlaceRows.map((row) => String(row.position_id)));
-  const placesByPositionId = new Map(
-    placeRows
-      .filter((row) => neededPositionIds.has(String(row.position_id)))
-      .map((row) => [String(row.position_id), { id: row.slug, name: row.name }]),
-  );
-  const usersById = new Map(userRows.map((row) => [row.user_id, row]));
-  const likedRouteIds = new Set(userRouteLikeRows.map((row) => String(row.route_id)));
-  return mapCommunityRoutes(routeRows, routePlaceRows, usersById, placesByPositionId, likedRouteIds);
-}
-async function loadMapData(env, sessionUserId = null) {
-  const [{ placeRows }, userSessionRows = [], ownerRouteRows = [], userStampRows = [], allPlaceStampRows = []] = await Promise.all([
-    loadStaticBaseRows(env),
-    sessionUserId
-      ? supabaseRequest(env, `travel_session?select=travel_session_id,user_id,started_at,ended_at,last_stamp_at,stamp_count,created_at&user_id=eq.${encodeFilterValue(sessionUserId)}&order=started_at.desc`)
-      : Promise.resolve([]),
-    sessionUserId
-      ? supabaseRequest(env, `user_route?select=route_id,travel_session_id&user_id=eq.${encodeFilterValue(sessionUserId)}&order=created_at.desc`)
-      : Promise.resolve([]),
-    sessionUserId
-      ? supabaseRequest(env, `user_stamp?select=stamp_id,user_id,position_id,travel_session_id,stamp_date,visit_ordinal,created_at&user_id=eq.${encodeFilterValue(sessionUserId)}&order=created_at.desc`)
-      : Promise.resolve([]),
-    supabaseRequest(env, "user_stamp?select=position_id"),
-  ]);
-
-  const placeVisitCounts = buildPlaceVisitCountMap(allPlaceStampRows);
-  const places = placeRows.map((row) => mapPlace({ ...row, total_visit_count: placeVisitCounts.get(String(row.position_id)) ?? 0 }));
-  const placesByPositionId = new Map(places.map((place) => [place.positionId, place]));
-  const collectedPlaceIds = [...new Set(userStampRows.map((row) => placesByPositionId.get(String(row.position_id))?.id).filter(Boolean))];
-  const stampLogs = buildStampLogs(userStampRows, placesByPositionId);
-  const travelSessions = buildTravelSessions(userSessionRows ?? [], userStampRows, placesByPositionId, ownerRouteRows ?? []);
-
-  return {
-    places,
-    collectedPlaceIds,
-    stampLogs,
-    travelSessions,
-  };
-}
-
-async function loadCuratedCourses(env) {
-  const { placeRows, courseRows, coursePlaceRows } = await loadStaticBaseRows(env);
-  const placesByPositionId = new Map(placeRows.map((row) => [String(row.position_id), mapPlace(row)]));
-  return mapCourses(courseRows, coursePlaceRows, placesByPositionId);
-}
-
-async function handleCommunityRoutes(request, env, url) {
-  const sessionUser = await readSessionUser(request, env);
-  const sort = url.searchParams.get('sort') === 'latest' ? 'latest' : 'popular';
-  const routes = await loadCommunityRoutes(env, { sort, sessionUserId: sessionUser?.id ?? null });
-  return jsonResponse(200, routes, env, request);
-}
-
-async function handleMyRoutes(request, env) {
-  const sessionUser = await readSessionUser(request, env);
-  if (!sessionUser) {
-    return jsonResponse(401, { detail: '로그인이 필요해요.' }, env, request);
-  }
-  return jsonResponse(200, await loadCommunityRoutes(env, { ownerUserId: sessionUser.id, sessionUserId: sessionUser.id }), env, request);
-}
-
 function mapMyComments(commentRows, feedRows, placesByPositionId) {
   const isDeletedCommentRow = (row) => {
     const body = String(row?.body ?? '').trim();
@@ -601,7 +478,7 @@ async function handleMySummary(request, env) {
   }
 
   const baseData = await loadBaseData(env, sessionUser.id);
-  const routes = await loadCommunityRoutes(env, { ownerUserId: sessionUser.id, sessionUserId: sessionUser.id });
+  const routes = await communityRouteService.loadCommunityRoutes(env, { ownerUserId: sessionUser.id, sessionUserId: sessionUser.id });
   const reviewItems = baseData.reviews.filter((review) => review.userId === sessionUser.id);
   const reviewById = new Map(baseData.reviews.map((review) => [String(review.id), review]));
   const notifications = await loadUserNotifications(env, sessionUser.id);
@@ -672,11 +549,6 @@ async function requireSessionUser(request, env) {
     return { response: jsonResponse(401, { detail: '로그인이 필요해요.' }, env, request) };
   }
   return { sessionUser };
-}
-
-async function readRouteRow(env, routeId) {
-  const rows = await supabaseRequest(env, `user_route?select=route_id,user_id,like_count&route_id=eq.${encodeFilterValue(routeId)}&limit=1`);
-  return rows?.[0] ?? null;
 }
 
 function buildReviewInteractionDeps() {
@@ -810,512 +682,6 @@ async function handleToggleStamp(request, env) {
     travelSessions: nextBaseData.travelSessions,
   }, env, request);
 }
-async function handleCreateUserRoute(request, env) {
-  const sessionResult = await requireSessionUser(request, env);
-  if (sessionResult.response) {
-    return sessionResult.response;
-  }
-
-  const payload = await readJsonBody(request);
-  const travelSessionId = String(payload.travelSessionId ?? "").trim();
-  const title = String(payload.title ?? "").trim();
-  const description = String(payload.description ?? "").trim();
-  const mood = String(payload.mood ?? "").trim();
-  const isPublic = payload.isPublic !== false;
-
-  if (!travelSessionId) {
-    return jsonResponse(400, { detail: "방향을 묶을 여행 세션이 필요해요." }, env, request);
-  }
-  if (!title) {
-    return jsonResponse(400, { detail: "경로 제목을 적어 주세요." }, env, request);
-  }
-  if (!description) {
-    return jsonResponse(400, { detail: "한 줄 소개를 적어 주세요." }, env, request);
-  }
-
-  const sessionRows = await supabaseRequest(env, `travel_session?select=travel_session_id,user_id&travel_session_id=eq.${encodeFilterValue(travelSessionId)}&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&limit=1`);
-  if (!sessionRows?.[0]) {
-    return jsonResponse(404, { detail: "여행 세션을 찾지 못했어요." }, env, request);
-  }
-
-  const existingRouteRows = await supabaseRequest(env, `user_route?select=route_id&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&travel_session_id=eq.${encodeFilterValue(travelSessionId)}&limit=1`);
-  if (existingRouteRows?.[0]) {
-    return jsonResponse(409, { detail: "이미 발행한 여행 코스예요." }, env, request);
-  }
-
-  const sessionStampRows = await supabaseRequest(env, `user_stamp?select=position_id,created_at&travel_session_id=eq.${encodeFilterValue(travelSessionId)}&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&order=created_at.asc`);
-  const orderedPositionIds = [];
-  const seenPositionIds = new Set();
-  for (const stampRow of sessionStampRows ?? []) {
-    const positionId = String(stampRow.position_id);
-    if (seenPositionIds.has(positionId)) {
-      continue;
-    }
-    seenPositionIds.add(positionId);
-    orderedPositionIds.push(positionId);
-  }
-  if (orderedPositionIds.length < 2) {
-    return jsonResponse(400, { detail: "코스에는 최소 두 곳 이상의 스탬프 기록이 필요해요." }, env, request);
-  }
-
-  const routeRows = await supabaseRequest(env, "user_route?select=route_id", {
-    method: "POST",
-    body: JSON.stringify({
-      user_id: sessionResult.sessionUser.id,
-      travel_session_id: Number(travelSessionId),
-      title,
-      description,
-      mood,
-      is_public: isPublic,
-      is_user_generated: true,
-      like_count: 0,
-    }),
-  });
-  const routeId = routeRows?.[0]?.route_id;
-
-  await supabaseRequest(env, "user_route_place?select=user_route_place_id", {
-    method: "POST",
-    body: JSON.stringify(orderedPositionIds.map((positionId, index) => ({
-      route_id: Number(routeId),
-      position_id: Number(positionId),
-      stop_order: index + 1,
-    }))),
-  });
-
-  const routes = await loadCommunityRoutes(env, { ownerUserId: sessionResult.sessionUser.id, sessionUserId: sessionResult.sessionUser.id });
-  const createdRoute = routes.find((route) => route.id === String(routeId)) ?? null;
-  const createdNotification = await createUserNotification(env, {
-    userId: sessionResult.sessionUser.id,
-    actorUserId: sessionResult.sessionUser.id,
-    type: 'route-published',
-    title: '새로운 코스가 발행되었습니다.',
-    body: title,
-    routeId,
-    metadata: {
-      travelSessionId,
-    },
-  });
-  if (createdNotification?.notification_id) {
-    const notification = await loadNotificationById(env, createdNotification.notification_id);
-    if (notification) {
-      await publishNotificationEvent(env, sessionResult.sessionUser.id, 'notification.created', {
-        notification,
-        unreadCount: await countUnreadNotifications(env, sessionResult.sessionUser.id),
-      });
-    }
-  }
-  return jsonResponse(201, createdRoute, env, request);
-}
-
-async function handleAdminSummary(request, env) {
-  const sessionUser = await readSessionUser(request, env);
-  if (!sessionUser || !sessionUser.isAdmin) {
-    return jsonResponse(403, { detail: '??? ???.' }, env, request);
-  }
-  return jsonResponse(200, await buildAdminSummary(env), env, request);
-}
-
-async function handleAdminPlaceVisibility(request, env, placeId) {
-  const sessionUser = await readSessionUser(request, env);
-  if (!sessionUser || !sessionUser.isAdmin) {
-    return jsonResponse(403, { detail: '???? ??? ? ???.' }, env, request);
-  }
-  const payload = await request.json().catch(() => null);
-  const body = {};
-  if (typeof payload?.isActive === 'boolean') body.is_active = payload.isActive;
-  if (typeof payload?.isManualOverride === 'boolean') body.is_manual_override = payload.isManualOverride;
-  body.updated_at = new Date().toISOString();
-  const updatedRows = await supabaseRequest(env, `map?slug=eq.${encodeFilterValue(placeId)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(body),
-  });
-  const updatedRow = Array.isArray(updatedRows) ? updatedRows[0] : null;
-  if (!updatedRow) {
-    return jsonResponse(404, { detail: '??? ?? ? ???.' }, env, request);
-  }
-  const reviewRows = await supabaseRequest(env, `feed?select=feed_id&position_id=eq.${encodeFilterValue(updatedRow.position_id)}`);
-  return jsonResponse(200, {
-    id: updatedRow.slug,
-    name: updatedRow.name,
-    district: updatedRow.district,
-    category: normalizePlaceCategory(updatedRow.category, updatedRow.slug),
-    isActive: Boolean(updatedRow.is_active),
-    isManualOverride: Boolean(updatedRow.is_manual_override),
-    reviewCount: (reviewRows ?? []).length,
-    updatedAt: formatDateTime(updatedRow.updated_at),
-  }, env, request);
-}
-
-async function handleAdminImportPublicData(request, env) {
-  const sessionUser = await readSessionUser(request, env);
-  if (!sessionUser || !sessionUser.isAdmin) {
-    return jsonResponse(403, { detail: '관리자만 공공데이터를 다시 불러올 수 있어요.' }, env, request);
-  }
-
-  const sourceRows = await supabaseRequest(
-    env,
-    `public_data_source?select=name,last_imported_at&source_key=eq.${encodeFilterValue('jamissue-public-event-feed')}&limit=1`,
-  );
-  const source = sourceRows?.[0] ?? null;
-
-  return jsonResponse(200, {
-    importedPlaces: 0,
-    importedCourses: 0,
-    importedEvents: 0,
-    mode: 'scheduled',
-    detail: '공공 행사 동기화는 GitHub Actions 주간 작업으로 처리돼요.',
-    importedAt: source?.last_imported_at ?? null,
-  }, env, request);
-}
-
-async function handleMySummary(request, env) {
-  const sessionUser = await readSessionUser(request, env);
-  if (!sessionUser) {
-    return jsonResponse(401, { detail: "로그인이 필요해요." }, env, request);
-  }
-
-  const baseData = await loadBaseData(env, sessionUser.id);
-  const routes = await loadCommunityRoutes(env, { ownerUserId: sessionUser.id, sessionUserId: sessionUser.id });
-  const reviewItems = baseData.reviews.filter((review) => review.userId === sessionUser.id);
-  const reviewById = new Map(baseData.reviews.map((review) => [String(review.id), review]));
-  const notifications = await loadUserNotifications(env, sessionUser.id);
-  const myCommentRows = await supabaseRequest(
-    env,
-    `user_comment?select=comment_id,feed_id,user_id,parent_id,body,is_deleted,created_at&user_id=eq.${encodeFilterValue(sessionUser.id)}&order=created_at.desc`,
-  );
-  const myComments = buildMyComments(myCommentRows ?? [], reviewById);
-  const collectedSet = new Set(baseData.collectedPlaceIds);
-  const visitedPlaces = baseData.places.filter((place) => collectedSet.has(place.id)).map(({ positionId, ...place }) => place);
-  const unvisitedPlaces = baseData.places.filter((place) => !collectedSet.has(place.id)).map(({ positionId, ...place }) => place);
-
-  return jsonResponse(200, {
-    user: sessionUser,
-    stats: {
-      reviewCount: reviewItems.length,
-      stampCount: baseData.stampLogs.length,
-      uniquePlaceCount: collectedSet.size,
-      totalPlaceCount: baseData.places.length,
-      routeCount: routes.length,
-    },
-    reviews: reviewItems,
-    comments: myComments,
-    notifications,
-    unreadNotificationCount: notifications.filter((notification) => !notification.isRead).length,
-    stampLogs: baseData.stampLogs,
-    travelSessions: baseData.travelSessions,
-    visitedPlaces,
-    unvisitedPlaces,
-    collectedPlaces: visitedPlaces,
-    routes,
-  }, env, request);
-}
-function getStampUnlockRadius(env) {
-  const parsed = Number(env.APP_STAMP_UNLOCK_RADIUS_METERS ?? '120');
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 120;
-}
-
-function calculateDistanceMeters(startLatitude, startLongitude, endLatitude, endLongitude) {
-  const earthRadiusMeters = 6_371_000;
-  const latitudeDelta = ((endLatitude - startLatitude) * Math.PI) / 180;
-  const longitudeDelta = ((endLongitude - startLongitude) * Math.PI) / 180;
-  const startLatitudeRadians = (startLatitude * Math.PI) / 180;
-  const endLatitudeRadians = (endLatitude * Math.PI) / 180;
-
-  const haversine =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(startLatitudeRadians) * Math.cos(endLatitudeRadians) * Math.sin(longitudeDelta / 2) ** 2;
-
-  return earthRadiusMeters * (2 * Math.asin(Math.sqrt(haversine)));
-}
-
-function buildNearPlaceMessage(placeName, distanceMeters, unlockRadius) {
-  return `${placeName}까지 ${formatDistanceMeters(distanceMeters)} 남았어요. 반경 ${unlockRadius}m 안에 들어오면 열려요.`;
-}
-
-async function readJsonBody(request) {
-  try {
-    return await request.json();
-  } catch {
-    throw new Error('요청 형식이 올바르지 않아요.');
-  }
-}
-
-async function requireSessionUser(request, env) {
-  const sessionUser = await readSessionUser(request, env);
-  if (!sessionUser) {
-    return { response: jsonResponse(401, { detail: '로그인이 필요해요.' }, env, request) };
-  }
-  return { sessionUser };
-}
-
-async function readRouteRow(env, routeId) {
-  const rows = await supabaseRequest(env, `user_route?select=route_id,user_id,like_count&route_id=eq.${encodeFilterValue(routeId)}&limit=1`);
-  return rows?.[0] ?? null;
-}
-
-async function handleToggleStamp(request, env) {
-  const sessionResult = await requireSessionUser(request, env);
-  if (sessionResult.response) {
-    return sessionResult.response;
-  }
-
-  const payload = await readJsonBody(request);
-  const placeId = String(payload.placeId ?? "").trim();
-  const latitude = Number(payload.latitude);
-  const longitude = Number(payload.longitude);
-  if (!placeId || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return jsonResponse(400, { detail: "장소와 현재 좌표가 필요해요." }, env, request);
-  }
-
-  const baseData = await loadBaseData(env, sessionResult.sessionUser.id);
-  const place = baseData.places.find((item) => item.id === placeId);
-  if (!place) {
-    return jsonResponse(404, { detail: "장소를 찾지 못했어요." }, env, request);
-  }
-
-  const distanceMeters = calculateDistanceMeters(latitude, longitude, place.latitude, place.longitude);
-  const unlockRadius = getStampUnlockRadius(env);
-  if (distanceMeters > unlockRadius) {
-    return jsonResponse(403, { detail: buildNearPlaceMessage(place.name, distanceMeters, unlockRadius) }, env, request);
-  }
-
-  const stampDate = toSeoulDateKey();
-  const existingTodayRows = await supabaseRequest(env, `user_stamp?select=stamp_id&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&position_id=eq.${encodeFilterValue(place.positionId)}&stamp_date=eq.${encodeFilterValue(stampDate)}&limit=1`);
-  if (existingTodayRows?.[0]) {
-    const nextBaseData = await loadBaseData(env, sessionResult.sessionUser.id);
-    return jsonResponse(200, {
-      collectedPlaceIds: nextBaseData.collectedPlaceIds,
-      logs: nextBaseData.stampLogs,
-      travelSessions: nextBaseData.travelSessions,
-    }, env, request);
-  }
-
-  const nowIso = new Date().toISOString();
-  const placeStampRows = await supabaseRequest(env, `user_stamp?select=stamp_id&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&position_id=eq.${encodeFilterValue(place.positionId)}`);
-  const visitOrdinal = (placeStampRows?.length ?? 0) + 1;
-
-  const lastStampRows = await supabaseRequest(env, `user_stamp?select=stamp_id,travel_session_id,created_at&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&order=created_at.desc&limit=1`);
-  const lastStampRow = lastStampRows?.[0] ?? null;
-  let travelSessionId = null;
-
-  if (lastStampRow) {
-    const gapMs = new Date(nowIso).getTime() - new Date(lastStampRow.created_at).getTime();
-    if (gapMs <= 1000 * 60 * 60 * 24) {
-      if (lastStampRow.travel_session_id) {
-        travelSessionId = Number(lastStampRow.travel_session_id);
-        const sessionRows = await supabaseRequest(env, `travel_session?select=stamp_count&travel_session_id=eq.${encodeFilterValue(travelSessionId)}&limit=1`);
-        const sessionRow = sessionRows?.[0] ?? null;
-        await supabaseRequest(env, `travel_session?travel_session_id=eq.${encodeFilterValue(travelSessionId)}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            ended_at: nowIso,
-            last_stamp_at: nowIso,
-            stamp_count: Number(sessionRow?.stamp_count ?? 0) + 1,
-            updated_at: nowIso,
-          }),
-        });
-      } else {
-        const createdSessions = await supabaseRequest(env, "travel_session?select=travel_session_id", {
-          method: "POST",
-          body: JSON.stringify({
-            user_id: sessionResult.sessionUser.id,
-            started_at: lastStampRow.created_at,
-            ended_at: nowIso,
-            last_stamp_at: nowIso,
-            stamp_count: 2,
-            created_at: nowIso,
-            updated_at: nowIso,
-          }),
-        });
-        travelSessionId = Number(createdSessions?.[0]?.travel_session_id);
-        await supabaseRequest(env, `user_stamp?stamp_id=eq.${encodeFilterValue(lastStampRow.stamp_id)}`, {
-          method: "PATCH",
-          body: JSON.stringify({ travel_session_id: travelSessionId }),
-        });
-      }
-    }
-  }
-
-  if (!travelSessionId) {
-    const createdSessions = await supabaseRequest(env, "travel_session?select=travel_session_id", {
-      method: "POST",
-      body: JSON.stringify({
-        user_id: sessionResult.sessionUser.id,
-        started_at: nowIso,
-        ended_at: nowIso,
-        last_stamp_at: nowIso,
-        stamp_count: 1,
-        created_at: nowIso,
-        updated_at: nowIso,
-      }),
-    });
-    travelSessionId = Number(createdSessions?.[0]?.travel_session_id);
-  }
-
-  await supabaseRequest(env, "user_stamp?select=stamp_id", {
-    method: "POST",
-    body: JSON.stringify({
-      user_id: sessionResult.sessionUser.id,
-      position_id: Number(place.positionId),
-      travel_session_id: travelSessionId,
-      stamp_date: stampDate,
-      visit_ordinal: visitOrdinal,
-      created_at: nowIso,
-    }),
-  });
-
-  const nextBaseData = await loadBaseData(env, sessionResult.sessionUser.id);
-  return jsonResponse(200, {
-    collectedPlaceIds: nextBaseData.collectedPlaceIds,
-    logs: nextBaseData.stampLogs,
-    travelSessions: nextBaseData.travelSessions,
-  }, env, request);
-}
-async function handleCreateUserRoute(request, env) {
-  const sessionResult = await requireSessionUser(request, env);
-  if (sessionResult.response) {
-    return sessionResult.response;
-  }
-
-  const payload = await readJsonBody(request);
-  const travelSessionId = String(payload.travelSessionId ?? "").trim();
-  const title = String(payload.title ?? "").trim();
-  const description = String(payload.description ?? "").trim();
-  const mood = String(payload.mood ?? "").trim();
-  const isPublic = payload.isPublic !== false;
-
-  if (!travelSessionId) {
-    return jsonResponse(400, { detail: "방향을 묶을 여행 세션이 필요해요." }, env, request);
-  }
-  if (!title) {
-    return jsonResponse(400, { detail: "경로 제목을 적어 주세요." }, env, request);
-  }
-  if (!description) {
-    return jsonResponse(400, { detail: "한 줄 소개를 적어 주세요." }, env, request);
-  }
-
-  const sessionRows = await supabaseRequest(env, `travel_session?select=travel_session_id,user_id&travel_session_id=eq.${encodeFilterValue(travelSessionId)}&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&limit=1`);
-  if (!sessionRows?.[0]) {
-    return jsonResponse(404, { detail: "여행 세션을 찾지 못했어요." }, env, request);
-  }
-
-  const existingRouteRows = await supabaseRequest(env, `user_route?select=route_id&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&travel_session_id=eq.${encodeFilterValue(travelSessionId)}&limit=1`);
-  if (existingRouteRows?.[0]) {
-    return jsonResponse(409, { detail: "이미 발행한 여행 코스예요." }, env, request);
-  }
-
-  const sessionStampRows = await supabaseRequest(env, `user_stamp?select=position_id,created_at&travel_session_id=eq.${encodeFilterValue(travelSessionId)}&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&order=created_at.asc`);
-  const orderedPositionIds = [];
-  const seenPositionIds = new Set();
-  for (const stampRow of sessionStampRows ?? []) {
-    const positionId = String(stampRow.position_id);
-    if (seenPositionIds.has(positionId)) {
-      continue;
-    }
-    seenPositionIds.add(positionId);
-    orderedPositionIds.push(positionId);
-  }
-  if (orderedPositionIds.length < 2) {
-    return jsonResponse(400, { detail: "코스에는 최소 두 곳 이상의 스탬프 기록이 필요해요." }, env, request);
-  }
-
-  const routeRows = await supabaseRequest(env, "user_route?select=route_id", {
-    method: "POST",
-    body: JSON.stringify({
-      user_id: sessionResult.sessionUser.id,
-      travel_session_id: Number(travelSessionId),
-      title,
-      description,
-      mood,
-      is_public: isPublic,
-      is_user_generated: true,
-      like_count: 0,
-    }),
-  });
-  const routeId = routeRows?.[0]?.route_id;
-
-  await supabaseRequest(env, "user_route_place?select=user_route_place_id", {
-    method: "POST",
-    body: JSON.stringify(orderedPositionIds.map((positionId, index) => ({
-      route_id: Number(routeId),
-      position_id: Number(positionId),
-      stop_order: index + 1,
-    }))),
-  });
-
-  const routes = await loadCommunityRoutes(env, { ownerUserId: sessionResult.sessionUser.id, sessionUserId: sessionResult.sessionUser.id });
-  const createdRoute = routes.find((route) => route.id === String(routeId)) ?? null;
-  const createdNotification = await createUserNotification(env, {
-    userId: sessionResult.sessionUser.id,
-    actorUserId: sessionResult.sessionUser.id,
-    type: 'route-published',
-    title: '새로운 코스가 발행되었습니다.',
-    body: title,
-    routeId,
-    metadata: {
-      travelSessionId,
-    },
-  });
-  if (createdNotification?.notification_id) {
-    const notification = await loadNotificationById(env, createdNotification.notification_id);
-    if (notification) {
-      await publishNotificationEvent(env, sessionResult.sessionUser.id, 'notification.created', {
-        notification,
-        unreadCount: await countUnreadNotifications(env, sessionResult.sessionUser.id),
-      });
-    }
-  }
-  return jsonResponse(201, createdRoute, env, request);
-}
-
-async function handleToggleCommunityRouteLike(request, env, routeId) {
-  const sessionResult = await requireSessionUser(request, env);
-  if (sessionResult.response) {
-    return sessionResult.response;
-  }
-
-  const routeRow = await readRouteRow(env, routeId);
-  if (!routeRow) {
-    return jsonResponse(404, { detail: '경로를 찾지 못했어요.' }, env, request);
-  }
-  const existingRows = await supabaseRequest(
-    env,
-    `user_route_like?select=route_like_id&route_id=eq.${encodeFilterValue(routeId)}&user_id=eq.${encodeFilterValue(sessionResult.sessionUser.id)}&limit=1`,
-  );
-  const existing = existingRows?.[0] ?? null;
-
-  if (existing) {
-    await supabaseRequest(env, `user_route_like?route_like_id=eq.${encodeFilterValue(existing.route_like_id)}`, {
-      method: 'DELETE',
-      headers: { Prefer: 'return=minimal' },
-    });
-  } else {
-    await supabaseRequest(env, 'user_route_like?select=route_like_id', {
-      method: 'POST',
-      body: JSON.stringify({
-        route_id: Number(routeId),
-        user_id: sessionResult.sessionUser.id,
-      }),
-    });
-  }
-
-  const likeRows = await supabaseRequest(env, `user_route_like?select=route_like_id&route_id=eq.${encodeFilterValue(routeId)}`);
-  const likeCount = likeRows.length;
-  await supabaseRequest(env, `user_route?route_id=eq.${encodeFilterValue(routeId)}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      like_count: likeCount,
-      updated_at: new Date().toISOString(),
-    }),
-  });
-
-  return jsonResponse(200, {
-    routeId: String(routeId),
-    likeCount,
-    likedByMe: !existing,
-  }, env, request);
-}
-
 function resolveOriginUrl(request, env) {
   const originBaseUrl = (env.APP_ORIGIN_API_URL ?? '').trim();
   if (!originBaseUrl) {
@@ -1366,139 +732,120 @@ async function proxyToOrigin(request, env) {
 
 async function routeRequest(request, env) {
   const url = new URL(request.url);
-  const reviewCommentMatch = url.pathname.match(/^\/api\/reviews\/(\d+)\/comments$/);
-  const reviewCommentDetailMatch = url.pathname.match(/^\/api\/reviews\/(\d+)\/comments\/(\d+)$/);
-  const reviewLikeMatch = url.pathname.match(/^\/api\/reviews\/(\d+)\/like$/);
-  const reviewDetailMatch = url.pathname.match(/^\/api\/reviews\/(\d+)$/);
-  const communityRouteLikeMatch = url.pathname.match(/^\/api\/community-routes\/(\d+)\/like$/);
-  const notificationReadMatch = url.pathname.match(/^\/api\/notifications\/(\d+)\/read$/);
-  const notificationDetailMatch = url.pathname.match(/^\/api\/notifications\/(\d+)$/);
-  const adminPlaceMatch = url.pathname.match(/^\/api\/admin\/places\/([^/]+)$/);
 
   if (request.method === "OPTIONS") {
     return handlePreflight(env, request);
   }
-  if (request.method === "GET" && url.pathname === "/api/health") {
-    return handleHealth(request, env);
+
+  const exactRoutes = [
+    ["GET", "/api/health", () => handleHealth(request, env)],
+    ["GET", "/api/auth/providers", () => handleAuthProviders(request, env)],
+    ["GET", "/api/auth/me", () => handleAuthSession(request, env)],
+    ["POST", "/api/auth/logout", () => handleLogout(request, env)],
+    ["PATCH", "/api/auth/profile", () => handleUpdateProfile(request, env)],
+    ["GET", "/api/auth/naver/login", () => handleStartNaverLogin(request, env, url)],
+    ["GET", "/api/auth/naver/callback", () => handleNaverCallback(request, env, url)],
+    ["GET", "/api/bootstrap", () => handleBootstrap(request, env)],
+    ["GET", "/api/map-bootstrap", () => handleMapBootstrap(request, env)],
+    ["GET", "/api/courses/curated", () => handleCuratedCourses(request, env)],
+    ["GET", "/api/review-feed", () => reviewReadService.handleReviewFeed(request, env, url)],
+    ["GET", "/api/reviews", () => reviewReadService.handleReviews(request, env, url)],
+    ["POST", "/api/reviews/upload", () => handleReviewUpload(request, env, buildReviewInteractionDeps())],
+    ["POST", "/api/reviews", () => handleCreateReview(request, env, buildReviewInteractionDeps())],
+    ["POST", "/api/stamps/toggle", () => handleToggleStamp(request, env)],
+    ["GET", "/api/community-routes", () => communityRouteService.handleCommunityRoutes(request, env, url)],
+    ["POST", "/api/community-routes", () => communityRouteService.handleCreateUserRoute(request, env)],
+    ["GET", "/api/my/routes", () => communityRouteService.handleMyRoutes(request, env)],
+    ["GET", "/api/my/summary", () => handleMySummary(request, env)],
+    ["GET", "/api/my/notifications", () => handleMyNotifications(request, env)],
+    ["GET", "/api/my/notifications/realtime-channel", () => handleNotificationRealtimeChannel(request, env)],
+    ["GET", "/api/my/comments", () => handleMyComments(request, env, url)],
+    ["PATCH", "/api/notifications/read-all", () => handleMarkAllNotificationsRead(request, env)],
+    ["GET", "/api/festivals", () => handleFestivals(request, env)],
+    ["GET", "/api/banner/events", () => handleBannerEvents(request, env)],
+    ["POST", "/api/internal/public-events/import", () => handleFestivalImport(request, env)],
+    ["GET", "/api/admin/summary", () => handleAdminSummary(request, env)],
+    ["POST", "/api/admin/import/public-data", () => handleAdminImportPublicData(request, env)],
+  ];
+
+  for (const [method, pathname, handler] of exactRoutes) {
+    if (request.method === method && url.pathname === pathname) {
+      return handler();
+    }
   }
-  if (request.method === "GET" && url.pathname === "/api/auth/providers") {
-    return handleAuthProviders(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/auth/me") {
-    return handleAuthSession(request, env);
-  }
-  if (request.method === "POST" && url.pathname === "/api/auth/logout") {
-    return handleLogout(request, env);
-  }
-  if (request.method === "PATCH" && url.pathname === "/api/auth/profile") {
-    return handleUpdateProfile(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/auth/naver/login") {
-    return handleStartNaverLogin(request, env, url);
-  }
-  if (request.method === "GET" && url.pathname === "/api/auth/naver/callback") {
-    return handleNaverCallback(request, env, url);
-  }
-  if (request.method === "GET" && url.pathname === "/api/bootstrap") {
-    return handleBootstrap(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/map-bootstrap") {
-    return handleMapBootstrap(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/courses/curated") {
-    return handleCuratedCourses(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/review-feed") {
-    return reviewReadService.handleReviewFeed(request, env, url);
-  }
-  if (request.method === "GET" && url.pathname === "/api/reviews") {
-    return reviewReadService.handleReviews(request, env, url);
-  }
-  if (request.method === "POST" && url.pathname === "/api/reviews/upload") {
-    return handleReviewUpload(request, env, buildReviewInteractionDeps());
-  }
-  if (request.method === "POST" && url.pathname === "/api/reviews") {
-    return handleCreateReview(request, env, buildReviewInteractionDeps());
-  }
-  if (request.method === "GET" && reviewDetailMatch) {
-    return reviewReadService.handleReviewDetail(request, env, reviewDetailMatch[1]);
-  }
-  if (request.method === "PATCH" && reviewDetailMatch) {
-    return handleUpdateReview(request, env, reviewDetailMatch[1], buildReviewInteractionDeps());
-  }
-  if (request.method === "GET" && reviewCommentMatch) {
-    const sessionUser = await readSessionUser(request, env);
-    const comments = (await reviewReadService.loadSingleReview(env, reviewCommentMatch[1], sessionUser?.id ?? null))?.comments ?? [];
-    return jsonResponse(200, comments, env, request);
-  }
-  if (request.method === "POST" && reviewCommentMatch) {
-    return handleCreateComment(request, env, reviewCommentMatch[1], buildReviewInteractionDeps());
-  }
-  if (request.method === "PATCH" && reviewCommentDetailMatch) {
-    return handleUpdateComment(request, env, reviewCommentDetailMatch[1], reviewCommentDetailMatch[2], buildReviewInteractionDeps());
-  }
-  if (request.method === "DELETE" && reviewCommentDetailMatch) {
-    return handleDeleteComment(request, env, reviewCommentDetailMatch[1], reviewCommentDetailMatch[2], buildReviewInteractionDeps());
-  }
-  if (request.method === "POST" && reviewLikeMatch) {
-    return handleToggleReviewLike(request, env, reviewLikeMatch[1], buildReviewInteractionDeps());
-  }
-  if (request.method === "DELETE" && reviewDetailMatch) {
-    return handleDeleteReview(request, env, reviewDetailMatch[1], buildReviewInteractionDeps());
-  }
-  if (request.method === "POST" && url.pathname === "/api/stamps/toggle") {
-    return handleToggleStamp(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/community-routes") {
-    return handleCommunityRoutes(request, env, url);
-  }
-  if (request.method === "POST" && url.pathname === "/api/community-routes") {
-    return handleCreateUserRoute(request, env);
-  }
-  if (request.method === "POST" && communityRouteLikeMatch) {
-    return handleToggleCommunityRouteLike(request, env, communityRouteLikeMatch[1]);
-  }
-  if (request.method === "GET" && url.pathname === "/api/my/routes") {
-    return handleMyRoutes(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/my/summary") {
-    return handleMySummary(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/my/notifications") {
-    return handleMyNotifications(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/my/notifications/realtime-channel") {
-    return handleNotificationRealtimeChannel(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/my/comments") {
-    return handleMyComments(request, env, url);
-  }
-  if (request.method === "PATCH" && notificationReadMatch) {
-    return handleMarkNotificationRead(request, env, notificationReadMatch[1]);
-  }
-  if (request.method === "PATCH" && url.pathname === "/api/notifications/read-all") {
-    return handleMarkAllNotificationsRead(request, env);
-  }
-  if (request.method === "DELETE" && notificationDetailMatch) {
-    return handleDeleteNotification(request, env, notificationDetailMatch[1]);
-  }
-  if (request.method === "GET" && url.pathname === "/api/festivals") {
-    return handleFestivals(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/banner/events") {
-    return handleBannerEvents(request, env);
-  }
-  if (request.method === "POST" && url.pathname === "/api/internal/public-events/import") {
-    return handleFestivalImport(request, env);
-  }
-  if (request.method === "GET" && url.pathname === "/api/admin/summary") {
-    return handleAdminSummary(request, env);
-  }
-  if (request.method === "POST" && url.pathname === "/api/admin/import/public-data") {
-    return handleAdminImportPublicData(request, env);
-  }
-  if (request.method === "PATCH" && adminPlaceMatch) {
-    return handleAdminPlaceVisibility(request, env, adminPlaceMatch[1]);
+
+  const patternRoutes = [
+    [
+      "GET",
+      /^\/api\/reviews\/(\d+)$/,
+      (match) => reviewReadService.handleReviewDetail(request, env, match[1]),
+    ],
+    [
+      "PATCH",
+      /^\/api\/reviews\/(\d+)$/,
+      (match) => handleUpdateReview(request, env, match[1], buildReviewInteractionDeps()),
+    ],
+    [
+      "DELETE",
+      /^\/api\/reviews\/(\d+)$/,
+      (match) => handleDeleteReview(request, env, match[1], buildReviewInteractionDeps()),
+    ],
+    [
+      "GET",
+      /^\/api\/reviews\/(\d+)\/comments$/,
+      async (match) => {
+        const sessionUser = await readSessionUser(request, env);
+        const comments = (await reviewReadService.loadSingleReview(env, match[1], sessionUser?.id ?? null))?.comments ?? [];
+        return jsonResponse(200, comments, env, request);
+      },
+    ],
+    [
+      "POST",
+      /^\/api\/reviews\/(\d+)\/comments$/,
+      (match) => handleCreateComment(request, env, match[1], buildReviewInteractionDeps()),
+    ],
+    [
+      "PATCH",
+      /^\/api\/reviews\/(\d+)\/comments\/(\d+)$/,
+      (match) => handleUpdateComment(request, env, match[1], match[2], buildReviewInteractionDeps()),
+    ],
+    [
+      "DELETE",
+      /^\/api\/reviews\/(\d+)\/comments\/(\d+)$/,
+      (match) => handleDeleteComment(request, env, match[1], match[2], buildReviewInteractionDeps()),
+    ],
+    [
+      "POST",
+      /^\/api\/reviews\/(\d+)\/like$/,
+      (match) => handleToggleReviewLike(request, env, match[1], buildReviewInteractionDeps()),
+    ],
+    [
+      "POST",
+      /^\/api\/community-routes\/(\d+)\/like$/,
+      (match) => communityRouteService.handleToggleCommunityRouteLike(request, env, match[1]),
+    ],
+    [
+      "PATCH",
+      /^\/api\/notifications\/(\d+)\/read$/,
+      (match) => handleMarkNotificationRead(request, env, match[1]),
+    ],
+    [
+      "DELETE",
+      /^\/api\/notifications\/(\d+)$/,
+      (match) => handleDeleteNotification(request, env, match[1]),
+    ],
+    [
+      "PATCH",
+      /^\/api\/admin\/places\/([^/]+)$/,
+      (match) => handleAdminPlaceVisibility(request, env, match[1]),
+    ],
+  ];
+
+  for (const [method, pattern, handler] of patternRoutes) {
+    const match = url.pathname.match(pattern);
+    if (request.method === method && match) {
+      return handler(match);
+    }
   }
 
   return proxyToOrigin(request, env);
