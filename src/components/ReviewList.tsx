@@ -77,7 +77,7 @@ function ReviewImageFrame({ src, alt }: { src: string; alt: string }) {
   return (
     <div
       ref={frameRef}
-      className="review-card__image-frame"
+      className={isTall ? 'review-card__image-frame review-card__image-frame--rotated' : 'review-card__image-frame'}
       style={{
         width: '100%',
         height: 'min(220px, 56vw)',

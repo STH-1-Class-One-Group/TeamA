@@ -1557,26 +1557,28 @@ body {
   width: 100% !important;
   aspect-ratio: 4 / 3 !important;
   min-height: 0 !important;
-  max-height: 280px !important;
+  height: 100% !important;
+  max-height: none !important;
   border-radius: 20px !important;
-  object-fit: contain !important;
-  background: rgba(255, 250, 252, 0.96) !important;
-  border: 1px solid rgba(255, 176, 201, 0.16) !important;
-  padding: 6px !important;
+  object-fit: cover !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
 }
 
-/* 2026-03-24 hard cap review image height */
+/* 2026-03-24 review image frame cleanup */
 .review-card__image-frame {
   position: relative !important;
   width: 100% !important;
-  height: min(280px, 64vw) !important;
-  max-height: 280px !important;
+  height: auto !important;
+  aspect-ratio: 4 / 3 !important;
+  max-height: min(320px, 78vw) !important;
   margin: 4px 0 14px !important;
   border-radius: 20px !important;
   overflow: hidden !important;
   background: rgba(255, 250, 252, 0.96) !important;
   border: 1px solid rgba(255, 176, 201, 0.16) !important;
-  padding: 6px !important;
+  padding: 0 !important;
 }
 
 .review-card__image-frame .review-card__image {
@@ -1584,11 +1586,22 @@ body {
   height: 100% !important;
   max-height: none !important;
   margin: 0 !important;
-  border-radius: 14px !important;
-  object-fit: contain !important;
+  border-radius: 20px !important;
+  object-fit: cover !important;
   background: transparent !important;
   border: 0 !important;
   padding: 0 !important;
+}
+
+.review-card__image-frame--rotated {
+  aspect-ratio: auto !important;
+  height: min(320px, 78vw) !important;
+  max-height: 320px !important;
+  background: rgba(255, 250, 252, 0.82) !important;
+}
+
+.review-card__image-frame--rotated .review-card__image {
+  object-fit: contain !important;
 }
 
 /* 2026-03-28 review typography normalization */
