@@ -877,21 +877,14 @@ input.visually-hidden[type='file'] {
 }
 
 .review-card__title-block--feed {
-  gap: 4px !important;
+  gap: 5px !important;
 }
 
-.review-card__title {
-  font-size: 17px !important;
-  line-height: 1.18 !important;
-  letter-spacing: -0.03em !important;
-  color: var(--ink) !important;
-}
-
-.review-card__author-line {
-  margin: 0 !important;
-  color: rgba(93, 77, 101, 0.74) !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
+.review-card__title-row {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
 }
 
 .review-card__tag-row {
@@ -1323,19 +1316,6 @@ body {
   box-shadow: none !important;
 }
 
-.review-card__tag-row .review-card__visit-pill,
-.review-card__tag-row .soft-tag {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-height: 32px !important;
-  padding: 6px 12px !important;
-  font-size: 12px !important;
-  line-height: 1 !important;
-  font-weight: 700 !important;
-  letter-spacing: -0.01em !important;
-}
-
 .secondary-button,
 .review-link-button,
 .review-card__place-link,
@@ -1387,13 +1367,6 @@ body {
 .review-card--stamp-log .review-card__tag-row {
   gap: 10px !important;
   margin-top: 6px !important;
-}
-
-.review-card--stamp-log .review-card__visit-pill,
-.review-card--stamp-log .soft-tag {
-  min-height: 34px !important;
-  padding: 7px 12px !important;
-  border-radius: 999px !important;
 }
 
 .review-card--stamp-log .review-card__actions {
@@ -1451,16 +1424,9 @@ body {
   gap: 10px !important;
 }
 
-.review-card--comment-log .review-card__body--comment-log {
-  font-size: 14px !important;
-  line-height: 1.55 !important;
-}
-
 .review-card--comment-log .review-card__context-line {
   margin: 0 !important;
   color: var(--muted) !important;
-  font-size: 12px !important;
-  line-height: 1.45 !important;
 }
 
 .review-card--stamp-log .soft-tag.is-complete {
@@ -1623,4 +1589,68 @@ body {
   background: transparent !important;
   border: 0 !important;
   padding: 0 !important;
+}
+
+/* 2026-03-28 review typography normalization */
+.review-card,
+.feed-comment-sheet {
+  --review-type-title: 18px;
+  --review-type-body: 14px;
+  --review-type-meta: 11px;
+  --review-type-label: 10px;
+  --review-tag-min-height: 24px;
+  --review-tag-padding-block: 3px;
+  --review-tag-padding-inline: 8px;
+  --review-tag-font-weight: 600;
+}
+
+.review-card__title {
+  font-size: var(--review-type-title) !important;
+  line-height: 1.18 !important;
+  font-weight: 800 !important;
+}
+
+.review-card__mood-inline {
+  color: rgba(216, 79, 134, 0.88) !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+  white-space: nowrap !important;
+}
+
+.review-card__body,
+.review-card__body--comment-log,
+.feed-comment-sheet__body {
+  font-size: var(--review-type-body) !important;
+  line-height: 1.6 !important;
+}
+
+.review-card__author-line,
+.review-card__meta-line,
+.review-card__context-line,
+.feed-comment-sheet__meta {
+  font-size: var(--review-type-meta) !important;
+  line-height: 1.45 !important;
+}
+
+.review-card__top .eyebrow,
+.review-card__label,
+.review-card__visit-pill,
+.review-card__tag-row .soft-tag {
+  font-size: var(--review-type-label) !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.review-card__visit-pill,
+.review-card__tag-row .soft-tag,
+.review-card--stamp-log .review-card__visit-pill,
+.review-card--stamp-log .soft-tag {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: var(--review-tag-min-height) !important;
+  padding: var(--review-tag-padding-block) var(--review-tag-padding-inline) !important;
+  font-weight: var(--review-tag-font-weight) !important;
 }

@@ -180,6 +180,10 @@ async function main() {
     jsx: "automatic",
     loader: {
       ".css": "css",
+      ".otf": "file",
+      ".ttf": "file",
+      ".woff": "file",
+      ".woff2": "file",
     },
     minify: true,
     sourcemap: false,

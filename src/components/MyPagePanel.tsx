@@ -495,8 +495,12 @@ export function MyPagePanel({
                   <article key={review.id} className="review-card review-card--my-feed">
                     <div className="review-card__top review-card__top--feed">
                       <div className="review-card__title-block review-card__title-block--feed">
-                        <p className="eyebrow">{review.mood}</p>
-                        <button type="button" className="review-card__place-anchor" onClick={() => onOpenPlace(review.placeId)}><strong className="review-card__title">{review.placeName}</strong></button>
+                        <div className="review-card__title-row">
+                          <button type="button" className="review-card__place-anchor" onClick={() => onOpenPlace(review.placeId)}>
+                            <strong className="review-card__title">{review.placeName}</strong>
+                          </button>
+                          <span className="review-card__mood-inline">{review.mood}</span>
+                        </div>
                         <p className="review-card__author-line">{review.visitLabel} · {review.visitedAt}</p>
                       </div>
                     </div>

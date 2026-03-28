@@ -55,7 +55,7 @@ export function ReviewFormFields({
 
   return (
     <>
-      <div className="chip-row compact-gap">
+      <div className="chip-row compact-gap review-form-fields__mood-row">
         {moodOptions.map((option) => (
           <button
             key={option}
@@ -69,7 +69,7 @@ export function ReviewFormFields({
         ))}
       </div>
 
-      <label className="route-builder-field">
+      <label className="route-builder-field review-form-fields__body-field">
         <span>{bodyLabel}</span>
         <textarea
           rows={4}

@@ -232,8 +232,10 @@ export function ReviewList({
         >
           <div className="review-card__top review-card__top--feed">
             <div className="review-card__title-block review-card__title-block--feed">
-              <p className="eyebrow">{review.mood}</p>
-              <strong className="review-card__title">{review.placeName}</strong>
+              <div className="review-card__title-row">
+                <strong className="review-card__title">{review.placeName}</strong>
+                <span className="review-card__mood-inline">{review.mood}</span>
+              </div>
               <p className="review-card__author-line">
                 {review.author} · {review.visitLabel} · {review.visitedAt}
               </p>
