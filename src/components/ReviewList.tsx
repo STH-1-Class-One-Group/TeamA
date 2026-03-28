@@ -1,5 +1,9 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { CommentThread } from './CommentThread';
+import { CommentIcon, HeartIcon } from './review/ReviewActionIcons';
+import { ReviewFeedCardHeader } from './review/ReviewFeedCardHeader';
+import { ReviewImageFrame } from './review/ReviewImageFrame';
+import { ReviewTagRow } from './review/ReviewTagRow';
 import type { Review } from '../types';
 
 interface ReviewListProps {
@@ -20,146 +24,6 @@ interface ReviewListProps {
   onOpenComments?: (reviewId: string) => void;
   emptyTitle: string;
   emptyBody: string;
-}
-
-function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" className="review-action-button__svg" aria-hidden="true">
-      <path
-        d="M12 21s-6.716-4.309-9.193-8.19C1.25 10.387 2.17 6.9 5.41 5.61c1.98-.788 4.183-.145 5.59 1.495 1.408-1.64 3.611-2.283 5.59-1.495 3.24 1.29 4.16 4.777 2.603 7.2C18.716 16.691 12 21 12 21Z"
-        fill={filled ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function CommentIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="review-action-button__svg" aria-hidden="true">
-      <path
-        d="M6.5 5.5h11A2.5 2.5 0 0 1 20 8v6A2.5 2.5 0 0 1 17.5 16.5H11l-4.5 3.5v-3.5h0A2.5 2.5 0 0 1 4 14V8a2.5 2.5 0 0 1 2.5-2.5Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.85"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M8.75 10.75h.5M12 10.75h.5M15.25 10.75h.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ReviewImageFrame({ src, alt }: { src: string; alt: string }) {
-  const frameRef = useRef<HTMLDivElement | null>(null);
-  const [isTall, setIsTall] = useState(false);
-  const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const updateFrameSize = () => {
-      if (frameRef.current) {
-        setFrameSize({
-          width: frameRef.current.clientWidth || 0,
-          height: frameRef.current.clientHeight || 0,
-        });
-      }
-    };
-
-    updateFrameSize();
-    window.addEventListener('resize', updateFrameSize);
-    return () => {
-      window.removeEventListener('resize', updateFrameSize);
-    };
-  }, []);
-
-  return (
-    <div
-      ref={frameRef}
-      className={isTall ? 'review-card__image-frame review-card__image-frame--rotated' : 'review-card__image-frame'}
-      style={{
-        width: '100%',
-        height: 'min(220px, 56vw)',
-        maxHeight: '220px',
-        borderRadius: '20px',
-        overflow: 'hidden',
-        background: 'rgba(255, 250, 252, 0.96)',
-        border: '1px solid rgba(255, 176, 201, 0.16)',
-        padding: '0',
-        position: 'relative',
-      }}
-    >
-      {isTall ? (
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            width: `${Math.max(frameSize.height, 1)}px`,
-            height: `${Math.max(frameSize.width, 1)}px`,
-            transform: 'translate(-50%, -50%) rotate(-90deg)',
-            transformOrigin: 'center center',
-            overflow: 'hidden',
-            borderRadius: '14px',
-          }}
-        >
-          <img
-            className="review-card__image"
-            src={src}
-            alt={alt}
-            loading="lazy"
-            decoding="async"
-            onLoad={(event) => {
-              const target = event.currentTarget;
-              setIsTall(target.naturalHeight > target.naturalWidth * 1.12);
-              if (frameRef.current) {
-                setFrameSize({
-                  width: frameRef.current.clientWidth || 0,
-                  height: frameRef.current.clientHeight || 0,
-                });
-              }
-            }}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              borderRadius: '14px',
-              display: 'block',
-              margin: 0,
-            }}
-          />
-        </div>
-      ) : (
-        <img
-          className="review-card__image"
-          src={src}
-          alt={alt}
-          loading="lazy"
-          decoding="async"
-          onLoad={(event) => {
-            const target = event.currentTarget;
-            setIsTall(target.naturalHeight > target.naturalWidth * 1.12);
-            if (frameRef.current) {
-              setFrameSize({
-                width: frameRef.current.clientWidth || 0,
-                height: frameRef.current.clientHeight || 0,
-              });
-            }
-          }}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            borderRadius: '14px',
-            display: 'block',
-            margin: 0,
-          }}
-        />
-      )}
-    </div>
-  );
 }
 
 export function ReviewList({
@@ -231,21 +95,13 @@ export function ReviewList({
           data-review-id={review.id}
           className={review.id === highlightedReviewId ? 'review-card review-card--feed review-card--highlighted' : 'review-card review-card--feed'}
         >
-          <div className="review-card__top review-card__top--feed">
-            <div className="review-card__title-block review-card__title-block--feed">
-              <div className="review-card__title-row">
-                <strong className="review-card__title">{review.placeName}</strong>
-                <span className="review-card__mood-inline">{review.mood}</span>
-              </div>
-            </div>
-            <p className="review-card__corner-meta">{review.author} · {review.visitedAt}</p>
-          </div>
+          <ReviewFeedCardHeader
+            title={<strong className="review-card__title">{review.placeName}</strong>}
+            mood={review.mood}
+            meta={`${review.author} · ${review.visitedAt}`}
+          />
 
-          <div className="review-card__tag-row">
-            <span className="review-card__visit-pill">{review.visitLabel}</span>
-            {review.hasPublishedRoute && <span className="soft-tag">연속 여행 기록</span>}
-            <span className="soft-tag">{review.badge}</span>
-          </div>
+          <ReviewTagRow visitLabel={review.visitLabel} badge={review.badge} hasPublishedRoute={review.hasPublishedRoute} />
 
           {review.imageUrl && <ReviewImageFrame src={review.imageUrl} alt={`${review.placeName} 후기 이미지`} />}
 

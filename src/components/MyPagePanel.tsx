@@ -1,9 +1,12 @@
 ﻿import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useScrollRestoration } from '../hooks/useScrollRestoration';
 import { useAutoLoadMore } from '../hooks/useAutoLoadMore';
+import { MyCommentsTabSection } from './my-page/MyCommentsTabSection';
+import { MyFeedTabSection } from './my-page/MyFeedTabSection';
+import { MyRoutesTabSection } from './my-page/MyRoutesTabSection';
+import { MyStampTabSection } from './my-page/MyStampTabSection';
 import { ProviderButtons } from './ProviderButtons';
-import { ReviewFormFields } from './ReviewFormFields';
-import type { AdminSummaryResponse, AuthProvider, CourseMood, MyPageResponse, MyPageTabKey, ReviewMood, SessionUser, TravelSession } from '../types';
+import type { AdminSummaryResponse, AuthProvider, MyPageResponse, MyPageTabKey, ReviewMood, SessionUser } from '../types';
 
 interface MyPagePanelProps {
   sessionUser: SessionUser | null;
@@ -43,53 +46,7 @@ interface MyPagePanelProps {
 
 const AdminPanel = lazy(() => import('./AdminPanel').then((module) => ({ default: module.AdminPanel })));
 
-const routeMoodOptions: CourseMood[] = ['데이트', '사진', '힐링', '비 오는 날'];
-const reviewMoodOptions: ReviewMood[] = ['혼자서', '친구랑', '데이트', '야경 맛집'];
-
-interface DraftState {
-  title: string;
-  description: string;
-  mood: string;
-}
-
 type NotificationItem = NonNullable<MyPageResponse>['notifications'][number];
-
-function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" className="review-action-button__svg" aria-hidden="true">
-      <path
-        d="M12 21s-6.716-4.309-9.193-8.19C1.25 10.387 2.17 6.9 5.41 5.61c1.98-.788 4.183-.145 5.59 1.495 1.408-1.64 3.611-2.283 5.59-1.495 3.24 1.29 4.16 4.777 2.603 7.2C18.716 16.691 12 21 12 21Z"
-        fill={filled ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="review-action-button__svg" aria-hidden="true">
-      <path
-        d="M12 4.75a4.25 4.25 0 0 0-4.25 4.25v2.23c0 .92-.3 1.81-.86 2.54l-1.1 1.47a1 1 0 0 0 .8 1.6h11.82a1 1 0 0 0 .8-1.6l-1.1-1.47a4.24 4.24 0 0 1-.86-2.54V9A4.25 4.25 0 0 0 12 4.75Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M10.25 18.25a2 2 0 0 0 3.5 0"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 function getNotificationLabel(notification: NotificationItem) {
   switch (notification.type) {
@@ -104,16 +61,6 @@ function getNotificationLabel(notification: NotificationItem) {
     default:
       return '알림';
   }
-}
-
-function buildDefaultDraft(session: TravelSession): DraftState {
-  const firstPlaceName = session.placeNames[0] ?? '하루 코스';
-  const lastPlaceName = session.placeNames[session.placeNames.length - 1] ?? firstPlaceName;
-  return {
-    title: `${firstPlaceName}에서 ${lastPlaceName}까지`,
-    description: `${session.placeNames.join(' - ')} 순서로 24시간 안에 이어진 실제 방문 기록이에요.`,
-    mood: '데이트',
-  };
 }
 
 export function MyPagePanel({
@@ -155,14 +102,6 @@ export function MyPagePanel({
   const [showVisitedDetail, setShowVisitedDetail] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
-  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
-  const [editingReviewBody, setEditingReviewBody] = useState('');
-  const [editingReviewMood, setEditingReviewMood] = useState<ReviewMood>('혼자서');
-  const [editingReviewFile, setEditingReviewFile] = useState<File | null>(null);
-  const [editingReviewRemoveImage, setEditingReviewRemoveImage] = useState(false);
-  const [reviewUpdatingId, setReviewUpdatingId] = useState<string | null>(null);
-  const [reviewEditError, setReviewEditError] = useState<string | null>(null);
   const [notificationBusyId, setNotificationBusyId] = useState<string | null>(null);
   const [notificationsBusy, setNotificationsBusy] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
@@ -187,29 +126,6 @@ export function MyPagePanel({
     }
   }, [myPage]);
 
-  function startEditingReview(review: NonNullable<MyPageResponse>['reviews'][number]) {
-    setEditingReviewId(review.id);
-    setEditingReviewBody(review.body);
-    setEditingReviewMood(review.mood);
-    setEditingReviewFile(null);
-    setEditingReviewRemoveImage(false);
-    setReviewEditError(null);
-  }
-
-  function cancelEditingReview() {
-    setEditingReviewId(null);
-    setEditingReviewBody('');
-    setEditingReviewMood('혼자서');
-    setEditingReviewFile(null);
-    setEditingReviewRemoveImage(false);
-    setReviewEditError(null);
-  }
-
-  const unpublishedSessions = useMemo(
-    () => myPage?.travelSessions.filter((session) => session.canPublish && !session.publishedRouteId) ?? [],
-    [myPage],
-  );
-
   const visitPct = useMemo(
     () => (myPage && myPage.stats.totalPlaceCount > 0
       ? Math.round((myPage.stats.uniquePlaceCount / myPage.stats.totalPlaceCount) * 100)
@@ -217,21 +133,6 @@ export function MyPagePanel({
     [myPage],
   );
   const unreadNotificationCount = myPage?.unreadNotificationCount ?? 0;
-
-  function readDraft(session: TravelSession) {
-    return drafts[session.id] ?? buildDefaultDraft(session);
-  }
-
-  function updateDraft(sessionId: string, patch: Partial<DraftState>, fallbackSession: TravelSession) {
-    setDrafts((current) => ({
-      ...current,
-      [sessionId]: {
-        ...buildDefaultDraft(fallbackSession),
-        ...(current[sessionId] ?? {}),
-        ...patch,
-      },
-    }));
-  }
 
   async function handleNicknameSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -456,257 +357,44 @@ export function MyPagePanel({
             </div>
 
             {activeTab === 'stamps' && (
-              <div className="review-stack">
-                {unpublishedSessions.length > 0 && (
-                  <article className="sheet-card stack-gap">
-                    <div className="section-title-row section-title-row--tight">
-                      <div>
-                        <p className="eyebrow">READY TO PUBLISH</p>
-                        <h3>{'\uCF54\uC2A4\uB85C \uBC1C\uD589\uD560 \uC218 \uC788\uB294 \uC5EC\uC815\uC774 \uC788\uC5B4\uC694'}</h3>
-                      </div>
-                      <span className="counter-pill">{unpublishedSessions.length}{'\uAC1C'}</span>
-                    </div>
-                    <p className="section-copy">{'\u0032\u0034\uC2DC\uAC04 \uC548\uC5D0 \uC774\uC5B4\uC9C4 \uC2A4\uD0EC\uD504 \uAE30\uB85D\uC744 \uACF5\uAC1C \uCF54\uC2A4\uB85C \uBC1C\uD589\uD574 \uBCF4\uC138\uC694.'}</p>
-                    <button type="button" className="primary-button route-submit-button" onClick={() => onChangeTab('routes')}>
-                      {'\uCF54\uC2A4 \uBC1C\uD589\uD558\uB7EC \uAC00\uAE30'}
-                    </button>
-                  </article>
-                )}
-                {myPage.stampLogs.map((stampLog) => (
-                  <article key={stampLog.id} className="review-card review-card--stamp-log">
-                    <div className="review-card__top review-card__top--feed review-card__top--stamp-log">
-                      <div className="review-card__title-block review-card__title-block--feed">
-                        <p className="eyebrow">STAMP LOG</p>
-                        <strong className="review-card__title">{stampLog.placeName}</strong>
-                        <p className="review-card__author-line">{'\uD68D\uB4DD / '}{stampLog.stampedAt}</p>
-                      </div>
-                      <button type="button" className="review-link-button review-link-button--inline" onClick={() => onOpenPlace(stampLog.placeId)}>{'\uC774 \uC7A5\uC18C \uBCF4\uAE30'}</button>
-                    </div>
-                    <div className="review-card__tag-row">
-                      <span className="review-card__visit-pill">{stampLog.visitLabel}</span>
-                      {stampLog.isToday && <span className="soft-tag is-complete">{'\uC624\uB298'}</span>}
-                      {stampLog.travelSessionId && stampLog.travelSessionStampCount >= 2 && <span className="soft-tag">{'\uC5EC\uD589 \uC138\uC158 \uC5F0\uACB0'}</span>}
-                    </div>
-                  </article>
-                ))}
-                {myPage.stampLogs.length === 0 && <p className="empty-copy">아직 찍은 스탬프가 없어요.</p>}
-              </div>
+              <MyStampTabSection
+                stampLogs={myPage.stampLogs}
+                travelSessions={myPage.travelSessions}
+                onOpenPlace={onOpenPlace}
+                onOpenRoutes={() => onChangeTab('routes')}
+              />
             )}
 
             {activeTab === 'feeds' && (
-              <div className="review-stack">
-                {myPage.reviews.map((review) => (
-                  <article key={review.id} className="review-card review-card--my-feed">
-                    <div className="review-card__top review-card__top--feed">
-                      <div className="review-card__title-block review-card__title-block--feed">
-                        <div className="review-card__title-row">
-                          <button type="button" className="review-card__place-anchor" onClick={() => onOpenPlace(review.placeId)}>
-                            <strong className="review-card__title">{review.placeName}</strong>
-                          </button>
-                          <span className="review-card__mood-inline">{review.mood}</span>
-                        </div>
-                      </div>
-                      <p className="review-card__corner-meta">{review.visitedAt}</p>
-                    </div>
-                    <div className="review-card__tag-row">
-                      <span className="review-card__visit-pill">{review.visitLabel}</span>
-                      {review.hasPublishedRoute && <span className="soft-tag">연속 여행 기록</span>}
-                      <span className="soft-tag">{review.badge}</span>
-                    </div>
-                    {editingReviewId === review.id ? (
-                      <div className="route-builder-form review-edit-form">
-                        <ReviewFormFields
-                          moodOptions={reviewMoodOptions}
-                          mood={editingReviewMood}
-                          onMoodChange={setEditingReviewMood}
-                          body={editingReviewBody}
-                          onBodyChange={setEditingReviewBody}
-                          file={editingReviewFile}
-                          onFileChange={(nextFile) => {
-                            setEditingReviewFile(nextFile);
-                            if (nextFile) {
-                              setEditingReviewRemoveImage(false);
-                            }
-                          }}
-                          disabled={reviewUpdatingId === review.id}
-                          bodyLabel="피드 내용"
-                          fileLabel="피드 이미지"
-                          existingImageUrl={review.imageUrl}
-                          existingImageAlt={`${review.placeName} 기존 피드 이미지`}
-                          removeImage={editingReviewRemoveImage}
-                          onToggleRemoveImage={review.imageUrl ? (() => {
-                            setEditingReviewRemoveImage((current) => !current);
-                            setEditingReviewFile(null);
-                          }) : undefined}
-                        />
-                        {reviewEditError ? <p className="form-error-copy">{reviewEditError}</p> : null}
-                        <div className="review-card__actions review-card__actions--my-feed">
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            onClick={cancelEditingReview}
-                            disabled={reviewUpdatingId === review.id}
-                          >
-                            취소
-                          </button>
-                          <button
-                            type="button"
-                            className="primary-button"
-                            disabled={reviewUpdatingId === review.id || editingReviewBody.trim().length < 4}
-                            onClick={() => {
-                              setReviewUpdatingId(review.id);
-                              setReviewEditError(null);
-                              void onUpdateReview(review.id, {
-                                body: editingReviewBody.trim(),
-                                mood: editingReviewMood,
-                                file: editingReviewFile,
-                                removeImage: editingReviewRemoveImage,
-                              })
-                                .then(() => {
-                                  cancelEditingReview();
-                                })
-                                .catch((error) => {
-                                  setReviewEditError(error instanceof Error ? error.message : '피드를 수정하지 못했어요.');
-                                })
-                                .finally(() => {
-                                  setReviewUpdatingId(null);
-                                });
-                            }}
-                          >
-                            {reviewUpdatingId === review.id ? '저장 중' : '수정 저장'}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <p className="review-card__body">{review.body}</p>
-                        <div className="review-card__actions review-card__actions--my-feed">
-                          <button type="button" className="review-card__place-link" onClick={() => onOpenReview(review.id)}>내 피드 보기</button>
-                          <button type="button" className="review-card__place-link" onClick={() => startEditingReview(review)}>수정</button>
-                          <button type="button" className="review-card__place-link review-card__place-link--danger" onClick={() => void onDeleteReview(review.id)}>삭제</button>
-                        </div>
-                      </>
-                    )}
-                  </article>
-                ))}
-                {myPage.reviews.length === 0 && <p className="empty-copy">아직 작성한 피드가 없어요.</p>}
-              </div>
+              <MyFeedTabSection
+                reviews={myPage.reviews}
+                onOpenPlace={onOpenPlace}
+                onOpenReview={onOpenReview}
+                onUpdateReview={onUpdateReview}
+                onDeleteReview={onDeleteReview}
+              />
             )}
 
             {activeTab === 'comments' && (
-              <div className="review-stack">
-                {myPage.comments.map((comment) => (
-                  <article key={comment.id} className="review-card review-card--comment-log">
-                    <div className="review-card__top review-card__top--comment-log">
-                      <div className="review-card__title-block review-card__title-block--comment-log">
-                        <p className="review-card__label review-card__label--comment-log">내 댓글</p>
-                        <p className="review-card__body review-card__body--comment-log">{comment.body}</p>
-                        <p className="review-card__meta-line">{comment.parentId ? '답글 남김' : '댓글 남김'} · {comment.createdAt}</p>
-                        <button type="button" className="review-card__place-anchor" onClick={() => onOpenPlace(comment.placeId)}>
-                          <strong>{comment.placeName}</strong>
-                        </button>
-                      </div>
-                    </div>
-                    <p className="review-card__context-line">피드 원문 · {comment.reviewBody}</p>
-                    <button type="button" className="review-card__place-link" onClick={() => onOpenComment(comment.reviewId, comment.id)}>
-                      내 댓글 보기
-                    </button>
-                  </article>
-                ))}
-                {myPage.comments.length === 0 && <p className="empty-copy">아직 작성한 댓글이 없어요.</p>}
-              </div>
+              <MyCommentsTabSection
+                comments={myPage.comments}
+                commentsHasMore={commentsHasMore}
+                commentsLoadingMore={commentsLoadingMore}
+                commentsLoadMoreRef={commentsLoadMoreRef}
+                onOpenPlace={onOpenPlace}
+                onOpenComment={onOpenComment}
+              />
             )}
 
             {activeTab === 'routes' && (
-              <div className="stack-gap">
-                <div className="review-stack">
-                  {unpublishedSessions.map((session) => {
-                    const draft = readDraft(session);
-                    return (
-                      <article key={session.id} className="community-route-card community-route-card--draft">
-                        <div className="community-route-card__header">
-                          <div>
-                            <p className="eyebrow">TRAVEL SESSION</p>
-                            <h4>{session.durationLabel}</h4>
-                          </div>
-                          <span className="counter-pill">스탬프 {session.stampCount}개</span>
-                        </div>
-                        <div className="course-card__places community-route-places">
-                          {session.placeIds.map((placeId, index) => (
-                            <button key={`${session.id}-${placeId}`} type="button" className="soft-tag soft-tag--button course-card__place" onClick={() => onOpenPlace(placeId)}>
-                              {index + 1}. {session.placeNames[index] ?? placeId}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="route-builder-form">
-                          <label className="route-builder-field">
-                            <span>코스 제목</span>
-                            <input value={draft.title} onChange={(event) => updateDraft(session.id, { title: event.target.value }, session)} />
-                          </label>
-                          <label className="route-builder-field">
-                            <span>한 줄 설명</span>
-                            <textarea rows={3} value={draft.description} onChange={(event) => updateDraft(session.id, { description: event.target.value }, session)} />
-                          </label>
-                          <div className="chip-row compact-gap">
-                            {routeMoodOptions.map((mood) => (
-                              <button key={mood} type="button" className={draft.mood === mood ? 'chip is-active' : 'chip'} onClick={() => updateDraft(session.id, { mood }, session)}>
-                                {mood}
-                              </button>
-                            ))}
-                          </div>
-                          <button
-                            type="button"
-                            className="primary-button route-submit-button"
-                            disabled={routeSubmitting || draft.title.trim().length < 2 || draft.description.trim().length < 8}
-                            onClick={() =>
-                              void onPublishRoute({
-                                travelSessionId: session.id,
-                                title: draft.title.trim(),
-                                description: draft.description.trim(),
-                                mood: draft.mood,
-                              })
-                            }
-                          >
-                            {routeSubmitting ? '발행 중' : '코스로 발행'}
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })}
-                  {unpublishedSessions.length === 0 && <p className="empty-copy">아직 코스로 묶을 수 있는 여행 세션이 없어요.</p>}
-                </div>
-
-                {routeError && <p className="form-error-copy">{routeError}</p>}
-
-                <div className="review-stack">
-                  {myPage.routes.map((route) => (
-                    <article key={route.id} className="community-route-card community-route-card--my">
-                      <div className="community-route-card__header community-route-card__header--feedlike">
-                        <div className="community-route-card__title-block">
-                          <div className="community-route-card__tag-row">
-                            <span className="soft-tag">발행 완료</span>
-                          </div>
-                          <h4>{route.title}</h4>
-                          <p className="community-route-meta community-route-meta--inline">{route.createdAt}</p>
-                        </div>
-                        <span className="review-action-button review-action-button--static community-like-button" aria-hidden="true">
-                          <span className="review-action-button__icon"><HeartIcon filled={true} /></span>
-                          <span className="review-action-button__label">{route.likeCount}</span>
-                        </span>
-                      </div>
-                      <p>{route.description}</p>
-                      <div className="course-card__places community-route-places">
-                        {route.placeIds.map((placeId, index) => (
-                          <button key={`${route.id}-${placeId}`} type="button" className="soft-tag soft-tag--button course-card__place" onClick={() => onOpenPlace(placeId)}>
-                            {index + 1}. {route.placeNames[index] ?? placeId}
-                          </button>
-                        ))}
-                      </div>
-                    </article>
-                  ))}
-                  {myPage.routes.length === 0 && <p className="empty-copy">아직 발행한 코스가 없어요.</p>}
-                </div>
-              </div>
+              <MyRoutesTabSection
+                travelSessions={myPage.travelSessions}
+                routes={myPage.routes}
+                routeSubmitting={routeSubmitting}
+                routeError={routeError}
+                onOpenPlace={onOpenPlace}
+                onPublishRoute={onPublishRoute}
+              />
             )}
             {activeTab === 'admin' && sessionUser.isAdmin && (
               <AdminPanel

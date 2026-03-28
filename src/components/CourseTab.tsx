@@ -1,20 +1,6 @@
 import { useScrollRestoration } from '../hooks/useScrollRestoration';
+import { HeartIcon } from './review/ReviewActionIcons';
 import type { CommunityRouteSort, Course, SessionUser, UserRoute } from '../types';
-
-function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" className="review-action-button__svg" aria-hidden="true">
-      <path
-        d="M12 21s-6.716-4.309-9.193-8.19C1.25 10.387 2.17 6.9 5.41 5.61c1.98-.788 4.183-.145 5.59 1.495 1.408-1.64 3.611-2.283 5.59-1.495 3.24 1.29 4.16 4.777 2.603 7.2C18.716 16.691 12 21 12 21Z"
-        fill={filled ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 interface CourseTabProps {
   courses: Course[];

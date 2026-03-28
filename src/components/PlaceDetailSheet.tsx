@@ -1,5 +1,6 @@
 ﻿import { useRef } from 'react';
 import { categoryInfo } from '../lib/categories';
+import { PlaceReviewPreviewList } from './review/PlaceReviewPreviewList';
 import { ReviewComposer } from './ReviewComposer';
 import type { ApiStatus, DrawerState, Place, Review, ReviewMood, StampLog } from '../types';
 
@@ -26,21 +27,6 @@ interface PlaceDetailSheetProps {
   onRequestLogin: () => void;
   onClaimStamp: (place: Place) => Promise<void>;
   onCreateReview: (payload: { stampId: string; body: string; mood: ReviewMood; file: File | null }) => Promise<void>;
-}
-
-function formatVisitedAt(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date);
 }
 
 export function PlaceDetailSheet({
@@ -213,27 +199,7 @@ export function PlaceDetailSheet({
           </button>
         </div>
 
-        {reviewPreview.length > 0 ? (
-          <div className="review-stack place-drawer__feed-preview">
-            {reviewPreview.map((review) => (
-              <article key={review.id} className="sheet-card place-drawer__preview-card">
-                <div className="review-card__top place-drawer__preview-top">
-                  <strong>{review.author}</strong>
-                  <span className="counter-pill counter-pill--muted">{review.badge}</span>
-                </div>
-                <p className="review-card__meta-line">
-                  {review.visitLabel} / {formatVisitedAt(review.visitedAt)}
-                </p>
-                <p className="review-card__body place-drawer__preview-body">{review.body}</p>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="sheet-card stack-gap place-drawer__preview-empty">
-            <strong>아직 등록된 피드가 없어요.</strong>
-            <p className="section-copy">오늘 방문 인증을 마친 뒤 첫 피드를 남겨 보세요.</p>
-          </div>
-        )}
+        <PlaceReviewPreviewList reviews={reviewPreview} />
       </div>
     </section>
   );
