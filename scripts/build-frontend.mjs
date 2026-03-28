@@ -191,6 +191,7 @@ async function main() {
     entryPoints: [path.join(rootDir, "src", "main.tsx")],
     bundle: true,
     outdir: assetsDir,
+    publicPath: "/assets",
     entryNames: "main-[hash]",
     chunkNames: "chunk-[hash]",
     assetNames: "asset-[hash]",

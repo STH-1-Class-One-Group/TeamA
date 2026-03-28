@@ -81,6 +81,7 @@ New-Item -ItemType Directory -Force -Path $iconsDir | Out-Null
     (Join-Path $root "src/main.tsx") `
     "--bundle" `
     "--outdir=$assetsDir" `
+    "--public-path=/assets" `
     "--entry-names=main" `
     "--format=esm" `
     "--target=es2020,chrome110,safari16" `
