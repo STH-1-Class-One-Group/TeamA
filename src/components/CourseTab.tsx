@@ -52,7 +52,11 @@ export function CourseTab({
       <header className="panel-header">
         <p className="eyebrow">COURSE</p>
         <h2>{'\uCF54\uC2A4'}</h2>
-        <p>{'\uC2A4\uD0EC\uD504 \uC774\uB825\uC73C\uB85C \uBC1C\uD589\uB41C \uACF5\uAC1C \uCF54\uC2A4\uB97C \uD6D1\uC5B4\uBCF4\uACE0, \uB9C8\uC74C\uC5D0 \uB4DC\uB294 \uB3D9\uC120\uC744 \uB2E4\uC2DC \uB530\uB77C\uAC00 \uBCF4\uC138\uC694.'}</p>
+        <p>
+          스탬프 이력으로 발행된 공개 코스를 훑어보고,
+          <br />
+          마음에 드는 동선을 다시 따라가 보세요.
+        </p>
       </header>
 
       <section className="sheet-card stack-gap">

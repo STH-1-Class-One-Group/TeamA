@@ -314,7 +314,11 @@ export function MyPagePanel({
         <div>
           <p className="eyebrow">MY PAGE</p>
           <h2>{sessionUser.nickname}님의 기록</h2>
-          <p>스탬프를 모으고 피드를 남기고, 하나의 여행 세션을 코스로 발행할 수 있어요.</p>
+          <p>
+            스탬프와 피드, 댓글을 확인할 수 있고,
+            <br />
+            하나의 여행 세션을 코스로 발행할 수 있어요.
+          </p>
         </div>
       </header>
 

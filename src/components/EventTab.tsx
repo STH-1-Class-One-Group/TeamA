@@ -49,7 +49,11 @@ export function EventTab({ festivals }: EventTabProps) {
       <header className="panel-header">
         <p className="eyebrow">EVENT</p>
         <h2>행사</h2>
-        <p>대전에서 진행 중이거나 곧 열릴 행사를 한 번에 보고 빠르게 훑어볼 수 있어요.</p>
+        <p>
+          대전에서 진행 중이거나 곧 열릴 행사를
+          <br />
+          한 번에 보고 빠르게 훑어볼 수 있어요.
+        </p>
       </header>
 
       <section className="sheet-card stack-gap">
