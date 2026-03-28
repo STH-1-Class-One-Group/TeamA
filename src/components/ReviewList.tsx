@@ -237,7 +237,7 @@ export function ReviewList({
                 <span className="review-card__mood-inline">{review.mood}</span>
               </div>
               <p className="review-card__author-line">
-                {review.author} · {review.visitLabel} · {review.visitedAt}
+                {review.author} · {review.visitedAt}
               </p>
             </div>
           </div>
@@ -248,9 +248,9 @@ export function ReviewList({
             <span className="soft-tag">{review.badge}</span>
           </div>
 
-          <p className="review-card__body">{review.body}</p>
-
           {review.imageUrl && <ReviewImageFrame src={review.imageUrl} alt={`${review.placeName} 후기 이미지`} />}
+
+          <p className="review-card__body">{review.body}</p>
 
           <div className="review-card__actions">
             <div className="review-card__action-group">
