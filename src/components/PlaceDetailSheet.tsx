@@ -1,5 +1,8 @@
 ﻿import { useRef } from 'react';
 import { categoryInfo } from '../lib/categories';
+import { PlaceBadgeRow } from './place/PlaceBadgeRow';
+import { PlaceDetailHeader } from './place/PlaceDetailHeader';
+import { PlaceProofCard } from './place/PlaceProofCard';
 import { PlaceReviewPreviewList } from './review/PlaceReviewPreviewList';
 import { ReviewComposer } from './ReviewComposer';
 import type { ApiStatus, DrawerState, Place, Review, ReviewMood, StampLog } from '../types';
@@ -106,16 +109,7 @@ export function PlaceDetailSheet({
       </button>
 
       <div className="place-drawer__content">
-        <div className="place-drawer__header">
-          <div>
-            <p className="eyebrow">PLACE</p>
-            <h2>{place.name}</h2>
-            <p className="place-drawer__summary">{place.summary}</p>
-          </div>
-          <button type="button" className="place-drawer__close" onClick={onClose} aria-label="닫기">
-            {'\u00D7'}
-          </button>
-        </div>
+        <PlaceDetailHeader name={place.name} summary={place.summary} onClose={onClose} />
 
         {place.imageUrl && (
           <div className="place-drawer__hero">
@@ -123,40 +117,26 @@ export function PlaceDetailSheet({
           </div>
         )}
 
-        <div className="place-drawer__badges">
-          <span className="counter-pill" style={{ background: categoryMeta.color, color: '#4a3140' }}>
-            {categoryMeta.icon} {categoryMeta.name}
-          </span>
-          <span className="counter-pill">{place.district}</span>
-          <span className="counter-pill">{visitLabel}</span>
-          <span className="counter-pill">누적 방문 {visitCount}회</span>
-        </div>
+        <PlaceBadgeRow
+          categoryLabel={categoryMeta.name}
+          categoryIcon={categoryMeta.icon}
+          categoryColor={categoryMeta.color}
+          district={place.district}
+          visitLabel={visitLabel}
+          visitCount={visitCount}
+        />
 
-        <div className="sheet-card place-drawer__proof-card">
-          <div className="place-drawer__proof-copy">
-            <strong>오늘 스탬프</strong>
-            <p>{stampActionMessage}</p>
-          </div>
-          <div className="place-drawer__proof-action">
-            {!loggedIn ? (
-              <>
-                <span className="place-drawer__proof-kicker">피드와 코스 시작</span>
-                <button type="button" className="primary-button place-drawer__proof-button" onClick={onRequestLogin}>
-                  로그인하고 시작
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className={todayStamp ? 'secondary-button is-complete place-drawer__proof-button' : 'primary-button place-drawer__proof-button'}
-                onClick={() => void onClaimStamp(place)}
-                disabled={!canClaimStamp || stampActionStatus === 'loading'}
-              >
-                {todayStamp ? '오늘 스탬프 완료' : stampActionStatus === 'loading' ? '확인 중' : '오늘 스탬프 찍기'}
-              </button>
-            )}
-          </div>
-        </div>
+        <PlaceProofCard
+          loggedIn={loggedIn}
+          todayStampExists={Boolean(todayStamp)}
+          canClaimStamp={canClaimStamp}
+          stampActionStatus={stampActionStatus}
+          stampActionMessage={stampActionMessage}
+          onRequestLogin={onRequestLogin}
+          onClaimStamp={() => {
+            void onClaimStamp(place);
+          }}
+        />
 
         <div className="sheet-card route-hint-box">
           <strong>이동 힌트</strong>
