@@ -874,10 +874,15 @@ input.visually-hidden[type='file'] {
 /* 2026-03-19 feed card hierarchy alignment */
 .review-card__top--feed {
   align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
 }
 
 .review-card__title-block--feed {
-  gap: 5px !important;
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
 }
 
 .review-card__title-row {
@@ -885,6 +890,42 @@ input.visually-hidden[type='file'] {
   align-items: baseline !important;
   gap: 8px !important;
   flex-wrap: wrap !important;
+  min-width: 0 !important;
+}
+
+.review-card__title {
+  font-size: 17px !important;
+  line-height: 1.18 !important;
+  letter-spacing: -0.03em !important;
+  color: var(--ink) !important;
+}
+
+.review-card__mood-inline {
+  flex: 0 0 auto !important;
+  color: rgba(216, 79, 134, 0.88) !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+  white-space: nowrap !important;
+}
+
+.review-card__author-line {
+  margin: 0 !important;
+  color: rgba(93, 77, 101, 0.74) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.review-card__corner-meta {
+  flex: 0 0 auto !important;
+  margin: 2px 0 0 !important;
+  color: rgba(93, 77, 101, 0.72) !important;
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+  font-weight: 500 !important;
+  text-align: right !important;
+  white-space: nowrap !important;
 }
 
 .review-card__tag-row {
@@ -1593,7 +1634,6 @@ body {
   padding: 0 !important;
 }
 
-<<<<<<< HEAD
 .review-card__image-frame--rotated {
   aspect-ratio: auto !important;
   height: min(320px, 78vw) !important;
@@ -1668,3 +1708,5 @@ body {
   padding: var(--review-tag-padding-block) var(--review-tag-padding-inline) !important;
   font-weight: var(--review-tag-font-weight) !important;
 }
+=======
+>>>>>>> a4d9738 (Condense review card header layout)

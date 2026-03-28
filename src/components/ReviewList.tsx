@@ -236,10 +236,8 @@ export function ReviewList({
                 <strong className="review-card__title">{review.placeName}</strong>
                 <span className="review-card__mood-inline">{review.mood}</span>
               </div>
-              <p className="review-card__author-line">
-                {review.author} · {review.visitedAt}
-              </p>
             </div>
+            <p className="review-card__corner-meta">{review.author} · {review.visitedAt}</p>
           </div>
 
           <div className="review-card__tag-row">

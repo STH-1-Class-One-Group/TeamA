@@ -505,8 +505,8 @@ export function MyPagePanel({
                           </button>
                           <span className="review-card__mood-inline">{review.mood}</span>
                         </div>
-                        <p className="review-card__author-line">{review.visitedAt}</p>
                       </div>
+                      <p className="review-card__corner-meta">{review.visitedAt}</p>
                     </div>
                     <div className="review-card__tag-row">
                       <span className="review-card__visit-pill">{review.visitLabel}</span>
