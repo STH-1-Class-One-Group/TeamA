@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jam Issue Header Logo Proof</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: start center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top left, rgba(255, 216, 231, 0.55), transparent 42%),
+          linear-gradient(180deg, #fff8fb 0%, #fffdfd 100%);
+        font-family: 'Pretendard', 'Segoe UI', sans-serif;
+        color: #3e2740;
+      }
+
+      .proof-frame {
+        width: min(100%, 360px);
+      }
+
+      .map-stage__header--brand-only {
+        display: flex;
+        justify-content: flex-start;
+      }
+
+      .map-stage__brand--row {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        max-width: none;
+        min-width: 0;
+        padding: 10px 14px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 12px 28px rgba(207, 169, 185, 0.18);
+      }
+
+      .map-stage__brand-mark {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        flex: 0 0 44px;
+        overflow: hidden;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .map-stage__brand-mark-image {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+        object-position: center;
+        transform: none;
+      }
+
+      .map-stage__brand-copy {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .map-stage__brand-kicker {
+        margin: 0;
+        font-size: 9px;
+        line-height: 1.2;
+        letter-spacing: 0.12em;
+        color: #ff6f9f;
+        font-weight: 700;
+      }
+
+      .map-stage__brand-title {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        color: #3e2740;
+        font-weight: 700;
+      }
+
+      .proof-note {
+        margin: 14px 4px 0;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #7a6271;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="proof-frame">
+      <header class="map-stage__header--brand-only">
+        <div class="map-stage__brand--row">
+          <div class="map-stage__brand-mark">
+            <img src="../src/assets/jamissue-logo.png" alt="Jam Issue logo" class="map-stage__brand-mark-image" />
+          </div>
+          <div class="map-stage__brand-copy">
+            <p class="map-stage__brand-kicker">DAEJEON LOCAL GUIDE</p>
+            <h1 class="map-stage__brand-title">JAM ISSUE</h1>
+          </div>
+        </div>
+      </header>
+      <p class="proof-note">로고 헤더만 따로 분리한 확인용 샘플입니다. API 호출 없이, 실제 적용한 이미지 자산과 같은 파일을 직접 보여줍니다.</p>
+    </main>
+  </body>
+</html>
