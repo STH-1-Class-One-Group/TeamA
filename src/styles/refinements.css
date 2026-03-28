@@ -1593,6 +1593,7 @@ body {
   padding: 0 !important;
 }
 
+<<<<<<< HEAD
 .review-card__image-frame--rotated {
   aspect-ratio: auto !important;
   height: min(320px, 78vw) !important;
