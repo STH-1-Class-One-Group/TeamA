@@ -180,6 +180,7 @@ async function main() {
     jsx: "automatic",
     loader: {
       ".css": "css",
+      ".png": "file",
       ".otf": "file",
       ".ttf": "file",
       ".woff": "file",

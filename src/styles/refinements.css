@@ -393,14 +393,22 @@ input.visually-hidden[type='file'] {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 34px !important;
-  height: 34px !important;
-  border-radius: 12px !important;
-  background: linear-gradient(145deg, #ff78a8, #ffb5cc) !important;
-  color: #fff !important;
-  font-size: 18px !important;
-  font-weight: 700 !important;
-  box-shadow: 0 8px 16px rgba(255, 127, 168, 0.22) !important;
+  width: 40px !important;
+  height: 40px !important;
+  flex: 0 0 40px !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: 0 8px 18px rgba(179, 92, 121, 0.12) !important;
+}
+
+.map-stage__brand-mark-image {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  object-fit: cover !important;
+  object-position: center 20% !important;
+  transform: scale(1.14) !important;
 }
 
 .map-stage__brand-copy {
@@ -439,10 +447,10 @@ input.visually-hidden[type='file'] {
   }
 
   .map-stage__brand-mark {
-    width: 32px !important;
-    height: 32px !important;
-    border-radius: 11px !important;
-    font-size: 17px !important;
+    width: 36px !important;
+    height: 36px !important;
+    flex-basis: 36px !important;
+    border-radius: 12px !important;
   }
 
   .map-stage__brand-title {

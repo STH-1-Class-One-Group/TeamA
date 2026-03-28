@@ -86,6 +86,7 @@ New-Item -ItemType Directory -Force -Path $iconsDir | Out-Null
     "--target=es2020,chrome110,safari16" `
     "--jsx=automatic" `
     "--loader:.css=css" `
+    "--loader:.png=file" `
     "--minify" `
     "--log-level=info"
 
