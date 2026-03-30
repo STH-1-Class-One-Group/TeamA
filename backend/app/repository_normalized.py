@@ -530,10 +530,10 @@ def create_review(db: Session, payload: ReviewCreate, user_id: str, nickname: st
     day_start = datetime.combine(today, time.min)
     day_end = day_start + timedelta(days=1)
     existing_daily_feed = db.scalars(
-        select(Feed.feed_id).where(Feed.user_id == user_id, Feed.created_at >= day_start, Feed.created_at < day_end)
+        select(Feed.feed_id).where(Feed.user_id == user_id, Feed.position_id == place.position_id, Feed.created_at >= day_start, Feed.created_at < day_end)
     ).first()
     if existing_daily_feed:
-        raise ValueError("피드는 하루에 한 번만 작성할 수 있어요.")
+        raise ValueError("같은 장소에는 하루에 한 번만 피드를 작성할 수 있어요.")
 
     user = get_or_create_user(db, user_id, nickname)
     feed = Feed(
