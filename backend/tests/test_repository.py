@@ -84,27 +84,57 @@ def test_review_comment_and_my_page_flow(tmp_path: Path):
     assert my_page.stamp_logs[0].place_id == 'hanbat-forest'
 
 
-def test_review_is_limited_to_one_per_day(tmp_path: Path):
+def test_review_allows_different_places_on_same_day(tmp_path: Path):
     session = build_session(tmp_path)
     load_seed_data(session)
 
     first_stamp_state = claim_stamp_for(session, 'user-1', 'hanbat-forest')
     create_review(
         session,
-        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(first_stamp_state, 'hanbat-forest'), body='?? ? ????.', mood='??', imageUrl=None),
+        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(first_stamp_state, 'hanbat-forest'), body='한밭 숲 방문했어요.', mood='설렘', imageUrl=None),
         'user-1',
-        '??',
+        '민서',
     )
 
     second_stamp_state = claim_stamp_for(session, 'user-1', 'expo-bridge')
 
+    # 같은 날이더라도 다른 장소라면 피드 작성이 허용되어야 함
     blocked = False
     try:
         create_review(
             session,
-            ReviewCreate(placeId='expo-bridge', stampId=stamp_id_for_place(second_stamp_state, 'expo-bridge'), body='?? ? ?? ????.', mood='???', imageUrl=None),
+            ReviewCreate(placeId='expo-bridge', stampId=stamp_id_for_place(second_stamp_state, 'expo-bridge'), body='엑스포 다리도 왔어요.', mood='친구랑', imageUrl=None),
             'user-1',
-            '??',
+            '민서',
+        )
+    except ValueError:
+        blocked = True
+
+    assert blocked is False
+
+
+def test_review_is_limited_to_one_per_place_per_day(tmp_path: Path):
+    session = build_session(tmp_path)
+    load_seed_data(session)
+
+    stamp_state = claim_stamp_for(session, 'user-1', 'hanbat-forest')
+    create_review(
+        session,
+        ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(stamp_state, 'hanbat-forest'), body='한밭 숲 첫 번째 피드.', mood='설렘', imageUrl=None),
+        'user-1',
+        '민서',
+    )
+
+    second_stamp_state = claim_stamp_for(session, 'user-1', 'hanbat-forest')
+
+    # 같은 날, 같은 장소에서 다시 피드를 작성하면 차단되어야 함
+    blocked = False
+    try:
+        create_review(
+            session,
+            ReviewCreate(placeId='hanbat-forest', stampId=stamp_id_for_place(second_stamp_state, 'hanbat-forest'), body='한밭 숲 중복 피드.', mood='설렘', imageUrl=None),
+            'user-1',
+            '민서',
         )
     except ValueError:
         blocked = True
