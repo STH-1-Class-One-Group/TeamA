@@ -130,7 +130,7 @@ export function clearAuthQueryParams() {
   params.delete('reason');
   const nextQuery = params.toString();
   const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}`;
-  window.history.replaceState({}, '', nextUrl);
+  window.history.replaceState(window.history.state ?? {}, '', nextUrl);
 }
 
 export function getLoginReturnUrl() {

@@ -594,6 +594,7 @@ export default function App() {
   });
 
   const { canNavigateBack, handleNavigateBack, handleBottomNavChange } = useAppShellNavigation({
+    sessionUser,
     returnView,
     activeCommentReviewId,
     activeTab,

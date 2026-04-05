@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppShellNavigation } from '../../src/hooks/useAppShellNavigation';
-import type { RoutePreview } from '../../src/types';
+import type { RoutePreview, SessionUser } from '../../src/types';
 
 const routePreview: RoutePreview = {
   id: 'route-1',
@@ -12,6 +12,15 @@ const routePreview: RoutePreview = {
 };
 
 describe('useAppShellNavigation', () => {
+  const sessionUser: SessionUser = {
+    id: 'user-1',
+    nickname: 'tester',
+    role: 'user',
+    profileCompletedAt: '2026-04-05T00:00:00Z',
+    linkedProviders: [],
+    isAdmin: false,
+  };
+
   beforeEach(() => {
     window.history.pushState({ tab: 'course' }, '', '/?tab=course');
   });
@@ -21,6 +30,7 @@ describe('useAppShellNavigation', () => {
     const setReturnView = vi.fn();
 
     const navigation = useAppShellNavigation({
+      sessionUser: null,
       returnView: {
         tab: 'course',
         myPageTab: 'stamps',
@@ -54,5 +64,44 @@ describe('useAppShellNavigation', () => {
 
     expect(historyBack).toHaveBeenCalledTimes(1);
     expect(setReturnView).not.toHaveBeenCalled();
+  });
+
+  it('keeps authenticated my-page back navigation inside the app shell', () => {
+    const historyBack = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    const goToTab = vi.fn();
+    const setFeedPlaceFilterId = vi.fn();
+    const setHighlightedCommentId = vi.fn();
+    const setHighlightedReviewId = vi.fn();
+    const setReturnView = vi.fn();
+
+    const navigation = useAppShellNavigation({
+      sessionUser,
+      returnView: null,
+      activeCommentReviewId: null,
+      activeTab: 'my',
+      selectedPlaceId: null,
+      selectedFestivalId: null,
+      drawerState: 'closed',
+      selectedRoutePreview: null,
+      setMyPageTab: vi.fn(),
+      setActiveCommentReviewId: vi.fn(),
+      setHighlightedCommentId,
+      setHighlightedReviewId,
+      setFeedPlaceFilterId,
+      setSelectedRoutePreview: vi.fn(),
+      setReturnView,
+      handleCloseReviewComments: vi.fn(),
+      goToTab,
+      commitRouteState: vi.fn(),
+    });
+
+    navigation.handleNavigateBack();
+
+    expect(historyBack).not.toHaveBeenCalled();
+    expect(setHighlightedCommentId).toHaveBeenCalledWith(null);
+    expect(setHighlightedReviewId).toHaveBeenCalledWith(null);
+    expect(setFeedPlaceFilterId).toHaveBeenCalledWith(null);
+    expect(setReturnView).toHaveBeenCalledWith(null);
+    expect(goToTab).toHaveBeenCalledWith('map', 'replace');
   });
 });

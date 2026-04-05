@@ -1,8 +1,9 @@
-import type { DrawerState, MyPageTabKey, RoutePreview, Tab } from '../types';
+import type { DrawerState, MyPageTabKey, RoutePreview, SessionUser, Tab } from '../types';
 import type { ReturnViewState } from '../store/app-ui-store';
 import type { RouteStateCommitOptions } from './useAppRouteState';
 
 interface UseAppShellNavigationParams {
+  sessionUser: SessionUser | null;
   returnView: ReturnViewState | null;
   activeCommentReviewId: string | null;
   activeTab: Tab;
@@ -27,6 +28,7 @@ interface UseAppShellNavigationParams {
 }
 
 export function useAppShellNavigation({
+  sessionUser,
   returnView,
   activeCommentReviewId,
   activeTab,
@@ -60,6 +62,15 @@ export function useAppShellNavigation({
       && (selectedPlaceId !== null || selectedFestivalId !== null || drawerState !== 'closed' || selectedRoutePreview !== null)
       && typeof window !== 'undefined'
       && window.history.length > 1;
+    const shouldClampAuthenticatedMyPageBack =
+      sessionUser !== null
+      && activeTab === 'my'
+      && returnView === null
+      && activeCommentReviewId === null
+      && selectedPlaceId === null
+      && selectedFestivalId === null
+      && drawerState === 'closed'
+      && selectedRoutePreview === null;
 
     if (hasBrowserBackStepOnMap) {
       window.history.back();
@@ -94,6 +105,15 @@ export function useAppShellNavigation({
 
     if (selectedRoutePreview) {
       setSelectedRoutePreview(null);
+      return;
+    }
+
+    if (shouldClampAuthenticatedMyPageBack) {
+      setHighlightedCommentId(null);
+      setHighlightedReviewId(null);
+      setFeedPlaceFilterId(null);
+      setReturnView(null);
+      goToTab('map', 'replace');
       return;
     }
 
