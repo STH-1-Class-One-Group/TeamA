@@ -3,6 +3,7 @@ import { claimStamp } from '../api/client';
 import { getCurrentDevicePosition } from '../lib/geolocation';
 import { formatDistanceMeters } from '../lib/visits';
 import type { ApiStatus, DrawerState, Place, SessionUser, StampState, Tab } from '../types';
+import type { RouteStateCommitOptions } from './useAppRouteState';
 
 type HistoryMode = 'push' | 'replace';
 type SetState<T> = Dispatch<SetStateAction<T>>;
@@ -21,6 +22,7 @@ interface UseAppMapActionsParams {
   commitRouteState: (
     nextState: { tab: Tab; placeId: string | null; festivalId: string | null; drawerState: DrawerState },
     historyMode?: HistoryMode,
+    options?: RouteStateCommitOptions,
   ) => void;
   refreshMyPageForUser: (user: SessionUser | null, force?: boolean) => Promise<unknown>;
   formatErrorMessage: (error: unknown) => string;

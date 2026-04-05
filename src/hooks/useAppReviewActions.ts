@@ -10,6 +10,7 @@ import {
   uploadReviewImage,
 } from '../api/client';
 import { countCommentsInThread, toReviewSummary } from '../lib/reviews';
+import type { RouteStateCommitOptions } from './useAppRouteState';
 import type {
   Comment,
   DrawerState,
@@ -48,6 +49,7 @@ interface UseAppReviewActionsParams {
   commitRouteState: (
     nextState: { tab: Tab; placeId: string | null; festivalId: string | null; drawerState: DrawerState },
     historyMode?: HistoryMode,
+    options?: RouteStateCommitOptions,
   ) => void;
   refreshMyPageForUser: (user: SessionUser | null, force?: boolean) => Promise<MyPageResponse | null>;
   patchReviewCollections: (reviewId: string, updater: (review: Review) => Review) => void;

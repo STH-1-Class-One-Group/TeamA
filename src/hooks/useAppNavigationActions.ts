@@ -2,6 +2,7 @@
 import type { MyPageTabKey, Review, RoutePreview, Tab } from '../types';
 import type { ReturnViewState } from '../store/app-ui-store';
 import type { Dispatch, SetStateAction } from 'react';
+import type { RouteStateCommitOptions } from './useAppRouteState';
 
 type SetState<T> = Dispatch<SetStateAction<T>>;
 type HistoryMode = 'push' | 'replace';
@@ -33,6 +34,7 @@ interface UseAppNavigationActionsParams {
   commitRouteState: (
     nextState: { tab: Tab; placeId: string | null; festivalId: string | null; drawerState: 'closed' | 'partial' | 'full' },
     historyMode?: HistoryMode,
+    options?: RouteStateCommitOptions,
   ) => void;
   goToTab: (nextTab: Tab, historyMode?: HistoryMode) => void;
   openPlace: (placeId: string) => void;

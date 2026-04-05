@@ -1,5 +1,6 @@
 import type { DrawerState, MyPageTabKey, RoutePreview, Tab } from '../types';
 import type { ReturnViewState } from '../store/app-ui-store';
+import type { RouteStateCommitOptions } from './useAppRouteState';
 
 interface UseAppShellNavigationParams {
   returnView: ReturnViewState | null;
@@ -21,6 +22,7 @@ interface UseAppShellNavigationParams {
   commitRouteState: (
     nextState: { tab: Tab; placeId: string | null; festivalId: string | null; drawerState: DrawerState },
     historyMode?: 'push' | 'replace',
+    options?: RouteStateCommitOptions,
   ) => void;
 }
 
@@ -54,6 +56,16 @@ export function useAppShellNavigation({
     (typeof window !== 'undefined' && window.history.length > 1);
 
   function handleNavigateBack() {
+    const hasBrowserBackStepOnMap = activeTab === 'map'
+      && (selectedPlaceId !== null || selectedFestivalId !== null || drawerState !== 'closed' || selectedRoutePreview !== null)
+      && typeof window !== 'undefined'
+      && window.history.length > 1;
+
+    if (hasBrowserBackStepOnMap) {
+      window.history.back();
+      return;
+    }
+
     if (returnView) {
       setMyPageTab(returnView.myPageTab);
       setActiveCommentReviewId(returnView.activeCommentReviewId);
@@ -75,13 +87,13 @@ export function useAppShellNavigation({
       return;
     }
 
-    if (selectedRoutePreview) {
-      setSelectedRoutePreview(null);
+    if (activeCommentReviewId !== null) {
+      handleCloseReviewComments();
       return;
     }
 
-    if (activeCommentReviewId !== null) {
-      handleCloseReviewComments();
+    if (selectedRoutePreview) {
+      setSelectedRoutePreview(null);
       return;
     }
 
@@ -112,6 +124,7 @@ export function useAppShellNavigation({
           drawerState,
         },
         'replace',
+        { routePreview: null },
       );
       return;
     }

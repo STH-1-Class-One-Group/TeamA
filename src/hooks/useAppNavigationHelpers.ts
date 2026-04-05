@@ -7,6 +7,7 @@ import type {
   RoutePreview,
   Tab,
 } from '../types';
+import type { RouteStateCommitOptions } from './useAppRouteState';
 
 interface UseAppNavigationHelpersParams {
   activeTab: Tab;
@@ -32,6 +33,7 @@ interface UseAppNavigationHelpersParams {
   commitRouteState: (
     nextState: { tab: Tab; placeId: string | null; festivalId: string | null; drawerState: DrawerState },
     historyMode?: 'push' | 'replace',
+    options?: RouteStateCommitOptions,
   ) => void;
   openPlace: (placeId: string) => void;
   openFestival: (festivalId: string) => void;
@@ -108,7 +110,11 @@ export function useAppNavigationHelpers({
     }
     setSelectedRoutePreview(route);
     handleCloseReviewComments();
-    commitRouteState({ tab: 'map', placeId: null, festivalId: null, drawerState: 'closed' }, activeTab === 'map' ? 'replace' : 'push');
+    commitRouteState(
+      { tab: 'map', placeId: null, festivalId: null, drawerState: 'closed' },
+      activeTab === 'map' ? 'replace' : 'push',
+      { routePreview: route },
+    );
   }
 
   function handleOpenPlaceWithReturn(placeId: string) {
@@ -121,7 +127,7 @@ export function useAppNavigationHelpers({
       }));
     }
     setSelectedRoutePreview(null);
-    openPlace(placeId);
+    commitRouteState({ tab: 'map', placeId, festivalId: null, drawerState: 'partial' }, 'push', { routePreview: null });
   }
 
   function handleOpenFestivalWithReturn(festivalId: string) {
@@ -129,7 +135,7 @@ export function useAppNavigationHelpers({
       setReturnView(snapshotReturnView());
     }
     setSelectedRoutePreview(null);
-    openFestival(festivalId);
+    commitRouteState({ tab: 'map', placeId: null, festivalId, drawerState: 'partial' }, 'push', { routePreview: null });
   }
 
   async function ensureReviewLoadedById(reviewId: string | null) {

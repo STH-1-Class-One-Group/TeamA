@@ -94,6 +94,8 @@ export default function App() {
   const setHighlightedCommentId = useAppUIStore((state) => state.setHighlightedCommentId);
   const highlightedReviewId = useAppUIStore((state) => state.highlightedReviewId);
   const setHighlightedReviewId = useAppUIStore((state) => state.setHighlightedReviewId);
+  const selectedRoutePreview = useAppUIStore((state) => state.selectedRoutePreview);
+  const setSelectedRoutePreview = useAppUIStore((state) => state.setSelectedRoutePreview);
   const returnView = useAppUIStore((state) => state.returnView);
   const setReturnView = useAppUIStore((state) => state.setReturnView);
   const [notice, setNotice] = useState<string | null>(getInitialNotice);
@@ -162,8 +164,6 @@ export default function App() {
     setAdminBusyPlaceId,
     adminLoading,
     setAdminLoading,
-    selectedRoutePreview,
-    setSelectedRoutePreview,
     communityRoutesCacheRef,
     placeReviewsCacheRef,
     feedLoadedRef,
@@ -622,17 +622,22 @@ export default function App() {
 
   const handleMapOpenPlace = useCallback((placeId: string) => {
     setSelectedRoutePreview(null);
-    openPlace(placeId);
-  }, [openPlace, setSelectedRoutePreview]);
+    commitRouteState({ tab: 'map', placeId, festivalId: null, drawerState: 'partial' }, 'push', { routePreview: null });
+  }, [commitRouteState, setSelectedRoutePreview]);
 
   const handleMapOpenFestival = useCallback((festivalId: string) => {
     setSelectedRoutePreview(null);
-    openFestival(festivalId);
-  }, [openFestival, setSelectedRoutePreview]);
+    commitRouteState({ tab: 'map', placeId: null, festivalId, drawerState: 'partial' }, 'push', { routePreview: null });
+  }, [commitRouteState, setSelectedRoutePreview]);
 
   const handleClearRoutePreview = useCallback(() => {
     setSelectedRoutePreview(null);
-  }, [setSelectedRoutePreview]);
+    commitRouteState(
+      { tab: 'map', placeId: selectedPlaceId, festivalId: selectedFestivalId, drawerState },
+      'replace',
+      { routePreview: null },
+    );
+  }, [commitRouteState, drawerState, selectedFestivalId, selectedPlaceId, setSelectedRoutePreview]);
 
   const handleExpandPlaceDrawer = useCallback(() => {
     if (!selectedPlace) {

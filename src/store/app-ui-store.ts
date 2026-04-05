@@ -1,5 +1,5 @@
 ﻿import { create } from 'zustand';
-import type { Category, DrawerState, MyPageTabKey, Tab } from '../types';
+import type { Category, DrawerState, MyPageTabKey, RoutePreview, Tab } from '../types';
 
 export type ReturnViewState = {
   tab: Tab;
@@ -30,6 +30,7 @@ type AppUIState = {
   activeCommentReviewId: string | null;
   highlightedCommentId: string | null;
   highlightedReviewId: string | null;
+  selectedRoutePreview: RoutePreview | null;
   returnView: ReturnViewState | null;
   setActiveTab: (value: SetterValue<Tab>) => void;
   setDrawerState: (value: SetterValue<DrawerState>) => void;
@@ -41,6 +42,7 @@ type AppUIState = {
   setActiveCommentReviewId: (value: SetterValue<string | null>) => void;
   setHighlightedCommentId: (value: SetterValue<string | null>) => void;
   setHighlightedReviewId: (value: SetterValue<string | null>) => void;
+  setSelectedRoutePreview: (value: SetterValue<RoutePreview | null>) => void;
   setReturnView: (value: SetterValue<ReturnViewState | null>) => void;
 };
 
@@ -55,6 +57,7 @@ export const useAppUIStore = create<AppUIState>((set) => ({
   activeCommentReviewId: null,
   highlightedCommentId: null,
   highlightedReviewId: null,
+  selectedRoutePreview: null,
   returnView: null,
   setActiveTab: (value) => set((state) => ({ activeTab: resolveValue(value, state.activeTab) })),
   setDrawerState: (value) => set((state) => ({ drawerState: resolveValue(value, state.drawerState) })),
@@ -66,5 +69,6 @@ export const useAppUIStore = create<AppUIState>((set) => ({
   setActiveCommentReviewId: (value) => set((state) => ({ activeCommentReviewId: resolveValue(value, state.activeCommentReviewId) })),
   setHighlightedCommentId: (value) => set((state) => ({ highlightedCommentId: resolveValue(value, state.highlightedCommentId) })),
   setHighlightedReviewId: (value) => set((state) => ({ highlightedReviewId: resolveValue(value, state.highlightedReviewId) })),
+  setSelectedRoutePreview: (value) => set((state) => ({ selectedRoutePreview: resolveValue(value, state.selectedRoutePreview) })),
   setReturnView: (value) => set((state) => ({ returnView: resolveValue(value, state.returnView) })),
 }));

@@ -7,7 +7,6 @@ import type {
   CommunityRouteSort,
   FestivalItem,
   MyPageResponse,
-  RoutePreview,
   SessionUser,
   UserRoute,
 } from '../types';
@@ -39,8 +38,6 @@ export function useAppDataState(selectedPlaceId: string | null) {
   const [adminSummary, setAdminSummary] = useState<AdminSummaryResponse | null>(null);
   const [adminBusyPlaceId, setAdminBusyPlaceId] = useState<string | null>(null);
   const [adminLoading, setAdminLoading] = useState(false);
-  const [selectedRoutePreview, setSelectedRoutePreview] = useState<RoutePreview | null>(null);
-
   const communityRoutesCacheRef = useRef<Partial<Record<CommunityRouteSort, UserRoute[]>>>({});
   const placeReviewsCacheRef = useRef<Record<string, BootstrapResponse['reviews']>>({});
   const feedLoadedRef = useRef(false);
@@ -126,8 +123,6 @@ export function useAppDataState(selectedPlaceId: string | null) {
     setAdminBusyPlaceId,
     adminLoading,
     setAdminLoading,
-    selectedRoutePreview,
-    setSelectedRoutePreview,
     communityRoutesCacheRef,
     placeReviewsCacheRef,
     feedLoadedRef,

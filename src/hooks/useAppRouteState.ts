@@ -1,12 +1,20 @@
 ﻿import { useCallback, useEffect } from 'react';
 import { useAppUIStore } from '../store/app-ui-store';
-import type { DrawerState, Tab } from '../types';
+import type { DrawerState, RoutePreview, Tab } from '../types';
 
 export type RouteState = {
   tab: Tab;
   placeId: string | null;
   festivalId: string | null;
   drawerState: DrawerState;
+};
+
+export type AppHistoryState = RouteState & {
+  routePreview: RoutePreview | null;
+};
+
+export type RouteStateCommitOptions = {
+  routePreview?: RoutePreview | null;
 };
 
 const validTabs: Tab[] = ['map', 'event', 'feed', 'course', 'my'];
@@ -29,6 +37,36 @@ export function getInitialRouteState(): RouteState {
     placeId: placeId || null,
     festivalId: festivalId || null,
     drawerState: resolvedDrawer,
+  };
+}
+
+function isRoutePreview(value: unknown): value is RoutePreview {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<RoutePreview>;
+  return typeof candidate.id === 'string'
+    && typeof candidate.title === 'string'
+    && typeof candidate.subtitle === 'string'
+    && typeof candidate.mood === 'string'
+    && Array.isArray(candidate.placeIds)
+    && Array.isArray(candidate.placeNames);
+}
+
+export function getRoutePreviewFromHistoryState(historyState: unknown): RoutePreview | null {
+  if (!historyState || typeof historyState !== 'object') {
+    return null;
+  }
+
+  const routePreview = (historyState as Partial<AppHistoryState>).routePreview;
+  return isRoutePreview(routePreview) ? routePreview : null;
+}
+
+export function buildHistoryState(routeState: RouteState, routePreview: RoutePreview | null): AppHistoryState {
+  return {
+    ...routeState,
+    routePreview: routePreview ?? null,
   };
 }
 
@@ -153,6 +191,7 @@ function initializeRouteStore() {
     selectedPlaceId: routeState.tab === 'map' ? routeState.placeId : null,
     selectedFestivalId: routeState.tab === 'map' ? routeState.festivalId : null,
     drawerState: routeState.tab === 'map' ? routeState.drawerState : 'closed',
+    selectedRoutePreview: getRoutePreviewFromHistoryState(window.history.state),
   });
   routeStoreInitialized = true;
 }
@@ -164,34 +203,42 @@ export function useAppRouteState() {
   const drawerState = useAppUIStore((state) => state.drawerState);
   const selectedPlaceId = useAppUIStore((state) => state.selectedPlaceId);
   const selectedFestivalId = useAppUIStore((state) => state.selectedFestivalId);
+  const selectedRoutePreview = useAppUIStore((state) => state.selectedRoutePreview);
   const setActiveTab = useAppUIStore((state) => state.setActiveTab);
   const setDrawerState = useAppUIStore((state) => state.setDrawerState);
   const setSelectedPlaceId = useAppUIStore((state) => state.setSelectedPlaceId);
   const setSelectedFestivalId = useAppUIStore((state) => state.setSelectedFestivalId);
+  const setSelectedRoutePreview = useAppUIStore((state) => state.setSelectedRoutePreview);
 
-  const applyRouteState = useCallback((routeState: RouteState) => {
+  const applyRouteState = useCallback((routeState: RouteState, routePreview: RoutePreview | null = null) => {
     setActiveTab(routeState.tab);
     setSelectedPlaceId(routeState.tab === 'map' ? routeState.placeId : null);
     setSelectedFestivalId(routeState.tab === 'map' ? routeState.festivalId : null);
     setDrawerState(routeState.tab === 'map' ? routeState.drawerState : 'closed');
-  }, [setActiveTab, setDrawerState, setSelectedFestivalId, setSelectedPlaceId]);
+    setSelectedRoutePreview(routeState.tab === 'map' ? routePreview : null);
+  }, [setActiveTab, setDrawerState, setSelectedFestivalId, setSelectedPlaceId, setSelectedRoutePreview]);
 
   const commitRouteState = useCallback(
-    (routeState: RouteState, mode: 'push' | 'replace' = 'push') => {
-      applyRouteState(routeState);
+    (routeState: RouteState, mode: 'push' | 'replace' = 'push', options?: RouteStateCommitOptions) => {
+      const requestedRoutePreview = options && Object.prototype.hasOwnProperty.call(options, 'routePreview')
+        ? options.routePreview ?? null
+        : selectedRoutePreview;
+      const nextRoutePreview = routeState.tab === 'map' ? requestedRoutePreview : null;
+      applyRouteState(routeState, nextRoutePreview);
       if (typeof window === 'undefined') {
         return;
       }
 
       const nextUrl = buildRouteUrl(routeState);
+      const nextHistoryState = buildHistoryState(routeState, nextRoutePreview);
       if (mode === 'replace') {
-        window.history.replaceState(routeState, '', nextUrl);
+        window.history.replaceState(nextHistoryState, '', nextUrl);
         return;
       }
 
-      window.history.pushState(routeState, '', nextUrl);
+      window.history.pushState(nextHistoryState, '', nextUrl);
     },
-    [applyRouteState],
+    [applyRouteState, selectedRoutePreview],
   );
 
   const goToTab = useCallback(
@@ -204,6 +251,7 @@ export function useAppRouteState() {
           drawerState: 'closed',
         },
         mode,
+        { routePreview: null },
       );
     },
     [commitRouteState],
@@ -247,8 +295,8 @@ export function useAppRouteState() {
       return undefined;
     }
 
-    const handlePopState = () => {
-      applyRouteState(getInitialRouteState());
+    const handlePopState = (event: PopStateEvent) => {
+      applyRouteState(getInitialRouteState(), getRoutePreviewFromHistoryState(event.state));
     };
 
     window.addEventListener('popstate', handlePopState);

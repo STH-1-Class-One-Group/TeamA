@@ -19,6 +19,7 @@ import {
 } from '../api/client';
 import { countCommentsInThread } from '../lib/reviews';
 import { getCurrentDevicePosition } from '../lib/geolocation';
+import type { RouteStateCommitOptions } from './useAppRouteState';
 import type {
   AdminSummaryResponse,
   DrawerState,
@@ -65,6 +66,7 @@ interface UseAppMutationActionsParams {
   commitRouteState: (
     nextState: { tab: Tab; placeId: string | null; festivalId: string | null; drawerState: DrawerState },
     historyMode?: HistoryMode,
+    options?: RouteStateCommitOptions,
   ) => void;
   goToTab: (nextTab: Tab, historyMode?: HistoryMode) => void;
   patchReviewCollections: (reviewId: string, updater: (review: Review) => Review) => void;
