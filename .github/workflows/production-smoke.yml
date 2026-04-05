@@ -1,24 +1,121 @@
 name: production-smoke
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows:
+      - cloudflare-pages
+      - cloudflare-worker
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   smoke:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.conclusion == 'success'
+      )
     runs-on: ubuntu-latest
     env:
       SMOKE_BASE_URL: https://daejeon.jamissue.com
-      SMOKE_DEPLOY_WAIT_MS: 60000
+      SMOKE_DEPLOY_WAIT_MS: 0
       SMOKE_RETRY_ATTEMPTS: 5
       SMOKE_RETRY_DELAY_MS: 15000
+      REQUIRED_WORKFLOWS: cloudflare-pages,cloudflare-worker
+      WORKFLOW_RUN_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
+      WORKFLOW_RUN_BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || github.event.workflow_run.head_branch }}
     steps:
+      - uses: actions/github-script@v7
+        id: await-deployments
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = process.env.WORKFLOW_RUN_SHA;
+            const branch = process.env.WORKFLOW_RUN_BRANCH;
+            const workflowNames = process.env.REQUIRED_WORKFLOWS.split(',').map((name) => name.trim()).filter(Boolean);
+            const maxAttempts = 30;
+            const delayMs = 15000;
+
+            if (!sha) {
+              core.setFailed('Missing workflow head SHA for smoke run.');
+              return;
+            }
+
+            const workflowIds = new Map();
+            const { data: workflowData } = await github.rest.actions.listRepoWorkflows({
+              owner,
+              repo,
+              per_page: 100,
+            });
+
+            for (const workflow of workflowData.workflows) {
+              workflowIds.set(workflow.name, workflow.id);
+            }
+
+            for (const name of workflowNames) {
+              if (!workflowIds.has(name)) {
+                core.setFailed(`Required workflow "${name}" was not found.`);
+                return;
+              }
+            }
+
+            async function getLatestRun(name) {
+              const workflow_id = workflowIds.get(name);
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id,
+                branch,
+                event: 'push',
+                per_page: 20,
+              });
+              return data.workflow_runs.find((run) => run.head_sha === sha) || null;
+            }
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+              const states = [];
+
+              for (const name of workflowNames) {
+                const run = await getLatestRun(name);
+                states.push({
+                  name,
+                  status: run?.status || 'missing',
+                  conclusion: run?.conclusion || 'missing',
+                  url: run?.html_url || null,
+                });
+              }
+
+              core.info(`Deployment workflow states for ${sha}: ${JSON.stringify(states)}`);
+
+              const failed = states.find((state) => state.conclusion && state.conclusion !== 'success' && state.conclusion !== 'missing');
+              if (failed) {
+                core.setFailed(`Required workflow "${failed.name}" finished with conclusion "${failed.conclusion}". ${failed.url || ''}`.trim());
+                return;
+              }
+
+              const pending = states.filter((state) => state.status !== 'completed' || state.conclusion === 'missing');
+              if (pending.length === 0) {
+                return;
+              }
+
+              if (attempt === maxAttempts) {
+                core.setFailed(`Timed out waiting for deployment workflows for ${sha}: ${JSON.stringify(pending)}`);
+                return;
+              }
+
+              await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.WORKFLOW_RUN_SHA }}
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
