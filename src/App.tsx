@@ -700,7 +700,7 @@ export default function App() {
             <GlobalStatusBanner tone={globalStatus.tone} message={globalStatus.message} layout={activeTab === 'map' ? 'map' : 'page'} />
           </div>
         )}
-        <div className={activeTab === 'map' ? 'phone-shell__utility-slot phone-shell__utility-slot--map' : 'phone-shell__utility-slot'}>
+        <div className="phone-shell__utility-slot">
           <GlobalFeedbackButton />
           {sessionUser && hydratedMyPage && (
             <GlobalNotificationCenter

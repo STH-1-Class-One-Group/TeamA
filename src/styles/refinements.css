@@ -464,14 +464,8 @@ input.visually-hidden[type='file'] {
   }
 }
 
-.phone-shell__utility-slot--map {
-  top: 18px !important;
-  right: 22px !important;
-  gap: 12px !important;
-}
-
-.phone-shell__utility-slot--map .feedback-button,
-.phone-shell__utility-slot--map .notification-bell {
+.phone-shell--map .phone-shell__utility-slot .feedback-button,
+.phone-shell--map .phone-shell__utility-slot .notification-bell {
   background: rgba(255, 252, 249, 0.98) !important;
   border-color: rgba(255, 197, 217, 0.62) !important;
   box-shadow: 0 12px 24px rgba(255, 143, 183, 0.12) !important;
