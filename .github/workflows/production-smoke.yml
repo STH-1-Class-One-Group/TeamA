@@ -14,7 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SMOKE_BASE_URL: https://daejeon.jamissue.com
-      SMOKE_API_BASE_URL: https://api.daejeon.jamissue.com
       SMOKE_DEPLOY_WAIT_MS: 60000
       SMOKE_RETRY_ATTEMPTS: 5
       SMOKE_RETRY_DELAY_MS: 15000

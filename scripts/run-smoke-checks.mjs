@@ -1,5 +1,9 @@
-const baseUrl = (process.env.SMOKE_BASE_URL || "https://daejeon.jamissue.com").replace(/\/$/, "");
-const apiBaseUrl = (process.env.SMOKE_API_BASE_URL || "https://api.daejeon.jamissue.com").replace(/\/$/, "");
+const DEFAULT_BASE_URL = "https://daejeon.jamissue.com";
+const DEFAULT_API_BASE_URL = "https://api.daejeon.jamissue.com";
+const DEFAULT_BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36";
+const baseUrl = (process.env.SMOKE_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
+const configuredApiBaseUrl = (process.env.SMOKE_API_BASE_URL || "").replace(/\/$/, "");
 const timeoutMs = Number(process.env.SMOKE_TIMEOUT_MS || 15000);
 const deployWaitMs = Number(process.env.SMOKE_DEPLOY_WAIT_MS || 0);
 const retryAttempts = Math.max(1, Number(process.env.SMOKE_RETRY_ATTEMPTS || 4));
@@ -17,12 +21,27 @@ function withTimeout(promise, label) {
     .finally(() => clearTimeout(timer));
 }
 
+export function buildRequestHeaders(accept) {
+  return {
+    "accept": accept,
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "user-agent": DEFAULT_BROWSER_USER_AGENT,
+  };
+}
+
 async function fetchText(url, init = {}) {
+  const headers = {
+    ...buildRequestHeaders("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"),
+    ...(init.headers || {}),
+  };
   return withTimeout(
     async (signal) => {
       const response = await fetch(url, {
         redirect: "manual",
         ...init,
+        headers,
         signal,
       });
       const text = await response.text();
@@ -33,16 +52,52 @@ async function fetchText(url, init = {}) {
 }
 
 async function fetchJson(url, init = {}) {
-  const { response, text } = await fetchText(url, init);
+  const { response, text } = await fetchText(url, {
+    ...init,
+    headers: {
+      ...buildRequestHeaders("application/json,text/plain,*/*"),
+      ...(init.headers || {}),
+    },
+  });
   let json = null;
   if (text) {
     try {
       json = JSON.parse(text);
     } catch (error) {
-      throw new Error(`${url} returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+      const contentType = response.headers.get("content-type") || "unknown";
+      const snippet = text.slice(0, 120).replace(/\s+/g, " ").trim();
+      throw new Error(
+        `${url} returned invalid JSON (status ${response.status}, content-type ${contentType}): ${
+          error instanceof Error ? error.message : String(error)
+        }${snippet ? `; body starts with "${snippet}"` : ""}`,
+      );
     }
   }
   return { response, json, text };
+}
+
+export function parseRuntimeConfig(scriptText) {
+  const match = scriptText.match(/window\.__JAMISSUE_CONFIG__\s*=\s*(\{[\s\S]*?\})\s*;?\s*$/);
+  if (!match) {
+    throw new Error("runtime config bootstrap is missing");
+  }
+  return JSON.parse(match[1]);
+}
+
+function normalizeUrl(url) {
+  return String(url || "").replace(/\/$/, "");
+}
+
+export function resolveApiBaseUrl({ runtimeConfig, configuredApiBaseUrl: configuredUrl, defaultApiBaseUrl = DEFAULT_API_BASE_URL }) {
+  const runtimeApiBaseUrl = normalizeUrl(runtimeConfig?.apiBaseUrl);
+  const overrideApiBaseUrl = normalizeUrl(configuredUrl);
+  if (runtimeApiBaseUrl) {
+    return runtimeApiBaseUrl;
+  }
+  if (overrideApiBaseUrl) {
+    return overrideApiBaseUrl;
+  }
+  return normalizeUrl(defaultApiBaseUrl);
 }
 
 function assert(condition, message) {
@@ -124,6 +179,28 @@ async function main() {
     await sleep(deployWaitMs);
   }
 
+  let runtimeConfig = null;
+  let appConfigResult = null;
+  try {
+    appConfigResult = await fetchText(`${baseUrl}/app-config.js`, {
+      headers: buildRequestHeaders("application/javascript,text/javascript,text/plain,*/*"),
+    });
+    if (appConfigResult.response.status === 200) {
+      runtimeConfig = parseRuntimeConfig(appConfigResult.text);
+    }
+  } catch (error) {
+    appConfigResult = {
+      response: null,
+      text: "",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  const apiBaseUrl = resolveApiBaseUrl({
+    runtimeConfig,
+    configuredApiBaseUrl,
+  });
+
   const checks = [
     { name: "frontend-root", run: () => runCheck("frontend-root", async () => {
       const { response, text } = await fetchText(`${baseUrl}/`);
@@ -131,7 +208,11 @@ async function main() {
       assert(/<div id="root"><\/div>/i.test(text), "root mount node is missing");
     }) },
     { name: "frontend-app-config", run: () => runCheck("frontend-app-config", async () => {
-      const { response, text } = await fetchText(`${baseUrl}/app-config.js`);
+      const response = appConfigResult?.response;
+      const text = appConfigResult?.text || "";
+      if (!response) {
+        throw new Error(appConfigResult?.error || "app-config.js could not be fetched");
+      }
       assert(response.status === 200, `expected 200, received ${response.status}`);
       assert(text.includes("window.__JAMISSUE_CONFIG__"), "runtime config bootstrap is missing");
       assert(text.includes('"apiBaseUrl"'), "apiBaseUrl is missing from runtime config");
@@ -181,6 +262,8 @@ async function main() {
 
   console.log(JSON.stringify({
     baseUrl,
+    configuredApiBaseUrl: configuredApiBaseUrl || null,
+    runtimeApiBaseUrl: runtimeConfig?.apiBaseUrl || null,
     apiBaseUrl,
     checkedAt: new Date().toISOString(),
     summary: {
@@ -196,7 +279,11 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error("[smoke] fatal error", error);
-  process.exitCode = 1;
-});
+const entryUrl = process.argv[1] ? new URL(`file://${process.argv[1].replace(/\\/g, "/")}`).href : "";
+
+if (import.meta.url === entryUrl) {
+  main().catch((error) => {
+    console.error("[smoke] fatal error", error);
+    process.exitCode = 1;
+  });
+}
