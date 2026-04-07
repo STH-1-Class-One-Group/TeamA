@@ -1,10 +1,7 @@
 import { useCallback, useState } from 'react';
 import {
   getAuthSession,
-  getMyCommentsPage,
-  getReviewFeedPage,
 } from './api/client';
-import { toReviewSummaryList } from './lib/reviews';
 import { AppMapStageView } from './components/AppMapStageView';
 import { AppPageStage } from './components/AppPageStage';
 import { BottomNav } from './components/BottomNav';
@@ -34,6 +31,7 @@ import { useAppViewModels } from './hooks/useAppViewModels';
 import { useActiveReviewComments } from './hooks/useActiveReviewComments';
 import { useNotificationActions } from './hooks/useNotificationActions';
 import { useAppStageActions } from './hooks/useAppStageActions';
+import { useAppPagePaginationActions } from './hooks/useAppPagePaginationActions';
 import { useAppUIStore } from './store/app-ui-store';
 import { useNotificationStore } from './store/notification-store';
 import type {
@@ -295,60 +293,29 @@ export default function App() {
     upsertReviewCollections,
   });
 
-  const loadMoreFeedReviews = useCallback(async () => {
-    if (feedLoadingMore || !feedHasMore) {
-      return;
-    }
-
-    setFeedLoadingMore(true);
-    try {
-      const page = await getReviewFeedPage({ cursor: feedNextCursor, limit: 10 });
-      setReviews((current) => {
-        const existingIds = new Set(current.map((review) => review.id));
-        const nextItems = toReviewSummaryList(page.items).filter((review) => !existingIds.has(review.id));
-        return [...current, ...nextItems];
-      });
-      setFeedNextCursor(page.nextCursor);
-      setFeedHasMore(Boolean(page.nextCursor));
-    } catch (error) {
-      reportBackgroundError(error);
-    } finally {
-      setFeedLoadingMore(false);
-    }
-  }, [feedHasMore, feedLoadingMore, feedNextCursor, setFeedHasMore, setFeedLoadingMore, setFeedNextCursor, setReviews]);
-
-  const loadMoreMyComments = useCallback(async (initial = false) => {
-    if (!sessionUser || !myPage) {
-      return;
-    }
-    if (myCommentsLoadingMore || (!initial && !myCommentsHasMore)) {
-      return;
-    }
-
-    setMyCommentsLoadingMore(true);
-    setMyCommentsLoadedOnce(true);
-    try {
-      const page = await getMyCommentsPage({ cursor: initial ? null : myCommentsNextCursor, limit: 10 });
-      setMyPage((current) => {
-        if (!current) {
-          return current;
-        }
-        const base = initial ? [] : current.comments;
-        const existingIds = new Set(base.map((comment) => comment.id));
-        const nextItems = page.items.filter((comment) => !existingIds.has(comment.id));
-        return {
-          ...current,
-          comments: [...base, ...nextItems],
-        };
-      });
-      setMyCommentsNextCursor(page.nextCursor);
-      setMyCommentsHasMore(Boolean(page.nextCursor));
-    } catch (error) {
-      reportBackgroundError(error);
-    } finally {
-      setMyCommentsLoadingMore(false);
-    }
-  }, [myCommentsHasMore, myCommentsLoadingMore, myCommentsNextCursor, myPage, sessionUser, setMyCommentsHasMore, setMyCommentsLoadedOnce, setMyCommentsLoadingMore, setMyCommentsNextCursor, setMyPage]);
+  const {
+    loadMoreFeedReviews,
+    loadMoreMyComments,
+  } = useAppPagePaginationActions({
+    sessionUser,
+    myPage,
+    feedNextCursor,
+    feedHasMore,
+    feedLoadingMore,
+    myCommentsNextCursor,
+    myCommentsHasMore,
+    myCommentsLoadingMore,
+    setReviews,
+    setMyPage,
+    setFeedNextCursor,
+    setFeedHasMore,
+    setFeedLoadingMore,
+    setMyCommentsNextCursor,
+    setMyCommentsHasMore,
+    setMyCommentsLoadingMore,
+    setMyCommentsLoadedOnce,
+    reportBackgroundError,
+  });
 
   const {
     activeReviewComments,
