@@ -585,46 +585,50 @@ export default function App() {
         <div className="phone-shell__body">
           {activeTab === 'map' ? (
             <AppMapStageView
-              activeCategory={activeCategory}
-              setActiveCategory={setActiveCategory}
-              filteredPlaces={filteredPlaces}
-              festivals={festivals}
-              selectedPlace={selectedPlace}
-              selectedFestival={selectedFestival}
-              currentPosition={currentPosition}
-              mapLocationStatus={mapLocationStatus}
-              mapLocationFocusKey={mapLocationFocusKey}
-              drawerState={drawerState}
-              sessionUser={sessionUser}
-              selectedPlaceReviews={selectedPlaceReviews}
-              routePreview={selectedRoutePreview}
-              routePreviewPlaces={routePreviewPlaces}
-              visitCount={visitCount}
-              latestStamp={latestStamp}
-              todayStamp={todayStamp}
-              stampActionStatus={stampActionStatus}
-              stampActionMessage={stampActionMessage}
-              reviewProofMessage={reviewProofMessage}
-              reviewError={reviewError}
-              reviewSubmitting={reviewSubmitting}
-              canCreateReview={canCreateReview}
-              hasCreatedReviewToday={hasCreatedReviewToday}
-              initialMapViewport={initialMapViewport}
-              onOpenPlaceFeed={handleMapOpenPlaceFeed}
-              onOpenPlace={handleMapOpenPlace}
-              onOpenRoutePreviewPlace={handleMapOpenRoutePreviewPlace}
-              onOpenFestival={handleMapOpenFestival}
-              onCloseDrawer={closeDrawer}
-              onClearRoutePreview={handleClearRoutePreview}
-              onExpandPlaceDrawer={handleExpandPlaceDrawer}
-              onCollapsePlaceDrawer={handleCollapsePlaceDrawer}
-              onExpandFestivalDrawer={handleExpandFestivalDrawer}
-              onCollapseFestivalDrawer={handleCollapseFestivalDrawer}
-              onRequestLogin={handleRequestLogin}
-              onClaimStamp={handleClaimStamp}
-              onCreateReview={handleCreateReview}
-              onLocateCurrentPosition={handleLocateCurrentPosition}
-              onMapViewportChange={updateMapViewportInUrl}
+              mapData={{
+                activeCategory,
+                filteredPlaces,
+                festivals,
+                selectedPlace,
+                selectedFestival,
+                currentPosition,
+                mapLocationStatus,
+                mapLocationFocusKey,
+                drawerState,
+                sessionUser,
+                selectedPlaceReviews,
+                routePreview: selectedRoutePreview,
+                routePreviewPlaces,
+                visitCount,
+                latestStamp,
+                todayStamp,
+                stampActionStatus,
+                stampActionMessage,
+                reviewProofMessage,
+                reviewError,
+                reviewSubmitting,
+                canCreateReview,
+                hasCreatedReviewToday,
+                initialMapViewport,
+              }}
+              mapActions={{
+                setActiveCategory,
+                onOpenPlaceFeed: handleMapOpenPlaceFeed,
+                onOpenPlace: handleMapOpenPlace,
+                onOpenRoutePreviewPlace: handleMapOpenRoutePreviewPlace,
+                onOpenFestival: handleMapOpenFestival,
+                onCloseDrawer: closeDrawer,
+                onClearRoutePreview: handleClearRoutePreview,
+                onExpandPlaceDrawer: handleExpandPlaceDrawer,
+                onCollapsePlaceDrawer: handleCollapsePlaceDrawer,
+                onExpandFestivalDrawer: handleExpandFestivalDrawer,
+                onCollapseFestivalDrawer: handleCollapseFestivalDrawer,
+                onRequestLogin: handleRequestLogin,
+                onClaimStamp: handleClaimStamp,
+                onCreateReview: handleCreateReview,
+                onLocateCurrentPosition: handleLocateCurrentPosition,
+                onMapViewportChange: updateMapViewportInUrl,
+              }}
             />
           ) : (
             <AppPageStage
