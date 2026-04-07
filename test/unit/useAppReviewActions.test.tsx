@@ -1,6 +1,7 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MyPageResponse, Review } from '../../src/types';
+import { useActiveReviewComments } from '../../src/hooks/useActiveReviewComments';
 import { useAppReviewActions } from '../../src/hooks/useAppReviewActions';
 import { createReviewFixture, myPageFixture, placeFixture, sessionUserFixture } from '../fixtures/app-fixtures';
 
@@ -9,17 +10,19 @@ vi.mock('../../src/api/client', () => ({
   createReview: vi.fn(),
   deleteComment: vi.fn(),
   deleteReview: vi.fn(),
+  getReviewComments: vi.fn(),
   toggleReviewLike: vi.fn(),
   updateComment: vi.fn(),
   updateReview: vi.fn(),
   uploadReviewImage: vi.fn(),
 }));
 
-import { updateReview } from '../../src/api/client';
+import { getReviewComments, updateReview } from '../../src/api/client';
 
 describe('useAppReviewActions', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(getReviewComments).mockResolvedValue([]);
   });
 
   it('keeps my-page reviews summarized after editing a review', async () => {
@@ -124,5 +127,57 @@ describe('useAppReviewActions', () => {
       },
     ]);
     expect(myPageState?.comments[0]?.reviewBody).toBe('수정 후 본문');
+  });
+
+  it('reuses cached active comments while refreshing the thread in the background', async () => {
+    const refreshedComments = [{ ...myPageFixture.reviews[0].comments[0], body: '?덈줈怨좎묠???볤?' }];
+    const setNotice = vi.fn();
+    const formatErrorMessage = (error: unknown) => String(error);
+    vi.mocked(getReviewComments)
+      .mockResolvedValueOnce(myPageFixture.reviews[0].comments)
+      .mockResolvedValueOnce(refreshedComments);
+
+    const { result, rerender } = renderHook(
+      ({ reviewId }) => useActiveReviewComments({
+        activeCommentReviewId: reviewId,
+        setNotice,
+        formatErrorMessage,
+      }),
+      { initialProps: { reviewId: 'review-1' as string | null } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeReviewCommentsStatus).toBe('ready');
+    });
+    expect(result.current.activeReviewComments).toEqual(myPageFixture.reviews[0].comments);
+
+    rerender({ reviewId: null });
+    expect(result.current.activeReviewCommentsStatus).toBe('idle');
+
+    rerender({ reviewId: 'review-1' });
+    expect(result.current.activeReviewCommentsStatus).toBe('ready');
+    expect(result.current.activeReviewComments).toEqual(myPageFixture.reviews[0].comments);
+
+    await waitFor(() => {
+      expect(result.current.activeReviewComments).toEqual(refreshedComments);
+    });
+    expect(getReviewComments).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports loading errors for uncached active comment threads', async () => {
+    const setNotice = vi.fn();
+    const formatErrorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
+    vi.mocked(getReviewComments).mockRejectedValue(new Error('boom'));
+
+    const { result } = renderHook(() => useActiveReviewComments({
+      activeCommentReviewId: 'review-1',
+      setNotice,
+      formatErrorMessage,
+    }));
+
+    await waitFor(() => {
+      expect(result.current.activeReviewCommentsStatus).toBe('error');
+    });
+    expect(setNotice).toHaveBeenCalledWith('boom');
   });
 });

@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   getAuthSession,
   getMyCommentsPage,
-  getReviewComments,
   getReviewFeedPage,
 } from './api/client';
 import { toReviewSummaryList } from './lib/reviews';
@@ -32,6 +31,9 @@ import { useAppRouteActions } from './hooks/useAppRouteActions';
 import { useAppShellNavigation } from './hooks/useAppShellNavigation';
 import { useAppTabDataLoaders } from './hooks/useAppTabDataLoaders';
 import { useAppViewModels } from './hooks/useAppViewModels';
+import { useActiveReviewComments } from './hooks/useActiveReviewComments';
+import { useNotificationActions } from './hooks/useNotificationActions';
+import { useAppStageActions } from './hooks/useAppStageActions';
 import { useAppUIStore } from './store/app-ui-store';
 import { useNotificationStore } from './store/notification-store';
 import type {
@@ -39,7 +41,6 @@ import type {
   Category,
   Comment,
   Tab,
-  UserNotification,
 } from './types';
 
 const STAMP_UNLOCK_RADIUS_METERS = 120;
@@ -125,9 +126,6 @@ export default function App() {
   const [myCommentsHasMore, setMyCommentsHasMore] = useState(false);
   const [myCommentsLoadingMore, setMyCommentsLoadingMore] = useState(false);
   const [myCommentsLoadedOnce, setMyCommentsLoadedOnce] = useState(false);
-  const [activeReviewComments, setActiveReviewComments] = useState<Comment[]>([]);
-  const [activeReviewCommentsStatus, setActiveReviewCommentsStatus] = useState<ApiStatus>('idle');
-  const commentThreadsCacheRef = useRef<Record<string, Comment[]>>({});
 
   const {
     bootstrapStatus,
@@ -352,46 +350,16 @@ export default function App() {
     }
   }, [myCommentsHasMore, myCommentsLoadingMore, myCommentsNextCursor, myPage, sessionUser, setMyCommentsHasMore, setMyCommentsLoadedOnce, setMyCommentsLoadingMore, setMyCommentsNextCursor, setMyPage]);
 
-  useEffect(() => {
-    if (!activeCommentReviewId) {
-      setActiveReviewComments([]);
-      setActiveReviewCommentsStatus('idle');
-      return;
-    }
-
-    let cancelled = false;
-    const cachedComments = commentThreadsCacheRef.current[activeCommentReviewId];
-    if (cachedComments) {
-      setActiveReviewComments(cachedComments);
-      setActiveReviewCommentsStatus('ready');
-    } else {
-      setActiveReviewComments([]);
-      setActiveReviewCommentsStatus('loading');
-    }
-
-    void getReviewComments(activeCommentReviewId)
-      .then((comments) => {
-        if (cancelled) {
-          return;
-        }
-        commentThreadsCacheRef.current[activeCommentReviewId] = comments;
-        setActiveReviewComments(comments);
-        setActiveReviewCommentsStatus('ready');
-      })
-      .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-        if (!cachedComments) {
-          setActiveReviewCommentsStatus('error');
-        }
-        setNotice(formatErrorMessage(error));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCommentReviewId]);
+  const {
+    activeReviewComments,
+    activeReviewCommentsStatus,
+    syncReviewComments,
+    clearReviewComments,
+  } = useActiveReviewComments({
+    activeCommentReviewId,
+    setNotice,
+    formatErrorMessage,
+  });
 
   useAppFeedbackEffects({
     selectedPlace,
@@ -469,22 +437,6 @@ export default function App() {
     formatErrorMessage,
   });
 
-  const syncReviewComments = useCallback((reviewId: string, comments: Comment[]) => {
-    commentThreadsCacheRef.current[reviewId] = comments;
-    if (activeCommentReviewId === reviewId) {
-      setActiveReviewComments(comments);
-      setActiveReviewCommentsStatus('ready');
-    }
-  }, [activeCommentReviewId]);
-
-  const clearReviewComments = useCallback((reviewId: string) => {
-    delete commentThreadsCacheRef.current[reviewId];
-    if (activeCommentReviewId === reviewId) {
-      setActiveReviewComments([]);
-      setActiveReviewCommentsStatus('idle');
-    }
-  }, [activeCommentReviewId]);
-
   const {
     handleCreateReview,
     handleUpdateReview,
@@ -544,36 +496,20 @@ export default function App() {
     goToTab,
   });
 
-  async function handleMarkNotificationRead(notificationId: string) {
-    await markNotificationReadInStore(notificationId);
-  }
-
-  async function handleMarkAllNotificationsRead() {
-    await markAllNotificationsReadInStore();
-  }
-
-  async function handleDeleteNotification(notificationId: string) {
-    await deleteNotificationInStore(notificationId);
-  }
-
-  async function handleOpenGlobalNotification(notification: UserNotification) {
-    if (!notification.isRead) {
-      await handleMarkNotificationRead(notification.id);
-    }
-
-    if (notification.reviewId && notification.commentId) {
-      handleOpenCommentWithReturn(notification.reviewId, notification.commentId);
-      return;
-    }
-    if (notification.reviewId) {
-      handleOpenReviewWithReturn(notification.reviewId);
-      return;
-    }
-    if (notification.routeId) {
-      goToTab('my');
-      setMyPageTab('routes');
-    }
-  }
+  const {
+    handleMarkNotificationRead,
+    handleMarkAllNotificationsRead,
+    handleDeleteNotification,
+    handleOpenGlobalNotification,
+  } = useNotificationActions({
+    markNotificationReadInStore,
+    markAllNotificationsReadInStore,
+    deleteNotificationInStore,
+    handleOpenCommentWithReturn,
+    handleOpenReviewWithReturn,
+    goToTab,
+    setMyPageTab,
+  });
 
   const {
     handleToggleAdminPlace,
@@ -614,95 +550,42 @@ export default function App() {
     commitRouteState,
   });
 
-  const handleMapOpenPlaceFeed = useCallback(() => {
-    if (!selectedPlace) {
-      return;
-    }
-    handleOpenPlaceFeedWithReturn(selectedPlace.id);
-  }, [handleOpenPlaceFeedWithReturn, selectedPlace]);
-
-  const handleMapOpenPlace = useCallback((placeId: string) => {
-    setSelectedRoutePreview(null);
-    commitRouteState({ tab: 'map', placeId, festivalId: null, drawerState: 'partial' }, 'push', { routePreview: null });
-  }, [commitRouteState, setSelectedRoutePreview]);
-
-  const handleMapOpenFestival = useCallback((festivalId: string) => {
-    setSelectedRoutePreview(null);
-    commitRouteState({ tab: 'map', placeId: null, festivalId, drawerState: 'partial' }, 'push', { routePreview: null });
-  }, [commitRouteState, setSelectedRoutePreview]);
-
-  const handleMapOpenRoutePreviewPlace = useCallback((placeId: string) => {
-    commitRouteState(
-      { tab: 'map', placeId, festivalId: null, drawerState: 'partial' },
-      'push',
-      { routePreview: selectedRoutePreview },
-    );
-  }, [commitRouteState, selectedRoutePreview]);
-
-  const handleClearRoutePreview = useCallback(() => {
-    setSelectedRoutePreview(null);
-    commitRouteState(
-      { tab: 'map', placeId: selectedPlaceId, festivalId: selectedFestivalId, drawerState },
-      'replace',
-      { routePreview: null },
-    );
-  }, [commitRouteState, drawerState, selectedFestivalId, selectedPlaceId, setSelectedRoutePreview]);
-
-  const handleExpandPlaceDrawer = useCallback(() => {
-    if (!selectedPlace) {
-      return;
-    }
-    commitRouteState({ tab: 'map', placeId: selectedPlace.id, festivalId: null, drawerState: 'full' }, 'replace');
-  }, [commitRouteState, selectedPlace]);
-
-  const handleCollapsePlaceDrawer = useCallback(() => {
-    if (!selectedPlace) {
-      return;
-    }
-    commitRouteState({ tab: 'map', placeId: selectedPlace.id, festivalId: null, drawerState: 'partial' }, 'replace');
-  }, [commitRouteState, selectedPlace]);
-
-  const handleExpandFestivalDrawer = useCallback(() => {
-    if (!selectedFestival) {
-      return;
-    }
-    commitRouteState({ tab: 'map', placeId: null, festivalId: selectedFestival.id, drawerState: 'full' }, 'replace');
-  }, [commitRouteState, selectedFestival]);
-
-  const handleCollapseFestivalDrawer = useCallback(() => {
-    if (!selectedFestival) {
-      return;
-    }
-    commitRouteState({ tab: 'map', placeId: null, festivalId: selectedFestival.id, drawerState: 'partial' }, 'replace');
-  }, [commitRouteState, selectedFestival]);
-
-  const handleRequestLogin = useCallback(() => {
-    goToTab('my');
-  }, [goToTab]);
-
-  const handleLocateCurrentPosition = useCallback(() => {
-    void refreshCurrentPosition(true);
-  }, [refreshCurrentPosition]);
-
-  const handleClearPlaceFilter = useCallback(() => {
-    setFeedPlaceFilterId(null);
-  }, [setFeedPlaceFilterId]);
-
-  const handleChangeRouteSort = useCallback((sort: 'popular' | 'latest') => {
-    setCommunityRouteSort(sort);
-    void fetchCommunityRoutes(sort).catch(reportBackgroundError);
-  }, [fetchCommunityRoutes, reportBackgroundError, setCommunityRouteSort]);
-
-  const handleRetryMyPage = useCallback(async () => {
-    if (!sessionUser) {
-      return;
-    }
-    await refreshMyPageForUser(sessionUser, true);
-  }, [refreshMyPageForUser, sessionUser]);
-
-  const handleOpenCommentFromMyPage = useCallback((reviewId: string, commentId: string) => {
-    handleOpenCommentWithReturn(reviewId, commentId);
-  }, [handleOpenCommentWithReturn]);
+  const {
+    handleMapOpenPlaceFeed,
+    handleMapOpenPlace,
+    handleMapOpenFestival,
+    handleMapOpenRoutePreviewPlace,
+    handleClearRoutePreview,
+    handleExpandPlaceDrawer,
+    handleCollapsePlaceDrawer,
+    handleExpandFestivalDrawer,
+    handleCollapseFestivalDrawer,
+    handleRequestLogin,
+    handleLocateCurrentPosition,
+    handleClearPlaceFilter,
+    handleChangeRouteSort,
+    handleRetryMyPage,
+    handleOpenCommentFromMyPage,
+  } = useAppStageActions({
+    selectedPlace,
+    selectedFestival,
+    selectedPlaceId,
+    selectedFestivalId,
+    drawerState,
+    selectedRoutePreview,
+    sessionUser,
+    setSelectedRoutePreview,
+    setFeedPlaceFilterId,
+    setCommunityRouteSort,
+    commitRouteState,
+    goToTab,
+    handleOpenPlaceFeedWithReturn,
+    handleOpenCommentWithReturn,
+    refreshCurrentPosition,
+    fetchCommunityRoutes,
+    refreshMyPageForUser,
+    reportBackgroundError,
+  });
   return (
     <div className="map-app-shell">
       <div className={[

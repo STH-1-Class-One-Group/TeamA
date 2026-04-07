@@ -1,6 +1,8 @@
+import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { useAppDataState } from '../../src/hooks/useAppDataState';
 import { countCommentsInThread, toReviewSummary } from '../../src/lib/reviews';
-import { createReviewFixture } from '../fixtures/app-fixtures';
+import { commentFixture, createReviewFixture } from '../fixtures/app-fixtures';
 
 describe('review helpers', () => {
   it('counts nested comments across the whole thread', () => {
@@ -51,5 +53,62 @@ describe('review helpers', () => {
       ...review,
       comments: [],
     });
+  });
+
+  it('keeps upserted review collections summary-only', () => {
+    const detailedReview = createReviewFixture({
+      id: 'review-upsert',
+      comments: [commentFixture],
+      commentCount: 1,
+    });
+
+    const { result } = renderHook(() => useAppDataState(detailedReview.placeId));
+
+    act(() => {
+      result.current.upsertReviewCollections(detailedReview);
+    });
+
+    expect(result.current.reviews[0]).toEqual({
+      ...detailedReview,
+      comments: [],
+    });
+    expect(result.current.selectedPlaceReviews[0]).toEqual({
+      ...detailedReview,
+      comments: [],
+    });
+    expect(result.current.placeReviewsCacheRef.current[detailedReview.placeId]?.[0]).toEqual({
+      ...detailedReview,
+      comments: [],
+    });
+  });
+
+  it('keeps patched review collections summary-only even when updater returns embedded comments', () => {
+    const baseReview = createReviewFixture({
+      id: 'review-patch',
+      comments: [],
+      commentCount: 0,
+    });
+    const embeddedComments = [{ ...commentFixture, id: 'comment-2' }];
+
+    const { result } = renderHook(() => useAppDataState(baseReview.placeId));
+
+    act(() => {
+      result.current.upsertReviewCollections(baseReview);
+      result.current.patchReviewCollections(baseReview.id, (review) => ({
+        ...review,
+        body: '?섏젙??蹂몃Ц',
+        commentCount: 1,
+        comments: embeddedComments,
+      }));
+    });
+
+    expect(result.current.reviews[0]).toEqual({
+      ...baseReview,
+      body: '?섏젙??蹂몃Ц',
+      commentCount: 1,
+      comments: [],
+    });
+    expect(result.current.selectedPlaceReviews[0]?.comments).toEqual([]);
+    expect(result.current.placeReviewsCacheRef.current[baseReview.placeId]?.[0]?.comments).toEqual([]);
   });
 });

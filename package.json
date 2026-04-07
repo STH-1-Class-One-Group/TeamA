@@ -4,11 +4,11 @@
   "version": "1.0.0",
   "scripts": {
     "build": "node scripts/build-frontend.mjs",
-    "test": "vitest run",
-    "test:unit": "vitest run test/unit",
-    "test:integration": "vitest run test/integration",
-    "test:regression": "vitest run test/regression",
-    "test:smoke:ui": "vitest run test/smoke",
+    "test": "node --max-old-space-size=8192 ./node_modules/vitest/vitest.mjs run",
+    "test:unit": "node scripts/run-unit-tests.mjs",
+    "test:integration": "node --max-old-space-size=8192 ./node_modules/vitest/vitest.mjs run test/integration",
+    "test:regression": "node --max-old-space-size=8192 ./node_modules/vitest/vitest.mjs run test/regression",
+    "test:smoke:ui": "node --max-old-space-size=8192 ./node_modules/vitest/vitest.mjs run test/smoke",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:regression && npm run test:smoke:ui",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/run-smoke-checks.mjs"
