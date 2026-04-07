@@ -629,40 +629,48 @@ export default function App() {
           ) : (
             <AppPageStage
               activeTab={activeTab}
-              reviews={reviews}
-              sessionUser={sessionUser}
-              reviewLikeUpdatingId={reviewLikeUpdatingId}
-              feedPlaceFilterId={feedPlaceFilterId}
-              placeNameById={placeNameById}
-              commentSubmittingReviewId={commentSubmittingReviewId}
-              commentMutatingId={commentMutatingId}
-              deletingReviewId={deletingReviewId}
-              activeCommentReviewId={activeCommentReviewId}
-              activeCommentReviewComments={activeReviewComments}
-              activeCommentReviewStatus={activeReviewCommentsStatus}
-              highlightedCommentId={highlightedCommentId}
-              highlightedReviewId={highlightedReviewId}
-              feedHasMore={feedHasMore}
-              feedLoadingMore={feedLoadingMore}
-              festivals={festivals}
-              courses={courses}
-              communityRoutes={communityRoutes}
-              communityRouteSort={communityRouteSort}
-              routeLikeUpdatingId={routeLikeUpdatingId}
-              myPage={hydratedMyPage}
-              providers={providers}
-              myPageError={myPageError}
-              myPageTab={myPageTab}
-              isLoggingOut={isLoggingOut}
-              profileSaving={profileSaving}
-              profileError={profileError}
-              routeSubmitting={routeSubmitting}
-              routeError={routeError}
-              adminSummary={adminSummary}
-              adminBusyPlaceId={adminBusyPlaceId}
-              adminLoading={adminLoading}
-              commentsHasMore={myCommentsHasMore}
-              commentsLoadingMore={myCommentsLoadingMore}
+              sharedData={{
+                sessionUser,
+                placeNameById,
+                festivals,
+              }}
+              feedData={{
+                reviews,
+                reviewLikeUpdatingId,
+                feedPlaceFilterId,
+                commentSubmittingReviewId,
+                commentMutatingId,
+                deletingReviewId,
+                activeCommentReviewId,
+                activeCommentReviewComments: activeReviewComments,
+                activeCommentReviewStatus: activeReviewCommentsStatus,
+                highlightedCommentId,
+                highlightedReviewId,
+                feedHasMore,
+                feedLoadingMore,
+              }}
+              courseData={{
+                courses,
+                communityRoutes,
+                communityRouteSort,
+                routeLikeUpdatingId,
+              }}
+              myPageData={{
+                myPage: hydratedMyPage,
+                providers,
+                myPageError,
+                myPageTab,
+                isLoggingOut,
+                profileSaving,
+                profileError,
+                routeSubmitting,
+                routeError,
+                adminSummary,
+                adminBusyPlaceId,
+                adminLoading,
+                commentsHasMore: myCommentsHasMore,
+                commentsLoadingMore: myCommentsLoadingMore,
+              }}
               sharedActions={{
                 onRequestLogin: handleRequestLogin,
                 onOpenPlace: handleOpenPlaceWithReturn,

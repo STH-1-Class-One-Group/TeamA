@@ -23,40 +23,48 @@ import type {
 
 interface AppPageStageProps {
   activeTab: Exclude<Tab, 'map'>;
-  reviews: Review[];
-  sessionUser: SessionUser | null;
-  reviewLikeUpdatingId: string | null;
-  feedPlaceFilterId: string | null;
-  placeNameById: Record<string, string>;
-  commentSubmittingReviewId: string | null;
-  commentMutatingId: string | null;
-  deletingReviewId: string | null;
-  activeCommentReviewId: string | null;
-  activeCommentReviewComments: Comment[];
-  activeCommentReviewStatus: ApiStatus;
-  highlightedCommentId: string | null;
-  highlightedReviewId: string | null;
-  feedHasMore: boolean;
-  feedLoadingMore: boolean;
-  festivals: FestivalItem[];
-  courses: Course[];
-  communityRoutes: UserRoute[];
-  communityRouteSort: CommunityRouteSort;
-  routeLikeUpdatingId: string | null;
-  myPage: MyPageResponse | null;
-  providers: AuthProvider[];
-  myPageError: string | null;
-  myPageTab: MyPageTabKey;
-  isLoggingOut: boolean;
-  profileSaving: boolean;
-  profileError: string | null;
-  routeSubmitting: boolean;
-  routeError: string | null;
-  adminSummary: AdminSummaryResponse | null;
-  adminBusyPlaceId: string | null;
-  adminLoading: boolean;
-  commentsHasMore: boolean;
-  commentsLoadingMore: boolean;
+  sharedData: {
+    sessionUser: SessionUser | null;
+    placeNameById: Record<string, string>;
+    festivals: FestivalItem[];
+  };
+  feedData: {
+    reviews: Review[];
+    reviewLikeUpdatingId: string | null;
+    feedPlaceFilterId: string | null;
+    commentSubmittingReviewId: string | null;
+    commentMutatingId: string | null;
+    deletingReviewId: string | null;
+    activeCommentReviewId: string | null;
+    activeCommentReviewComments: Comment[];
+    activeCommentReviewStatus: ApiStatus;
+    highlightedCommentId: string | null;
+    highlightedReviewId: string | null;
+    feedHasMore: boolean;
+    feedLoadingMore: boolean;
+  };
+  courseData: {
+    courses: Course[];
+    communityRoutes: UserRoute[];
+    communityRouteSort: CommunityRouteSort;
+    routeLikeUpdatingId: string | null;
+  };
+  myPageData: {
+    myPage: MyPageResponse | null;
+    providers: AuthProvider[];
+    myPageError: string | null;
+    myPageTab: MyPageTabKey;
+    isLoggingOut: boolean;
+    profileSaving: boolean;
+    profileError: string | null;
+    routeSubmitting: boolean;
+    routeError: string | null;
+    adminSummary: AdminSummaryResponse | null;
+    adminBusyPlaceId: string | null;
+    adminLoading: boolean;
+    commentsHasMore: boolean;
+    commentsLoadingMore: boolean;
+  };
   sharedActions: {
     onRequestLogin: () => void;
     onOpenPlace: (placeId: string) => void;
@@ -100,40 +108,10 @@ interface AppPageStageProps {
 
 export const AppPageStage = memo(function AppPageStage({
   activeTab,
-  reviews,
-  sessionUser,
-  reviewLikeUpdatingId,
-  feedPlaceFilterId,
-  placeNameById,
-  commentSubmittingReviewId,
-  commentMutatingId,
-  deletingReviewId,
-  activeCommentReviewId,
-  activeCommentReviewComments,
-  activeCommentReviewStatus,
-  highlightedCommentId,
-  highlightedReviewId,
-  feedHasMore,
-  feedLoadingMore,
-  festivals,
-  courses,
-  communityRoutes,
-  communityRouteSort,
-  routeLikeUpdatingId,
-  myPage,
-  providers,
-  myPageError,
-  myPageTab,
-  isLoggingOut,
-  profileSaving,
-  profileError,
-  routeSubmitting,
-  routeError,
-  adminSummary,
-  adminBusyPlaceId,
-  adminLoading,
-  commentsHasMore,
-  commentsLoadingMore,
+  sharedData,
+  feedData,
+  courseData,
+  myPageData,
   sharedActions,
   feedActions,
   courseActions,
@@ -143,21 +121,21 @@ export const AppPageStage = memo(function AppPageStage({
     <div className="page-stage">
       {activeTab === 'feed' && (
         <FeedTab
-          reviews={reviews}
-          sessionUser={sessionUser}
-          reviewLikeUpdatingId={reviewLikeUpdatingId}
-          placeFilterId={feedPlaceFilterId}
-          placeFilterName={feedPlaceFilterId ? placeNameById[feedPlaceFilterId] ?? null : null}
-          commentSubmittingReviewId={commentSubmittingReviewId}
-          commentMutatingId={commentMutatingId}
-          deletingReviewId={deletingReviewId}
-          activeCommentReviewId={activeCommentReviewId}
-          activeCommentReviewComments={activeCommentReviewComments}
-          activeCommentReviewStatus={activeCommentReviewStatus}
-          highlightedCommentId={highlightedCommentId}
-          highlightedReviewId={highlightedReviewId}
-          hasMore={feedHasMore && !feedPlaceFilterId}
-          loadingMore={feedLoadingMore}
+          reviews={feedData.reviews}
+          sessionUser={sharedData.sessionUser}
+          reviewLikeUpdatingId={feedData.reviewLikeUpdatingId}
+          placeFilterId={feedData.feedPlaceFilterId}
+          placeFilterName={feedData.feedPlaceFilterId ? sharedData.placeNameById[feedData.feedPlaceFilterId] ?? null : null}
+          commentSubmittingReviewId={feedData.commentSubmittingReviewId}
+          commentMutatingId={feedData.commentMutatingId}
+          deletingReviewId={feedData.deletingReviewId}
+          activeCommentReviewId={feedData.activeCommentReviewId}
+          activeCommentReviewComments={feedData.activeCommentReviewComments}
+          activeCommentReviewStatus={feedData.activeCommentReviewStatus}
+          highlightedCommentId={feedData.highlightedCommentId}
+          highlightedReviewId={feedData.highlightedReviewId}
+          hasMore={feedData.feedHasMore && !feedData.feedPlaceFilterId}
+          loadingMore={feedData.feedLoadingMore}
           onLoadMore={feedActions.onLoadMoreFeed}
           onToggleReviewLike={feedActions.onToggleReviewLike}
           onCreateComment={feedActions.onCreateComment}
@@ -172,16 +150,16 @@ export const AppPageStage = memo(function AppPageStage({
         />
       )}
 
-      {activeTab === 'event' && <EventTab festivals={festivals} />}
+      {activeTab === 'event' && <EventTab festivals={sharedData.festivals} />}
 
       {activeTab === 'course' && (
         <CourseTab
-          courses={courses}
-          communityRoutes={communityRoutes}
-          sort={communityRouteSort}
-          sessionUser={sessionUser}
-          routeLikeUpdatingId={routeLikeUpdatingId}
-          placeNameById={placeNameById}
+          courses={courseData.courses}
+          communityRoutes={courseData.communityRoutes}
+          sort={courseData.communityRouteSort}
+          sessionUser={sharedData.sessionUser}
+          routeLikeUpdatingId={courseData.routeLikeUpdatingId}
+          placeNameById={sharedData.placeNameById}
           onChangeSort={courseActions.onChangeRouteSort}
           onToggleLike={courseActions.onToggleRouteLike}
           onOpenPlace={sharedActions.onOpenPlace}
@@ -192,19 +170,19 @@ export const AppPageStage = memo(function AppPageStage({
 
       {activeTab === 'my' && (
         <MyPagePanel
-          sessionUser={sessionUser}
-          myPage={myPage}
-          providers={providers}
-          myPageError={myPageError}
-          activeTab={myPageTab}
-          isLoggingOut={isLoggingOut}
-          profileSaving={profileSaving}
-          profileError={profileError}
-          routeSubmitting={routeSubmitting}
-          routeError={routeError}
-          adminSummary={adminSummary}
-          adminBusyPlaceId={adminBusyPlaceId}
-          adminLoading={adminLoading}
+          sessionUser={sharedData.sessionUser}
+          myPage={myPageData.myPage}
+          providers={myPageData.providers}
+          myPageError={myPageData.myPageError}
+          activeTab={myPageData.myPageTab}
+          isLoggingOut={myPageData.isLoggingOut}
+          profileSaving={myPageData.profileSaving}
+          profileError={myPageData.profileError}
+          routeSubmitting={myPageData.routeSubmitting}
+          routeError={myPageData.routeError}
+          adminSummary={myPageData.adminSummary}
+          adminBusyPlaceId={myPageData.adminBusyPlaceId}
+          adminLoading={myPageData.adminLoading}
           onChangeTab={myPageActions.onChangeMyPageTab}
           onLogin={myPageActions.onLogin}
           onRetry={myPageActions.onRetryMyPage}
@@ -219,8 +197,8 @@ export const AppPageStage = memo(function AppPageStage({
           onMarkNotificationRead={myPageActions.onMarkNotificationRead}
           onMarkAllNotificationsRead={myPageActions.onMarkAllNotificationsRead}
           onDeleteNotification={myPageActions.onDeleteNotification}
-          commentsHasMore={commentsHasMore}
-          commentsLoadingMore={commentsLoadingMore}
+          commentsHasMore={myPageData.commentsHasMore}
+          commentsLoadingMore={myPageData.commentsLoadingMore}
           onLoadMoreComments={myPageActions.onLoadMoreComments}
           onRefreshAdmin={myPageActions.onRefreshAdmin}
           onToggleAdminPlace={myPageActions.onToggleAdminPlace}
