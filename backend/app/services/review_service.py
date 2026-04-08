@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -13,21 +15,53 @@ from ..repository_normalized import (
     toggle_review_like,
 )
 
-_PLACE_NOT_FOUND_TOKEN = "\uc7a5\uc18c"
-_ENTITY_NOT_FOUND_TOKEN = "\ucc3e\uc744 \uc218"
-
-
-def _raise_review_value_error(detail: str, *, not_found_tokens: tuple[str, ...] = ()) -> None:
-    status_code = status.HTTP_404_NOT_FOUND if any(token in detail for token in not_found_tokens) else status.HTTP_400_BAD_REQUEST
-    raise HTTPException(status_code=status_code, detail=detail)
+_PLACE_NOT_FOUND_TOKEN = "장소"
+_ENTITY_NOT_FOUND_TOKEN = "찾을 수"
 
 
 def _raise_not_found(detail: str) -> None:
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
 
 
+def _raise_bad_request(detail: str) -> None:
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
 def _raise_forbidden(detail: str) -> None:
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+
+
+def _translate_value_error(detail: str, *, not_found_tokens: tuple[str, ...] = ()) -> None:
+    if any(token in detail for token in not_found_tokens):
+        _raise_not_found(detail)
+    _raise_bad_request(detail)
+
+
+def _run_with_policy(
+    action: Callable[[], object],
+    *,
+    not_found_tokens: tuple[str, ...] = (),
+    map_permission_error: bool = False,
+):
+    try:
+        return action()
+    except ValueError as error:
+        _translate_value_error(str(error), not_found_tokens=not_found_tokens)
+    except PermissionError as error:
+        if map_permission_error:
+            _raise_forbidden(str(error))
+        raise
+
+
+def _run_delete_with_policy(
+    action: Callable[[], object],
+):
+    try:
+        return action()
+    except ValueError as error:
+        _raise_not_found(str(error))
+    except PermissionError as error:
+        _raise_forbidden(str(error))
 
 
 def _publish_comment_notifications(
@@ -49,48 +83,42 @@ def _publish_comment_notifications(
 
 
 def create_review_service(db: Session, payload: ReviewCreate, session_user: SessionUser) -> ReviewOut:
-    try:
-        return create_review(db, payload, session_user.id, session_user.nickname)
-    except ValueError as error:
-        _raise_review_value_error(str(error), not_found_tokens=(_PLACE_NOT_FOUND_TOKEN,))
+    return _run_with_policy(
+        lambda: create_review(db, payload, session_user.id, session_user.nickname),
+        not_found_tokens=(_PLACE_NOT_FOUND_TOKEN,),
+    )
 
 
 def delete_review_service(db: Session, review_id: str, session_user: SessionUser) -> None:
-    try:
-        delete_review(db, review_id, session_user.id, is_admin=session_user.is_admin)
-    except ValueError as error:
-        _raise_not_found(str(error))
-    except PermissionError as error:
-        _raise_forbidden(str(error))
+    _run_delete_with_policy(
+        lambda: delete_review(db, review_id, session_user.id, is_admin=session_user.is_admin),
+    )
 
 
 def toggle_review_like_service(db: Session, review_id: str, session_user: SessionUser) -> ReviewLikeResponse:
-    try:
-        return toggle_review_like(db, review_id, session_user.id, session_user.nickname)
-    except ValueError as error:
-        _raise_review_value_error(str(error), not_found_tokens=(_ENTITY_NOT_FOUND_TOKEN,))
+    return _run_with_policy(
+        lambda: toggle_review_like(db, review_id, session_user.id, session_user.nickname),
+        not_found_tokens=(_ENTITY_NOT_FOUND_TOKEN,),
+    )
 
 
 def read_review_comments_service(db: Session, review_id: str):
-    try:
-        return get_review_comments(db, review_id)
-    except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+    return _run_with_policy(
+        lambda: get_review_comments(db, review_id),
+        not_found_tokens=(),
+    )
 
 
 def create_comment_service(db: Session, review_id: str, payload: CommentCreate, session_user: SessionUser):
-    try:
-        comments, notifications = create_comment_with_notifications(db, review_id, payload, session_user.id, session_user.nickname)
-        _publish_comment_notifications(db, notifications)
-        return comments
-    except ValueError as error:
-        _raise_review_value_error(str(error), not_found_tokens=(_ENTITY_NOT_FOUND_TOKEN,))
+    comments, notifications = _run_with_policy(
+        lambda: create_comment_with_notifications(db, review_id, payload, session_user.id, session_user.nickname),
+        not_found_tokens=(_ENTITY_NOT_FOUND_TOKEN,),
+    )
+    _publish_comment_notifications(db, notifications)
+    return comments
 
 
 def delete_comment_service(db: Session, review_id: str, comment_id: str, session_user: SessionUser):
-    try:
-        return delete_comment(db, review_id, comment_id, session_user.id, is_admin=session_user.is_admin)
-    except ValueError as error:
-        _raise_not_found(str(error))
-    except PermissionError as error:
-        _raise_forbidden(str(error))
+    return _run_delete_with_policy(
+        lambda: delete_comment(db, review_id, comment_id, session_user.id, is_admin=session_user.is_admin),
+    )

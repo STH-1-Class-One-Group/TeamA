@@ -125,6 +125,23 @@ def test_create_comment_service_maps_missing_review_to_404(monkeypatch):
     assert caught.value.status_code == status.HTTP_404_NOT_FOUND
 
 
+def test_create_comment_service_maps_invalid_reply_target_to_400(monkeypatch):
+    def failing_create_comment(*_args, **_kwargs):
+        raise ValueError("같은 리뷰의 댓글에만 답글을 달 수 있어요.")
+
+    monkeypatch.setattr(review_service, "create_comment_with_notifications", failing_create_comment)
+
+    with pytest.raises(HTTPException) as caught:
+        review_service.create_comment_service(
+            db=SimpleNamespace(),
+            review_id="11",
+            payload=CommentCreate(body="body", parentId="21"),
+            session_user=build_session_user(),
+        )
+
+    assert caught.value.status_code == status.HTTP_400_BAD_REQUEST
+
+
 def test_toggle_review_like_service_maps_missing_review_to_404(monkeypatch):
     def failing_toggle_review_like(*_args, **_kwargs):
         raise ValueError("\ub9ac\ubdf0\ub97c \ucc3e\uc744 \uc218 \uc5c6\uc5b4\uc694.")
@@ -157,6 +174,23 @@ def test_delete_review_service_maps_permission_error_to_403(monkeypatch):
     assert caught.value.status_code == status.HTTP_403_FORBIDDEN
 
 
+def test_delete_comment_service_maps_permission_error_to_403(monkeypatch):
+    def failing_delete_comment(*_args, **_kwargs):
+        raise PermissionError("forbidden")
+
+    monkeypatch.setattr(review_service, "delete_comment", failing_delete_comment)
+
+    with pytest.raises(HTTPException) as caught:
+        review_service.delete_comment_service(
+            db=SimpleNamespace(),
+            review_id="11",
+            comment_id="21",
+            session_user=build_session_user(),
+        )
+
+    assert caught.value.status_code == status.HTTP_403_FORBIDDEN
+
+
 def test_delete_comment_service_maps_missing_comment_to_404(monkeypatch):
     def failing_delete_comment(*_args, **_kwargs):
         raise ValueError("missing")
@@ -172,3 +206,18 @@ def test_delete_comment_service_maps_missing_comment_to_404(monkeypatch):
         )
 
     assert caught.value.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_read_review_comments_service_maps_invalid_review_id_to_400(monkeypatch):
+    def failing_get_review_comments(*_args, **_kwargs):
+        raise ValueError("리뷰 ID 형식이 올바르지 않아요.")
+
+    monkeypatch.setattr(review_service, "get_review_comments", failing_get_review_comments)
+
+    with pytest.raises(HTTPException) as caught:
+        review_service.read_review_comments_service(
+            db=SimpleNamespace(),
+            review_id="bad-id",
+        )
+
+    assert caught.value.status_code == status.HTTP_400_BAD_REQUEST
