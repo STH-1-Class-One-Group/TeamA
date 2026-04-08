@@ -104,4 +104,65 @@ describe('useAppShellNavigation', () => {
     expect(setReturnView).toHaveBeenCalledWith(null);
     expect(goToTab).toHaveBeenCalledWith('map', 'replace');
   });
+
+  it('restores the saved return view when there is no map history step to consume first', () => {
+    const setMyPageTab = vi.fn();
+    const setActiveCommentReviewId = vi.fn();
+    const setHighlightedCommentId = vi.fn();
+    const setHighlightedReviewId = vi.fn();
+    const setFeedPlaceFilterId = vi.fn();
+    const setSelectedRoutePreview = vi.fn();
+    const setReturnView = vi.fn();
+    const commitRouteState = vi.fn();
+
+    const navigation = useAppShellNavigation({
+      sessionUser: sessionUser,
+      returnView: {
+        tab: 'feed',
+        myPageTab: 'comments',
+        activeCommentReviewId: 'review-1',
+        highlightedCommentId: 'comment-1',
+        highlightedReviewId: 'review-1',
+        placeId: null,
+        festivalId: null,
+        drawerState: 'closed',
+        feedPlaceFilterId: 'place-1',
+      },
+      activeCommentReviewId: null,
+      activeTab: 'feed',
+      selectedPlaceId: null,
+      selectedFestivalId: null,
+      drawerState: 'closed',
+      selectedRoutePreview: null,
+      setMyPageTab,
+      setActiveCommentReviewId,
+      setHighlightedCommentId,
+      setHighlightedReviewId,
+      setFeedPlaceFilterId,
+      setSelectedRoutePreview,
+      setReturnView,
+      handleCloseReviewComments: vi.fn(),
+      goToTab: vi.fn(),
+      commitRouteState,
+    });
+
+    navigation.handleNavigateBack();
+
+    expect(setMyPageTab).toHaveBeenCalledWith('comments');
+    expect(setActiveCommentReviewId).toHaveBeenCalledWith('review-1');
+    expect(setHighlightedCommentId).toHaveBeenCalledWith('comment-1');
+    expect(setHighlightedReviewId).toHaveBeenCalledWith('review-1');
+    expect(setFeedPlaceFilterId).toHaveBeenCalledWith('place-1');
+    expect(setSelectedRoutePreview).toHaveBeenCalledWith(null);
+    expect(setReturnView).toHaveBeenCalledWith(null);
+    expect(commitRouteState).toHaveBeenCalledWith(
+      {
+        tab: 'feed',
+        placeId: null,
+        festivalId: null,
+        drawerState: 'closed',
+      },
+      'replace',
+    );
+  });
 });
