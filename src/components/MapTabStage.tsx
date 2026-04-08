@@ -16,91 +16,70 @@ import type {
 } from '../types';
 
 interface MapTabStageProps {
-  activeCategory: Category;
-  setActiveCategory: (category: Category) => void;
-  filteredPlaces: Place[];
-  festivals: FestivalItem[];
-  selectedPlace: Place | null;
-  selectedFestival: FestivalItem | null;
-  currentPosition: { latitude: number; longitude: number } | null;
-  mapLocationStatus: ApiStatus;
-  mapLocationFocusKey: number;
-  drawerState: DrawerState;
-  sessionUser: SessionUser | null;
-  selectedPlaceReviews: BootstrapResponse['reviews'];
-  routePreview: RoutePreview | null;
-  routePreviewPlaces: Place[];
-  visitCount: number;
-  latestStamp: BootstrapResponse['stamps']['logs'][number] | null;
-  todayStamp: BootstrapResponse['stamps']['logs'][number] | null;
-  stampActionStatus: ApiStatus;
-  stampActionMessage: string;
-  reviewProofMessage: string;
-  reviewError: string | null;
-  reviewSubmitting: boolean;
-  canCreateReview: boolean;
-  hasCreatedReviewToday: boolean;
-  onOpenFeedReview: () => void;
-  onClearRoutePreview: () => void;
-  initialMapCenter?: { lat: number; lng: number };
-  initialMapZoom?: number;
-  onOpenPlace: (placeId: string) => void;
-  onOpenRoutePreviewPlace: (placeId: string) => void;
-  onOpenFestival: (festivalId: string) => void;
-  onCloseDrawer: () => void;
-  onExpandPlaceDrawer: () => void;
-  onCollapsePlaceDrawer: () => void;
-  onExpandFestivalDrawer: () => void;
-  onCollapseFestivalDrawer: () => void;
-  onRequestLogin: () => void;
-  onClaimStamp: (place: Place) => Promise<void>;
-  onCreateReview: (payload: { stampId: string; body: string; mood: ReviewMood; file: File | null }) => Promise<void>;
-  onLocateCurrentPosition: () => void;
-  onMapViewportChange: (lat: number, lng: number, zoom: number) => void;
+  mapData: {
+    activeCategory: Category;
+    filteredPlaces: Place[];
+    festivals: FestivalItem[];
+    currentPosition: { latitude: number; longitude: number } | null;
+    mapLocationStatus: ApiStatus;
+    mapLocationFocusKey: number;
+    routePreviewPlaces: Place[];
+  };
+  routePreviewData: {
+    routePreview: RoutePreview | null;
+    onClearRoutePreview: () => void;
+    onOpenRoutePreviewPlace: (placeId: string) => void;
+  };
+  viewportData: {
+    initialMapCenter?: { lat: number; lng: number };
+    initialMapZoom?: number;
+    onLocateCurrentPosition: () => void;
+    onMapViewportChange: (lat: number, lng: number, zoom: number) => void;
+  };
+  placeSheet: {
+    selectedPlace: Place | null;
+    drawerState: DrawerState;
+    sessionUser: SessionUser | null;
+    selectedPlaceReviews: BootstrapResponse['reviews'];
+    visitCount: number;
+    latestStamp: BootstrapResponse['stamps']['logs'][number] | null;
+    todayStamp: BootstrapResponse['stamps']['logs'][number] | null;
+    stampActionStatus: ApiStatus;
+    stampActionMessage: string;
+    reviewProofMessage: string;
+    reviewError: string | null;
+    reviewSubmitting: boolean;
+    canCreateReview: boolean;
+    hasCreatedReviewToday: boolean;
+    onOpenPlace: (placeId: string) => void;
+    onOpenFeedReview: () => void;
+    onCloseDrawer: () => void;
+    onExpandPlaceDrawer: () => void;
+    onCollapsePlaceDrawer: () => void;
+    onRequestLogin: () => void;
+    onClaimStamp: (place: Place) => Promise<void>;
+    onCreateReview: (payload: { stampId: string; body: string; mood: ReviewMood; file: File | null }) => Promise<void>;
+  };
+  festivalSheet: {
+    selectedFestival: FestivalItem | null;
+    drawerState: DrawerState;
+    onOpenFestival: (festivalId: string) => void;
+    onCloseDrawer: () => void;
+    onExpandFestivalDrawer: () => void;
+    onCollapseFestivalDrawer: () => void;
+  };
+  mapActions: {
+    setActiveCategory: (category: Category) => void;
+  };
 }
 
 export function MapTabStage({
-  activeCategory,
-  setActiveCategory,
-  filteredPlaces,
-  festivals,
-  selectedPlace,
-  selectedFestival,
-  currentPosition,
-  mapLocationStatus,
-  mapLocationFocusKey,
-  drawerState,
-  sessionUser,
-  selectedPlaceReviews,
-  routePreview,
-  routePreviewPlaces,
-  visitCount,
-  latestStamp,
-  todayStamp,
-  stampActionStatus,
-  stampActionMessage,
-  reviewProofMessage,
-  reviewError,
-  reviewSubmitting,
-  canCreateReview,
-  hasCreatedReviewToday,
-  onOpenFeedReview,
-  onClearRoutePreview,
-  initialMapCenter,
-  initialMapZoom,
-  onOpenPlace,
-  onOpenRoutePreviewPlace,
-  onOpenFestival,
-  onCloseDrawer,
-  onExpandPlaceDrawer,
-  onCollapsePlaceDrawer,
-  onExpandFestivalDrawer,
-  onCollapseFestivalDrawer,
-  onRequestLogin,
-  onClaimStamp,
-  onCreateReview,
-  onLocateCurrentPosition,
-  onMapViewportChange,
+  mapData,
+  routePreviewData,
+  viewportData,
+  placeSheet,
+  festivalSheet,
+  mapActions,
 }: MapTabStageProps) {
   return (
     <div className="map-stage">
@@ -119,14 +98,14 @@ export function MapTabStage({
       <div className="map-filter-strip">
         <div className="chip-row compact-gap">
           {categoryItems.map((item) => {
-            const isActive = item.key === activeCategory;
+            const isActive = item.key === mapData.activeCategory;
             const info = item.key === 'all' ? null : categoryInfo[item.key];
             return (
               <button
                 key={item.key}
                 type="button"
                 className={isActive ? 'chip is-active map-filter-chip' : 'chip map-filter-chip'}
-                onClick={() => setActiveCategory(item.key)}
+                onClick={() => mapActions.setActiveCategory(item.key)}
                 style={
                   info
                     ? {
@@ -145,52 +124,57 @@ export function MapTabStage({
       </div>
 
       <NaverMap
-        places={filteredPlaces}
-        festivals={festivals}
-        selectedPlaceId={selectedPlace?.id ?? null}
-        selectedFestivalId={selectedFestival?.id ?? null}
-        onSelectPlace={onOpenPlace}
-        onSelectFestival={onOpenFestival}
-        currentPosition={currentPosition}
-        currentLocationStatus={mapLocationStatus}
+        places={mapData.filteredPlaces}
+        festivals={mapData.festivals}
+        selectedPlaceId={placeSheet.selectedPlace?.id ?? null}
+        selectedFestivalId={festivalSheet.selectedFestival?.id ?? null}
+        onSelectPlace={placeSheet.onOpenPlace}
+        onSelectFestival={festivalSheet.onOpenFestival}
+        currentPosition={mapData.currentPosition}
+        currentLocationStatus={mapData.mapLocationStatus}
         currentLocationMessage={null}
-        focusCurrentLocationKey={mapLocationFocusKey}
-        onLocateCurrentPosition={onLocateCurrentPosition}
-        initialCenter={initialMapCenter}
-        initialZoom={initialMapZoom}
-        onViewportChange={onMapViewportChange}
-        routePreviewPlaces={routePreviewPlaces}
+        focusCurrentLocationKey={mapData.mapLocationFocusKey}
+        onLocateCurrentPosition={viewportData.onLocateCurrentPosition}
+        initialCenter={viewportData.initialMapCenter}
+        initialZoom={viewportData.initialMapZoom}
+        onViewportChange={viewportData.onMapViewportChange}
+        routePreviewPlaces={mapData.routePreviewPlaces}
         height="100%"
       />
 
-      {!selectedPlace && !selectedFestival && routePreview && (
+      {!placeSheet.selectedPlace && !festivalSheet.selectedFestival && routePreviewData.routePreview && (
         <section className="map-route-preview-card">
           <div className="map-route-preview-card__top">
             <div>
               <p className="eyebrow">ROUTE PREVIEW</p>
-              <h3>{routePreview.title}</h3>
-              <p className="section-copy">{routePreview.subtitle}</p>
+              <h3>{routePreviewData.routePreview.title}</h3>
+              <p className="section-copy">{routePreviewData.routePreview.subtitle}</p>
             </div>
-            <button type="button" className="map-route-preview-card__close" onClick={onClearRoutePreview} aria-label="경로 미리보기 닫기">
+            <button
+              type="button"
+              className="map-route-preview-card__close"
+              onClick={routePreviewData.onClearRoutePreview}
+              aria-label="경로 미리보기 닫기"
+            >
               <span aria-hidden="true">{'\u00D7'}</span>
             </button>
           </div>
           <div className="course-card__places community-route-places map-route-preview-card__places">
-            {routePreview.placeIds.map((placeId, index) => (
+            {routePreviewData.routePreview.placeIds.map((placeId, index) => (
               <button
-                key={routePreview.id + '-' + placeId}
+                key={routePreviewData.routePreview!.id + '-' + placeId}
                 type="button"
                 className="soft-tag soft-tag--button course-card__place"
-                onClick={() => onOpenRoutePreviewPlace(placeId)}
+                onClick={() => routePreviewData.onOpenRoutePreviewPlace(placeId)}
               >
-                {index + 1}. {routePreview.placeNames[index] ?? placeId}
+                {index + 1}. {routePreviewData.routePreview!.placeNames[index] ?? placeId}
               </button>
             ))}
           </div>
         </section>
       )}
 
-      {!selectedPlace && !selectedFestival && (
+      {!placeSheet.selectedPlace && !festivalSheet.selectedFestival && (
         <section className="map-drawer-teaser">
           <span className="map-drawer-teaser__handle" aria-hidden="true" />
           <div className="map-drawer-teaser__peek" aria-hidden="true">
@@ -206,37 +190,37 @@ export function MapTabStage({
       )}
 
       <PlaceDetailSheet
-        place={selectedPlace}
-        reviews={selectedPlaceReviews}
-        isOpen={Boolean(selectedPlace) && drawerState !== 'closed'}
-        drawerState={drawerState}
-        loggedIn={Boolean(sessionUser)}
-        visitCount={visitCount}
-        latestStamp={latestStamp}
-        todayStamp={todayStamp}
-        hasCreatedReviewToday={hasCreatedReviewToday}
-        stampActionStatus={stampActionStatus}
-        stampActionMessage={stampActionMessage}
-        reviewProofMessage={reviewProofMessage}
-        reviewError={reviewError}
-        reviewSubmitting={reviewSubmitting}
-        canCreateReview={canCreateReview}
-        onOpenFeedReview={onOpenFeedReview}
-        onClose={onCloseDrawer}
-        onExpand={onExpandPlaceDrawer}
-        onCollapse={onCollapsePlaceDrawer}
-        onRequestLogin={onRequestLogin}
-        onClaimStamp={onClaimStamp}
-        onCreateReview={onCreateReview}
+        place={placeSheet.selectedPlace}
+        reviews={placeSheet.selectedPlaceReviews}
+        isOpen={Boolean(placeSheet.selectedPlace) && placeSheet.drawerState !== 'closed'}
+        drawerState={placeSheet.drawerState}
+        loggedIn={Boolean(placeSheet.sessionUser)}
+        visitCount={placeSheet.visitCount}
+        latestStamp={placeSheet.latestStamp}
+        todayStamp={placeSheet.todayStamp}
+        hasCreatedReviewToday={placeSheet.hasCreatedReviewToday}
+        stampActionStatus={placeSheet.stampActionStatus}
+        stampActionMessage={placeSheet.stampActionMessage}
+        reviewProofMessage={placeSheet.reviewProofMessage}
+        reviewError={placeSheet.reviewError}
+        reviewSubmitting={placeSheet.reviewSubmitting}
+        canCreateReview={placeSheet.canCreateReview}
+        onOpenFeedReview={placeSheet.onOpenFeedReview}
+        onClose={placeSheet.onCloseDrawer}
+        onExpand={placeSheet.onExpandPlaceDrawer}
+        onCollapse={placeSheet.onCollapsePlaceDrawer}
+        onRequestLogin={placeSheet.onRequestLogin}
+        onClaimStamp={placeSheet.onClaimStamp}
+        onCreateReview={placeSheet.onCreateReview}
       />
 
       <FestivalDetailSheet
-        festival={selectedFestival}
-        isOpen={Boolean(selectedFestival) && drawerState !== 'closed'}
-        drawerState={drawerState}
-        onClose={onCloseDrawer}
-        onExpand={onExpandFestivalDrawer}
-        onCollapse={onCollapseFestivalDrawer}
+        festival={festivalSheet.selectedFestival}
+        isOpen={Boolean(festivalSheet.selectedFestival) && festivalSheet.drawerState !== 'closed'}
+        drawerState={festivalSheet.drawerState}
+        onClose={festivalSheet.onCloseDrawer}
+        onExpand={festivalSheet.onExpandFestivalDrawer}
+        onCollapse={festivalSheet.onCollapseFestivalDrawer}
       />
     </div>
   );

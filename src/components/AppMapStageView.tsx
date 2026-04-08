@@ -65,11 +65,61 @@ export const AppMapStageView = memo(function AppMapStageView({
 }: AppMapStageViewProps) {
   return (
     <MapTabStage
-      {...mapData}
-      {...mapActions}
-      onOpenFeedReview={mapActions.onOpenPlaceFeed}
-      initialMapCenter={{ lat: mapData.initialMapViewport.lat, lng: mapData.initialMapViewport.lng }}
-      initialMapZoom={mapData.initialMapViewport.zoom}
+      mapData={{
+        activeCategory: mapData.activeCategory,
+        filteredPlaces: mapData.filteredPlaces,
+        festivals: mapData.festivals,
+        currentPosition: mapData.currentPosition,
+        mapLocationStatus: mapData.mapLocationStatus,
+        mapLocationFocusKey: mapData.mapLocationFocusKey,
+        routePreviewPlaces: mapData.routePreviewPlaces,
+      }}
+      routePreviewData={{
+        routePreview: mapData.routePreview,
+        onClearRoutePreview: mapActions.onClearRoutePreview,
+        onOpenRoutePreviewPlace: mapActions.onOpenRoutePreviewPlace,
+      }}
+      viewportData={{
+        initialMapCenter: { lat: mapData.initialMapViewport.lat, lng: mapData.initialMapViewport.lng },
+        initialMapZoom: mapData.initialMapViewport.zoom,
+        onLocateCurrentPosition: mapActions.onLocateCurrentPosition,
+        onMapViewportChange: mapActions.onMapViewportChange,
+      }}
+      placeSheet={{
+        selectedPlace: mapData.selectedPlace,
+        drawerState: mapData.drawerState,
+        sessionUser: mapData.sessionUser,
+        selectedPlaceReviews: mapData.selectedPlaceReviews,
+        visitCount: mapData.visitCount,
+        latestStamp: mapData.latestStamp,
+        todayStamp: mapData.todayStamp,
+        stampActionStatus: mapData.stampActionStatus,
+        stampActionMessage: mapData.stampActionMessage,
+        reviewProofMessage: mapData.reviewProofMessage,
+        reviewError: mapData.reviewError,
+        reviewSubmitting: mapData.reviewSubmitting,
+        canCreateReview: mapData.canCreateReview,
+        hasCreatedReviewToday: mapData.hasCreatedReviewToday,
+        onOpenPlace: mapActions.onOpenPlace,
+        onOpenFeedReview: mapActions.onOpenPlaceFeed,
+        onCloseDrawer: mapActions.onCloseDrawer,
+        onExpandPlaceDrawer: mapActions.onExpandPlaceDrawer,
+        onCollapsePlaceDrawer: mapActions.onCollapsePlaceDrawer,
+        onRequestLogin: mapActions.onRequestLogin,
+        onClaimStamp: mapActions.onClaimStamp,
+        onCreateReview: mapActions.onCreateReview,
+      }}
+      festivalSheet={{
+        selectedFestival: mapData.selectedFestival,
+        drawerState: mapData.drawerState,
+        onOpenFestival: mapActions.onOpenFestival,
+        onCloseDrawer: mapActions.onCloseDrawer,
+        onExpandFestivalDrawer: mapActions.onExpandFestivalDrawer,
+        onCollapseFestivalDrawer: mapActions.onCollapseFestivalDrawer,
+      }}
+      mapActions={{
+        setActiveCategory: mapActions.setActiveCategory,
+      }}
     />
   );
 });

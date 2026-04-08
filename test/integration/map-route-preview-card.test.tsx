@@ -20,63 +20,77 @@ describe('MapTabStage route preview card', () => {
   it('opens the selected place detail directly from the route preview list', () => {
     const onOpenRoutePreviewPlace = vi.fn();
     const places = [
-      { ...placeFixture, id: 'place-1', name: '첫 번째 장소' },
-      { ...placeFixture, id: 'place-2', positionId: 'position-2', name: '두 번째 장소', latitude: 36.351, longitude: 127.385 },
+      { ...placeFixture, id: 'place-1', name: '첫번째 장소' },
+      { ...placeFixture, id: 'place-2', positionId: 'position-2', name: '두번째 장소', latitude: 36.351, longitude: 127.385 },
     ];
     const routePreview: RoutePreview = {
       id: 'route-1',
-      title: '빵집 산책 코스',
+      title: '맛집 탐방 코스',
       subtitle: 'tester / 04. 05. 12:00',
-      mood: '데이트',
+      mood: 'exciting',
       placeIds: places.map((place) => place.id),
       placeNames: places.map((place) => place.name),
     };
 
     render(
       <MapTabStage
-        activeCategory="all"
-        setActiveCategory={vi.fn()}
-        filteredPlaces={places}
-        festivals={[]}
-        selectedPlace={null}
-        selectedFestival={null}
-        currentPosition={null}
-        mapLocationStatus="idle"
-        mapLocationFocusKey={0}
-        drawerState="closed"
-        sessionUser={sessionUserFixture}
-        selectedPlaceReviews={[createReviewFixture()]}
-        routePreview={routePreview}
-        routePreviewPlaces={places}
-        visitCount={0}
-        latestStamp={null}
-        todayStamp={null}
-        stampActionStatus="idle"
-        stampActionMessage="스탬프 안내"
-        reviewProofMessage="리뷰 안내"
-        reviewError={null}
-        reviewSubmitting={false}
-        canCreateReview={false}
-        hasCreatedReviewToday={false}
-        onOpenFeedReview={vi.fn()}
-        onClearRoutePreview={vi.fn()}
-        onOpenPlace={vi.fn()}
-        onOpenRoutePreviewPlace={onOpenRoutePreviewPlace}
-        onOpenFestival={vi.fn()}
-        onCloseDrawer={vi.fn()}
-        onExpandPlaceDrawer={vi.fn()}
-        onCollapsePlaceDrawer={vi.fn()}
-        onExpandFestivalDrawer={vi.fn()}
-        onCollapseFestivalDrawer={vi.fn()}
-        onRequestLogin={vi.fn()}
-        onClaimStamp={vi.fn()}
-        onCreateReview={vi.fn()}
-        onLocateCurrentPosition={vi.fn()}
-        onMapViewportChange={vi.fn()}
+        mapData={{
+          activeCategory: 'all',
+          filteredPlaces: places,
+          festivals: [],
+          currentPosition: null,
+          mapLocationStatus: 'idle',
+          mapLocationFocusKey: 0,
+          routePreviewPlaces: places,
+        }}
+        routePreviewData={{
+          routePreview,
+          onClearRoutePreview: vi.fn(),
+          onOpenRoutePreviewPlace,
+        }}
+        viewportData={{
+          onLocateCurrentPosition: vi.fn(),
+          onMapViewportChange: vi.fn(),
+        }}
+        placeSheet={{
+          selectedPlace: null,
+          drawerState: 'closed',
+          sessionUser: sessionUserFixture,
+          selectedPlaceReviews: [createReviewFixture()],
+          visitCount: 0,
+          latestStamp: null,
+          todayStamp: null,
+          stampActionStatus: 'idle',
+          stampActionMessage: '스탬프 안내',
+          reviewProofMessage: '리뷰 안내',
+          reviewError: null,
+          reviewSubmitting: false,
+          canCreateReview: false,
+          hasCreatedReviewToday: false,
+          onOpenPlace: vi.fn(),
+          onOpenFeedReview: vi.fn(),
+          onCloseDrawer: vi.fn(),
+          onExpandPlaceDrawer: vi.fn(),
+          onCollapsePlaceDrawer: vi.fn(),
+          onRequestLogin: vi.fn(),
+          onClaimStamp: vi.fn(),
+          onCreateReview: vi.fn(),
+        }}
+        festivalSheet={{
+          selectedFestival: null,
+          drawerState: 'closed',
+          onOpenFestival: vi.fn(),
+          onCloseDrawer: vi.fn(),
+          onExpandFestivalDrawer: vi.fn(),
+          onCollapseFestivalDrawer: vi.fn(),
+        }}
+        mapActions={{
+          setActiveCategory: vi.fn(),
+        }}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '2. 두 번째 장소' }));
+    fireEvent.click(screen.getByRole('button', { name: '2. 두번째 장소' }));
 
     expect(onOpenRoutePreviewPlace).toHaveBeenCalledWith('place-2');
   });
