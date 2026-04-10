@@ -2,7 +2,8 @@
 import { getLoginReturnUrl } from './useAppRouteState';
 import type { Dispatch, SetStateAction } from 'react';
 import { useAuthStore } from '../store/auth-store';
-import { useAppRuntimeStore } from '../store/app-runtime-store';
+import { useAppPageRuntimeStore } from '../store/app-page-runtime-store';
+import { useAppShellRuntimeStore } from '../store/app-shell-runtime-store';
 import type { MyPageResponse, SessionUser } from '../types';
 
 type SetState<T> = Dispatch<SetStateAction<T>>;
@@ -25,10 +26,10 @@ export function useAppAuthActions({
 }: UseAppAuthActionsParams) {
   const setSessionUser = useAuthStore((state) => state.setSessionUser);
   const setProviders = useAuthStore((state) => state.setProviders);
-  const setNotice = useAppRuntimeStore((state) => state.setNotice);
-  const setIsLoggingOut = useAppRuntimeStore((state) => state.setIsLoggingOut);
-  const setProfileSaving = useAppRuntimeStore((state) => state.setProfileSaving);
-  const setProfileError = useAppRuntimeStore((state) => state.setProfileError);
+  const setNotice = useAppShellRuntimeStore((state) => state.setNotice);
+  const setIsLoggingOut = useAppPageRuntimeStore((state) => state.setIsLoggingOut);
+  const setProfileSaving = useAppPageRuntimeStore((state) => state.setProfileSaving);
+  const setProfileError = useAppPageRuntimeStore((state) => state.setProfileError);
 
   function startProviderLogin(provider: 'naver' | 'kakao') {
     window.location.assign(getProviderLoginUrl(provider, getLoginReturnUrl()));

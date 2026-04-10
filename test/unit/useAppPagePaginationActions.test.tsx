@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppPagePaginationActions } from '../../src/hooks/useAppPagePaginationActions';
-import { useAppRuntimeStore } from '../../src/store/app-runtime-store';
+import { useAppPageRuntimeStore } from '../../src/store/app-page-runtime-store';
 import { createReviewFixture, myCommentFixture, myPageFixture, sessionUserFixture } from '../fixtures/app-fixtures';
 import type { MyPageResponse, Review } from '../../src/types';
 
@@ -15,7 +15,7 @@ import { getMyCommentsPage, getReviewFeedPage } from '../../src/api/client';
 describe('useAppPagePaginationActions', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    useAppRuntimeStore.setState({
+    useAppPageRuntimeStore.setState({
       feedNextCursor: null,
       feedHasMore: false,
       feedLoadingMore: false,
@@ -28,7 +28,7 @@ describe('useAppPagePaginationActions', () => {
 
   it('appends deduped summarized reviews when loading more feed items', async () => {
     let reviews: Review[] = [createReviewFixture({ id: 'review-1', comments: [] })];
-    useAppRuntimeStore.setState({
+    useAppPageRuntimeStore.setState({
       feedNextCursor: 'cursor-1',
       feedHasMore: true,
       feedLoadingMore: false,
@@ -62,9 +62,9 @@ describe('useAppPagePaginationActions', () => {
       ...createReviewFixture({ id: 'review-2', comments: [myPageFixture.reviews[0].comments[0]], commentCount: 1 }),
       comments: [],
     });
-    expect(useAppRuntimeStore.getState().feedNextCursor).toBe('cursor-2');
-    expect(useAppRuntimeStore.getState().feedHasMore).toBe(true);
-    expect(useAppRuntimeStore.getState().feedLoadingMore).toBe(false);
+    expect(useAppPageRuntimeStore.getState().feedNextCursor).toBe('cursor-2');
+    expect(useAppPageRuntimeStore.getState().feedHasMore).toBe(true);
+    expect(useAppPageRuntimeStore.getState().feedLoadingMore).toBe(false);
   });
 
   it('replaces my comments on initial load and appends deduped items otherwise', async () => {
@@ -72,7 +72,7 @@ describe('useAppPagePaginationActions', () => {
       ...myPageFixture,
       comments: [myCommentFixture],
     };
-    useAppRuntimeStore.setState({
+    useAppPageRuntimeStore.setState({
       myCommentsNextCursor: 'cursor-1',
       myCommentsHasMore: true,
       myCommentsLoadingMore: false,
@@ -104,9 +104,9 @@ describe('useAppPagePaginationActions', () => {
     });
     expect(getMyCommentsPage).toHaveBeenNthCalledWith(1, { cursor: null, limit: 10 });
     expect(myPage?.comments.map((comment) => comment.id)).toEqual(['comment-2']);
-    expect(useAppRuntimeStore.getState().myCommentsNextCursor).toBe('cursor-2');
-    expect(useAppRuntimeStore.getState().myCommentsHasMore).toBe(true);
-    expect(useAppRuntimeStore.getState().myCommentsLoadedOnce).toBe(true);
+    expect(useAppPageRuntimeStore.getState().myCommentsNextCursor).toBe('cursor-2');
+    expect(useAppPageRuntimeStore.getState().myCommentsHasMore).toBe(true);
+    expect(useAppPageRuntimeStore.getState().myCommentsLoadedOnce).toBe(true);
     rerender();
 
     await act(async () => {
@@ -114,8 +114,8 @@ describe('useAppPagePaginationActions', () => {
     });
     expect(getMyCommentsPage).toHaveBeenNthCalledWith(2, { cursor: 'cursor-2', limit: 10 });
     expect(myPage?.comments.map((comment) => comment.id)).toEqual(['comment-2', 'comment-3']);
-    expect(useAppRuntimeStore.getState().myCommentsNextCursor).toBeNull();
-    expect(useAppRuntimeStore.getState().myCommentsHasMore).toBe(false);
-    expect(useAppRuntimeStore.getState().myCommentsLoadingMore).toBe(false);
+    expect(useAppPageRuntimeStore.getState().myCommentsNextCursor).toBeNull();
+    expect(useAppPageRuntimeStore.getState().myCommentsHasMore).toBe(false);
+    expect(useAppPageRuntimeStore.getState().myCommentsLoadingMore).toBe(false);
   });
 });

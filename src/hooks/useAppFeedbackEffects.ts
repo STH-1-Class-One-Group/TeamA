@@ -1,6 +1,6 @@
 ﻿import { useEffect } from 'react';
 import { formatDistanceMeters } from '../lib/visits';
-import { useAppRuntimeStore } from '../store/app-runtime-store';
+import { useAppShellRuntimeStore } from '../store/app-shell-runtime-store';
 import type { Place, SessionUser, StampLog } from '../types';
 
 interface UseAppFeedbackEffectsParams {
@@ -24,9 +24,9 @@ export function useAppFeedbackEffects({
   stampUnlockRadiusMeters,
   noticeDismissDelayMs,
 }: UseAppFeedbackEffectsParams) {
-  const setStampActionMessage = useAppRuntimeStore((state) => state.setStampActionMessage);
-  const setNotice = useAppRuntimeStore((state) => state.setNotice);
-  const setMapLocationMessage = useAppRuntimeStore((state) => state.setMapLocationMessage);
+  const setStampActionMessage = useAppShellRuntimeStore((state) => state.setStampActionMessage);
+  const setNotice = useAppShellRuntimeStore((state) => state.setNotice);
+  const setMapLocationMessage = useAppShellRuntimeStore((state) => state.setMapLocationMessage);
 
   useEffect(() => {
     if (!selectedPlace) {

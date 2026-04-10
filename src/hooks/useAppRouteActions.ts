@@ -1,7 +1,8 @@
 ﻿import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { createUserRoute, toggleCommunityRouteLike } from '../api/client';
 import { useAuthStore } from '../store/auth-store';
-import { useAppRuntimeStore } from '../store/app-runtime-store';
+import { useAppPageRuntimeStore } from '../store/app-page-runtime-store';
+import { useAppShellRuntimeStore } from '../store/app-shell-runtime-store';
 import { useMyPageStore } from '../store/my-page-store';
 import type { MyPageResponse, SessionUser, Tab, UserRoute } from '../types';
 
@@ -27,10 +28,10 @@ export function useAppRouteActions({
   goToTab,
 }: UseAppRouteActionsParams) {
   const sessionUser = useAuthStore((state) => state.sessionUser);
-  const setRouteLikeUpdatingId = useAppRuntimeStore((state) => state.setRouteLikeUpdatingId);
-  const setRouteSubmitting = useAppRuntimeStore((state) => state.setRouteSubmitting);
-  const setRouteError = useAppRuntimeStore((state) => state.setRouteError);
-  const setNotice = useAppRuntimeStore((state) => state.setNotice);
+  const setRouteLikeUpdatingId = useAppPageRuntimeStore((state) => state.setRouteLikeUpdatingId);
+  const setRouteSubmitting = useAppPageRuntimeStore((state) => state.setRouteSubmitting);
+  const setRouteError = useAppPageRuntimeStore((state) => state.setRouteError);
+  const setNotice = useAppShellRuntimeStore((state) => state.setNotice);
   const setMyPageTab = useMyPageStore((state) => state.setMyPageTab);
 
   async function handleToggleRouteLike(routeId: string) {

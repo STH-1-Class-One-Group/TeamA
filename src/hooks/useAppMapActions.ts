@@ -2,7 +2,7 @@
 import { claimStamp } from '../api/client';
 import { getCurrentDevicePosition } from '../lib/geolocation';
 import { formatDistanceMeters } from '../lib/visits';
-import { useAppRuntimeStore } from '../store/app-runtime-store';
+import { useAppShellRuntimeStore } from '../store/app-shell-runtime-store';
 import type { ApiStatus, DrawerState, Place, SessionUser, StampState, Tab } from '../types';
 import type { RouteStateCommitOptions } from './useAppRouteState';
 
@@ -32,12 +32,12 @@ export function useAppMapActions({
   refreshMyPageForUser,
   formatErrorMessage,
 }: UseAppMapActionsParams) {
-  const setCurrentPosition = useAppRuntimeStore((state) => state.setCurrentPosition);
-  const setMapLocationStatus = useAppRuntimeStore((state) => state.setMapLocationStatus);
-  const setMapLocationMessage = useAppRuntimeStore((state) => state.setMapLocationMessage);
-  const setMapLocationFocusKey = useAppRuntimeStore((state) => state.setMapLocationFocusKey);
-  const setNotice = useAppRuntimeStore((state) => state.setNotice);
-  const setStampActionStatus = useAppRuntimeStore((state) => state.setStampActionStatus);
+  const setCurrentPosition = useAppShellRuntimeStore((state) => state.setCurrentPosition);
+  const setMapLocationStatus = useAppShellRuntimeStore((state) => state.setMapLocationStatus);
+  const setMapLocationMessage = useAppShellRuntimeStore((state) => state.setMapLocationMessage);
+  const setMapLocationFocusKey = useAppShellRuntimeStore((state) => state.setMapLocationFocusKey);
+  const setNotice = useAppShellRuntimeStore((state) => state.setNotice);
+  const setStampActionStatus = useAppShellRuntimeStore((state) => state.setStampActionStatus);
 
   async function refreshCurrentPosition(shouldFocusMap: boolean) {
     setMapLocationStatus('loading');

@@ -109,9 +109,11 @@
   - [x] notice / current position / map location status
   - [x] review / comment mutation flags
   - [x] feed / my comments pagination flags
+- [x] runtime store 2차 분리
+  - [x] `app-shell-runtime-store`
+  - [x] `app-page-runtime-store`
 
 ### 남은 TODO
-- [ ] 현재 `app-runtime-store`를 shell runtime과 page runtime으로 더 나눌지 결정
 - [ ] 기존 selector/액션이 어떤 컴포넌트에서 쓰이는지 매핑
 - [ ] store 분리 후 컴포넌트별 의존 범위 최소화
 - [ ] 전역 notice 같은 cross-cutting 상태는 별도 `ui-shell` 또는 `app-shell` 계층으로 유지할지 결정

@@ -10,7 +10,7 @@ import {
   uploadReviewImage,
 } from '../api/client';
 import { countCommentsInThread, toReviewSummary } from '../lib/reviews';
-import { useAppRuntimeStore } from '../store/app-runtime-store';
+import { useAppPageRuntimeStore } from '../store/app-page-runtime-store';
 import { useReviewUIStore } from '../store/review-ui-store';
 import type { RouteStateCommitOptions } from './useAppRouteState';
 import type {
@@ -80,12 +80,12 @@ export function useAppReviewActions({
   clearReviewComments,
   formatErrorMessage,
 }: UseAppReviewActionsParams) {
-  const setReviewSubmitting = useAppRuntimeStore((state) => state.setReviewSubmitting);
-  const setReviewError = useAppRuntimeStore((state) => state.setReviewError);
-  const setCommentSubmittingReviewId = useAppRuntimeStore((state) => state.setCommentSubmittingReviewId);
-  const setCommentMutatingId = useAppRuntimeStore((state) => state.setCommentMutatingId);
-  const setDeletingReviewId = useAppRuntimeStore((state) => state.setDeletingReviewId);
-  const setReviewLikeUpdatingId = useAppRuntimeStore((state) => state.setReviewLikeUpdatingId);
+  const setReviewSubmitting = useAppPageRuntimeStore((state) => state.setReviewSubmitting);
+  const setReviewError = useAppPageRuntimeStore((state) => state.setReviewError);
+  const setCommentSubmittingReviewId = useAppPageRuntimeStore((state) => state.setCommentSubmittingReviewId);
+  const setCommentMutatingId = useAppPageRuntimeStore((state) => state.setCommentMutatingId);
+  const setDeletingReviewId = useAppPageRuntimeStore((state) => state.setDeletingReviewId);
+  const setReviewLikeUpdatingId = useAppPageRuntimeStore((state) => state.setReviewLikeUpdatingId);
   const setHighlightedReviewId = useReviewUIStore((state) => state.setHighlightedReviewId);
 
   async function handleCreateReview(payload: { stampId: string; body: string; mood: ReviewMood; file: File | null }) {

@@ -2,7 +2,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { getAdminSummary, getCommunityRoutes, getMySummary, getReviewFeedPage } from '../api/client';
 import { toReviewSummaryList } from '../lib/reviews';
-import { useAppRuntimeStore } from '../store/app-runtime-store';
+import { useAppPageRuntimeStore } from '../store/app-page-runtime-store';
 import type {
   AdminSummaryResponse,
   CommunityRouteSort,
@@ -49,9 +49,9 @@ export function useAppTabDataLoaders({
   setAdminSummary,
   setMyPage,
 }: UseAppTabDataLoadersParams) {
-  const setFeedHasMore = useAppRuntimeStore((state) => state.setFeedHasMore);
-  const setFeedNextCursor = useAppRuntimeStore((state) => state.setFeedNextCursor);
-  const setMyPageError = useAppRuntimeStore((state) => state.setMyPageError);
+  const setFeedHasMore = useAppPageRuntimeStore((state) => state.setFeedHasMore);
+  const setFeedNextCursor = useAppPageRuntimeStore((state) => state.setFeedNextCursor);
+  const setMyPageError = useAppPageRuntimeStore((state) => state.setMyPageError);
 
   const fetchCommunityRoutes = useCallback(async (sort: CommunityRouteSort, force = false) => {
     const cached = communityRoutesCacheRef.current[sort];

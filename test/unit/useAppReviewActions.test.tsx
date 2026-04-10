@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MyPageResponse, Review } from '../../src/types';
 import { useActiveReviewComments } from '../../src/hooks/useActiveReviewComments';
 import { useAppReviewActions } from '../../src/hooks/useAppReviewActions';
-import { useAppRuntimeStore } from '../../src/store/app-runtime-store';
+import { useAppPageRuntimeStore } from '../../src/store/app-page-runtime-store';
 import { useReviewUIStore } from '../../src/store/review-ui-store';
 import { createReviewFixture, myPageFixture, placeFixture, sessionUserFixture } from '../fixtures/app-fixtures';
 
@@ -25,7 +25,7 @@ describe('useAppReviewActions', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(getReviewComments).mockResolvedValue([]);
-    useAppRuntimeStore.setState({
+    useAppPageRuntimeStore.setState({
       reviewSubmitting: false,
       reviewError: null,
       reviewLikeUpdatingId: null,
@@ -136,7 +136,7 @@ describe('useAppReviewActions', () => {
   });
 
   it('reuses cached active comments while refreshing the thread in the background', async () => {
-    const refreshedComments = [{ ...myPageFixture.reviews[0].comments[0], body: '?덈줈怨좎묠???볤?' }];
+    const refreshedComments = [{ ...myPageFixture.reviews[0].comments[0], body: '새로 고친 댓글 본문' }];
     const setNotice = vi.fn();
     const formatErrorMessage = (error: unknown) => String(error);
     vi.mocked(getReviewComments)
