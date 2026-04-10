@@ -81,9 +81,9 @@ from .services.auth_service import (
 )
 from .services.my_page_service import read_my_page_service
 from .services.page_service import (
-    read_bootstrap_service,
     read_reviews_service,
 )
+from .services.bootstrap_service import read_bootstrap_service
 from .services.course_service import read_courses_service
 from .services.place_service import read_place_service, read_places_service
 from .services.stamp_service import (
