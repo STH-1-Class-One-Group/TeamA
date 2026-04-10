@@ -1,7 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
-import {
-  getAuthSession,
-} from './api/client';
+import { useEffect, useState } from 'react';
 import { AppMapStageView } from './components/AppMapStageView';
 import { AppPageStage } from './components/AppPageStage';
 import { BottomNav } from './components/BottomNav';
@@ -23,8 +20,10 @@ import { useAppFeedbackEffects } from './hooks/useAppFeedbackEffects';
 import { useGlobalNotifications } from './hooks/useGlobalNotifications';
 import { useAppMapActions } from './hooks/useAppMapActions';
 import { useAppNavigationHelpers } from './hooks/useAppNavigationHelpers';
+import { useAppPageRuntimeState } from './hooks/useAppPageRuntimeState';
 import { useAppReviewActions } from './hooks/useAppReviewActions';
 import { useAppRouteActions } from './hooks/useAppRouteActions';
+import { useAppShellRuntimeState } from './hooks/useAppShellRuntimeState';
 import { useAppShellNavigation } from './hooks/useAppShellNavigation';
 import { useAppTabDataLoaders } from './hooks/useAppTabDataLoaders';
 import { useAppViewModels } from './hooks/useAppViewModels';
@@ -34,8 +33,6 @@ import { useAppPagePaginationActions } from './hooks/useAppPagePaginationActions
 import { useAppPageStageActions } from './hooks/useAppPageStageActions';
 import { useAppMapStore } from './store/app-map-store';
 import { useAuthStore } from './store/auth-store';
-import { useAppPageRuntimeStore } from './store/app-page-runtime-store';
-import { useAppShellRuntimeStore } from './store/app-shell-runtime-store';
 import { useAppUIStore } from './store/app-ui-store';
 import { useMyPageStore } from './store/my-page-store';
 import { useReviewUIStore } from './store/review-ui-store';
@@ -88,47 +85,51 @@ export default function App() {
   const setSelectedRoutePreview = useAppMapStore((state) => state.setSelectedRoutePreview);
   const returnView = useAppUIStore((state) => state.returnView);
   const setReturnView = useAppUIStore((state) => state.setReturnView);
-  const notice = useAppShellRuntimeStore((state) => state.notice);
-  const setNotice = useAppShellRuntimeStore((state) => state.setNotice);
-  const currentPosition = useAppShellRuntimeStore((state) => state.currentPosition);
-  const setCurrentPosition = useAppShellRuntimeStore((state) => state.setCurrentPosition);
-  const mapLocationStatus = useAppShellRuntimeStore((state) => state.mapLocationStatus);
-  const setMapLocationStatus = useAppShellRuntimeStore((state) => state.setMapLocationStatus);
-  const mapLocationMessage = useAppShellRuntimeStore((state) => state.mapLocationMessage);
-  const setMapLocationMessage = useAppShellRuntimeStore((state) => state.setMapLocationMessage);
-  const mapLocationFocusKey = useAppShellRuntimeStore((state) => state.mapLocationFocusKey);
-  const setMapLocationFocusKey = useAppShellRuntimeStore((state) => state.setMapLocationFocusKey);
-  const stampActionStatus = useAppShellRuntimeStore((state) => state.stampActionStatus);
-  const setStampActionStatus = useAppShellRuntimeStore((state) => state.setStampActionStatus);
-  const stampActionMessage = useAppShellRuntimeStore((state) => state.stampActionMessage);
-  const setStampActionMessage = useAppShellRuntimeStore((state) => state.setStampActionMessage);
-  const bootstrapStatus = useAppShellRuntimeStore((state) => state.bootstrapStatus);
-  const bootstrapError = useAppShellRuntimeStore((state) => state.bootstrapError);
-  const reviewSubmitting = useAppPageRuntimeStore((state) => state.reviewSubmitting);
-  const reviewError = useAppPageRuntimeStore((state) => state.reviewError);
-  const reviewLikeUpdatingId = useAppPageRuntimeStore((state) => state.reviewLikeUpdatingId);
-  const commentSubmittingReviewId = useAppPageRuntimeStore((state) => state.commentSubmittingReviewId);
-  const commentMutatingId = useAppPageRuntimeStore((state) => state.commentMutatingId);
-  const deletingReviewId = useAppPageRuntimeStore((state) => state.deletingReviewId);
-  const routeSubmitting = useAppPageRuntimeStore((state) => state.routeSubmitting);
-  const setRouteSubmitting = useAppPageRuntimeStore((state) => state.setRouteSubmitting);
-  const routeError = useAppPageRuntimeStore((state) => state.routeError);
-  const setRouteError = useAppPageRuntimeStore((state) => state.setRouteError);
-  const routeLikeUpdatingId = useAppPageRuntimeStore((state) => state.routeLikeUpdatingId);
-  const setRouteLikeUpdatingId = useAppPageRuntimeStore((state) => state.setRouteLikeUpdatingId);
-  const profileSaving = useAppPageRuntimeStore((state) => state.profileSaving);
-  const setProfileSaving = useAppPageRuntimeStore((state) => state.setProfileSaving);
-  const profileError = useAppPageRuntimeStore((state) => state.profileError);
-  const setProfileError = useAppPageRuntimeStore((state) => state.setProfileError);
-  const myPageError = useAppPageRuntimeStore((state) => state.myPageError);
-  const setMyPageError = useAppPageRuntimeStore((state) => state.setMyPageError);
-  const isLoggingOut = useAppPageRuntimeStore((state) => state.isLoggingOut);
-  const setIsLoggingOut = useAppPageRuntimeStore((state) => state.setIsLoggingOut);
-  const feedHasMore = useAppPageRuntimeStore((state) => state.feedHasMore);
-  const feedLoadingMore = useAppPageRuntimeStore((state) => state.feedLoadingMore);
-  const myCommentsHasMore = useAppPageRuntimeStore((state) => state.myCommentsHasMore);
-  const myCommentsLoadingMore = useAppPageRuntimeStore((state) => state.myCommentsLoadingMore);
-  const myCommentsLoadedOnce = useAppPageRuntimeStore((state) => state.myCommentsLoadedOnce);
+  const {
+    notice,
+    setNotice,
+    currentPosition,
+    setCurrentPosition,
+    mapLocationStatus,
+    setMapLocationStatus,
+    mapLocationMessage,
+    setMapLocationMessage,
+    mapLocationFocusKey,
+    setMapLocationFocusKey,
+    stampActionStatus,
+    setStampActionStatus,
+    stampActionMessage,
+    setStampActionMessage,
+    bootstrapStatus,
+    bootstrapError,
+  } = useAppShellRuntimeState();
+  const {
+    reviewSubmitting,
+    reviewError,
+    reviewLikeUpdatingId,
+    commentSubmittingReviewId,
+    commentMutatingId,
+    deletingReviewId,
+    routeSubmitting,
+    setRouteSubmitting,
+    routeError,
+    setRouteError,
+    routeLikeUpdatingId,
+    setRouteLikeUpdatingId,
+    profileSaving,
+    setProfileSaving,
+    profileError,
+    setProfileError,
+    myPageError,
+    setMyPageError,
+    isLoggingOut,
+    setIsLoggingOut,
+    feedHasMore,
+    feedLoadingMore,
+    myCommentsHasMore,
+    myCommentsLoadingMore,
+    myCommentsLoadedOnce,
+  } = useAppPageRuntimeState();
 
   useEffect(() => {
     const initialNotice = getInitialNotice();
