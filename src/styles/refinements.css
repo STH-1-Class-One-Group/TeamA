@@ -1106,6 +1106,18 @@ body {
   flex-wrap: wrap !important;
 }
 
+.review-card__actions--my-feed-links {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: stretch !important;
+}
+
+.review-card__actions--my-feed-links .review-card__place-link {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin-top: 0 !important;
+}
+
 
 .place-drawer__proof-copy,
 .place-drawer__proof-action,
@@ -1267,7 +1279,7 @@ body {
 }
 
 .review-card__actions--my-feed .review-card__place-link--danger {
-  margin-left: auto !important;
+  margin-left: 0 !important;
 }
 
 

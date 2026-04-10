@@ -108,7 +108,7 @@ export function MyFeedTabSection({
                 }) : undefined}
               />
               {reviewEditError ? <p className="form-error-copy">{reviewEditError}</p> : null}
-              <div className="review-card__actions review-card__actions--my-feed">
+              <div className="review-card__actions review-card__actions--my-feed review-card__actions--my-feed-links">
                 <button
                   type="button"
                   className="secondary-button"
