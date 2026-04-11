@@ -1,13 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { getClientConfig } from '../config';
 import type { ApiStatus, FestivalItem, Place } from '../types';
-import { useNaverCurrentLocationMarker } from './naver-map/useNaverCurrentLocationMarker';
-import { useNaverCurrentLocationFocus } from './naver-map/useNaverCurrentLocationFocus';
-import { useNaverFestivalMarkers } from './naver-map/useNaverFestivalMarkers';
 import { useNaverMapInstance } from './naver-map/useNaverMapInstance';
-import { useNaverPlaceMarkers } from './naver-map/useNaverPlaceMarkers';
-import { useNaverRoutePreviewOverlay } from './naver-map/useNaverRoutePreviewOverlay';
-import { useNaverSelectionSync } from './naver-map/useNaverSelectionSync';
+import { useNaverMapInteractions } from './naver-map/useNaverMapInteractions';
 
 interface NaverMapProps {
   places: Place[];
@@ -47,10 +42,7 @@ export function NaverMap({
   height = '100%',
 }: NaverMapProps) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
-  const routeLineRef = useRef<any | null>(null);
-  const routeStepMarkersRef = useRef<any[]>([]);
   const onViewportChangeRef = useRef(onViewportChange);
-  const lastHandledCurrentLocationFocusKeyRef = useRef(0);
   const clientId = getClientConfig().naverMapClientId;
 
   useEffect(() => {
@@ -65,32 +57,7 @@ export function NaverMap({
     onViewportChangeRef,
   });
 
-  useNaverPlaceMarkers({
-    status,
-    mapsApi: window.naver?.maps,
-    mapRef,
-    places,
-    selectedPlaceId,
-    onSelectPlace,
-  });
-
-  useNaverFestivalMarkers({
-    status,
-    mapsApi: window.naver?.maps,
-    mapRef,
-    festivals,
-    selectedFestivalId,
-    onSelectFestival,
-  });
-
-  useNaverCurrentLocationMarker({
-    status,
-    mapsApi: window.naver?.maps,
-    mapRef,
-    currentPosition,
-  });
-
-  useNaverSelectionSync({
+  useNaverMapInteractions({
     status,
     mapsApi: window.naver?.maps,
     mapRef,
@@ -99,28 +66,11 @@ export function NaverMap({
     festivals,
     selectedPlaceId,
     selectedFestivalId,
-  });
-
-  useNaverCurrentLocationFocus({
-    status,
-    mapsApi: window.naver?.maps,
-    mapRef,
+    onSelectPlace,
+    onSelectFestival,
     currentPosition,
     focusCurrentLocationKey,
-    selectedPlaceId,
-    selectedFestivalId,
-    lastHandledCurrentLocationFocusKeyRef,
-  });
-
-  useNaverRoutePreviewOverlay({
-    status,
-    mapsApi: window.naver?.maps,
-    mapRef,
-    routeLineRef,
-    routeStepMarkersRef,
     routePreviewPlaces,
-    selectedPlaceId,
-    selectedFestivalId,
   });
 
   if (!clientId || status === 'error') {
