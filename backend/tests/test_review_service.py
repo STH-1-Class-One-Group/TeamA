@@ -36,7 +36,7 @@ def build_notification(notification_id: str) -> UserNotificationOut:
 
 def test_create_review_service_maps_missing_place_to_404(monkeypatch):
     def failing_create_review(*_args, **_kwargs):
-        raise ValueError("\uc7a5\uc18c\ub97c \ucc3e\uc744 \uc218 \uc5c6\uc5b4\uc694.")
+        raise ValueError("장소를 찾을 수 없어요.")
 
     monkeypatch.setattr(review_service, "create_review_entry", failing_create_review)
 
@@ -47,7 +47,7 @@ def test_create_review_service_maps_missing_place_to_404(monkeypatch):
                 placeId="place-1",
                 stampId="stamp-1",
                 body="body",
-                mood="\ud63c\uc790\uc11c",
+                mood="혼자서",
                 imageUrl=None,
             ),
             session_user=build_session_user(),
@@ -110,7 +110,7 @@ def test_create_comment_service_publishes_notifications(monkeypatch):
 
 def test_create_comment_service_maps_missing_review_to_404(monkeypatch):
     def failing_create_comment(*_args, **_kwargs):
-        raise ValueError("\ub9ac\ubdf0\ub97c \ucc3e\uc744 \uc218 \uc5c6\uc5b4\uc694.")
+        raise ValueError("리뷰를 찾을 수 없어요.")
 
     monkeypatch.setattr(review_service, "create_review_comment_with_notifications", failing_create_comment)
 
@@ -144,7 +144,7 @@ def test_create_comment_service_maps_invalid_reply_target_to_400(monkeypatch):
 
 def test_toggle_review_like_service_maps_missing_review_to_404(monkeypatch):
     def failing_toggle_review_like(*_args, **_kwargs):
-        raise ValueError("\ub9ac\ubdf0\ub97c \ucc3e\uc744 \uc218 \uc5c6\uc5b4\uc694.")
+        raise ValueError("리뷰를 찾을 수 없어요.")
 
     monkeypatch.setattr(review_service, "toggle_review_like_entry", failing_toggle_review_like)
 

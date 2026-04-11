@@ -50,22 +50,6 @@ from .models import (
 from .notification_broker import notification_broker
 from .naver_oauth import build_naver_login_url, generate_oauth_state
 from .public_event_api import router as public_event_router
-from .repository_normalized import (
-    create_comment,
-    create_review,
-    delete_comment,
-    delete_review,
-    get_bootstrap,
-    get_my_page,
-    get_place,
-    get_review_comments,
-    get_stamps,
-    list_courses,
-    list_places,
-    list_reviews,
-    toggle_review_like,
-    toggle_stamp,
-)
 from .services.account_service import delete_my_account_service
 from .seed import seed_database
 from .storage import FileTooLargeError, InvalidFileTypeError, StorageConfigurationError, StorageUploadError

@@ -10,8 +10,8 @@ from ..repositories.review_repository import (
     create_review_entry,
     delete_review_comment,
     delete_review_entry,
-    list_review_entries,
     list_review_comments,
+    list_review_entries,
     toggle_review_like_entry,
 )
 from ..repository_normalized import get_unread_notification_counts
@@ -54,9 +54,7 @@ def _run_with_policy(
         raise
 
 
-def _run_delete_with_policy(
-    action: Callable[[], object],
-):
+def _run_delete_with_policy(action: Callable[[], object]):
     try:
         return action()
     except ValueError as error:
@@ -91,7 +89,12 @@ def create_review_service(db: Session, payload: ReviewCreate, session_user: Sess
 
 
 def read_reviews_service(db: Session, place_id: str | None, user_id: str | None, session_user: SessionUser | None):
-    return list_review_entries(db, place_id=place_id, user_id=user_id, current_user_id=session_user.id if session_user else None)
+    return list_review_entries(
+        db,
+        place_id=place_id,
+        user_id=user_id,
+        current_user_id=session_user.id if session_user else None,
+    )
 
 
 def delete_review_service(db: Session, review_id: str, session_user: SessionUser) -> None:
