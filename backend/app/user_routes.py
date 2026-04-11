@@ -18,7 +18,7 @@ MIN_ROUTE_PLACE_COUNT = 2
 def _normalize_place_ids(place_ids: list[str]) -> list[str]:
     ordered_unique = list(OrderedDict.fromkeys(place_id.strip() for place_id in place_ids if place_id.strip()))
     if len(ordered_unique) < MIN_ROUTE_PLACE_COUNT:
-        raise ValueError("추천 경로는 최소 2곳 이상을 묶어야 해요.")
+        raise ValueError("추천 경로는 최소 2곳 이상 묶어야 해요.")
     if len(ordered_unique) > MAX_ROUTE_PLACE_COUNT:
         raise ValueError("추천 경로는 최대 6곳까지만 묶을 수 있어요.")
     return ordered_unique
@@ -30,7 +30,7 @@ def _to_user_route_out(route: UserRoute, current_user_id: str | None) -> UserRou
     return UserRouteOut(
         id=str(route.route_id),
         authorId=route.user_id,
-        author=route.user.nickname if route.user else "알 수 없음",
+        author=route.user.nickname if route.user else "이름 없음",
         title=route.title,
         description=route.description,
         mood=route.mood,
