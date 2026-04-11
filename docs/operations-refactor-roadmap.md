@@ -46,8 +46,9 @@
 - [x] 실패 시 요약 로그 출력
 
 ### 남은 후속
-- [ ] 인증 없는 public smoke와 인증 필요한 protected smoke 분리
+- [x] 인증 없는 public smoke와 인증 필요한 protected smoke 분리
 - [ ] 브라우저 수준 smoke 시나리오 확장
+- [ ] protected smoke 토큰/엔드포인트 계약 테스트와 운영 문서 보강
 
 ### 완료 조건
 - 배포 후 최소 1개의 자동 스모크가 실행된다.

@@ -5,7 +5,7 @@ import {
   parseRuntimeConfig,
   resolveApiBaseUrl,
 } from '../../scripts/run-smoke-checks.mjs';
-import { getProtectedAuthHeaders } from '../../scripts/run-protected-smoke-checks.mjs';
+import { createProtectedSmokeChecks, getProtectedAuthHeaders } from '../../scripts/run-protected-smoke-checks.mjs';
 
 describe('run-smoke-checks helpers', () => {
   it('parses runtime app config from the bootstrap script', () => {
@@ -66,6 +66,24 @@ describe('run-smoke-checks helpers', () => {
     expect(getProtectedAuthHeaders()).toEqual({
       Authorization: 'Bearer token-123',
     });
+
+    delete process.env.SMOKE_AUTH_BEARER_TOKEN;
+  });
+
+  it('throws when the protected smoke token is missing', () => {
+    delete process.env.SMOKE_AUTH_BEARER_TOKEN;
+
+    expect(() => getProtectedAuthHeaders()).toThrow('SMOKE_AUTH_BEARER_TOKEN is required for protected smoke checks');
+  });
+
+  it('defines the protected smoke endpoint contract', () => {
+    process.env.SMOKE_AUTH_BEARER_TOKEN = 'token-123';
+
+    expect(createProtectedSmokeChecks({ apiBaseUrl: 'https://api.example.com' }).map((check) => check.name)).toEqual([
+      'api-auth-me-authenticated',
+      'api-my-summary-authenticated',
+      'api-my-notifications-authenticated',
+    ]);
 
     delete process.env.SMOKE_AUTH_BEARER_TOKEN;
   });
