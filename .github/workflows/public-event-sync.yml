@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Import Daejeon public events
         env:
           PUBLIC_EVENT_IMPORT_URL: https://daejeon-jamissue-api.yhh4433.workers.dev/api/internal/public-events/import
