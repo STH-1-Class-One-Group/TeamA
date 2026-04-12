@@ -535,20 +535,18 @@ async function loadFestivalRowsFromDb(env, nowIso, windowEndIso, limit = 100) {
   return groupFestivalRowsBySeries((rows || []).filter((row) => isFestivalRowInTargetArea(row, cityKeyword)));
 }
 
-function buildFestivalCard(row, now, legacyDates = false) {
+function buildFestivalCard(row, now) {
   return {
     id: String(row.public_event_id),
     title: row.title,
     venueName: row.venue_name ?? null,
-    startDate: row.starts_at ? (legacyDates ? String(row.starts_at).slice(0, 10) : toSeoulDateKey(row.starts_at)) : '',
-    endDate: row.ends_at ? (legacyDates ? String(row.ends_at).slice(0, 10) : toSeoulDateKey(row.ends_at)) : '',
+    startDate: row.starts_at ? toSeoulDateKey(row.starts_at) : '',
+    endDate: row.ends_at ? toSeoulDateKey(row.ends_at) : '',
     homepageUrl: row.source_page_url ?? null,
     roadAddress: row.road_address ?? row.address ?? null,
     latitude: parseFestivalCoordinate(row.latitude),
     longitude: parseFestivalCoordinate(row.longitude),
-    isOngoing: legacyDates
-      ? new Date(row.starts_at).getTime() <= now && new Date(row.ends_at).getTime() >= now
-      : isFestivalOngoingInSeoul(row.starts_at, row.ends_at, now),
+    isOngoing: isFestivalOngoingInSeoul(row.starts_at, row.ends_at, now),
   };
 }
 
