@@ -1,6 +1,4 @@
-import type { Place, StampLog, TravelSession } from '../types';
-
-const KOREA_TIME_ZONE = 'Asia/Seoul';
+import type { StampLog } from '../types';
 
 export function calculateDistanceMeters(
   startLatitude: number,
@@ -39,29 +37,6 @@ export function getPlaceVisitCount(stampLogs: StampLog[], placeId: string) {
 
 export function getLatestPlaceStamp(stampLogs: StampLog[], placeId: string) {
   return stampLogs.find((stampLog) => stampLog.placeId === placeId) ?? null;
-}
-
-export function getTravelSessionCoverPlace(places: Place[], session: TravelSession) {
-  if (!session.coverPlaceId) {
-    return null;
-  }
-
-  return places.find((place) => place.id === session.coverPlaceId) ?? null;
-}
-
-export function formatTripWindowLabel(startedAt: string, endedAt: string) {
-  const formatter = new Intl.DateTimeFormat('ko-KR', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: KOREA_TIME_ZONE,
-  });
-
-  const startDate = new Date(startedAt);
-  const endDate = new Date(endedAt);
-  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`;
 }
 
 export function formatReviewVisitedAt(value: string) {
