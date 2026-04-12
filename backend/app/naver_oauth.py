@@ -108,17 +108,20 @@ def fetch_naver_profile(access_token: str) -> NaverProfile:
     )
 
 
+def _read_error_payload_detail(error: HTTPError, fallback_detail: str) -> str:
+    try:
+        payload = json.loads(error.read().decode("utf-8"))
+    except Exception:
+        return fallback_detail
+    return payload.get("error_description") or payload.get("message") or fallback_detail
+
+
 def _load_json(request: Request, default_detail: str) -> dict:
     try:
         with urlopen(request, timeout=10) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
-        detail = default_detail
-        try:
-            payload = json.loads(error.read().decode("utf-8"))
-            detail = payload.get("error_description") or payload.get("message") or detail
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            pass
+        detail = _read_error_payload_detail(error, default_detail)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail) from error
     except URLError as error:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=default_detail) from error
