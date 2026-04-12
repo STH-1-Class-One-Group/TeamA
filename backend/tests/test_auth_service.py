@@ -10,7 +10,7 @@ def test_update_profile_session_payload_uses_auth_repository(monkeypatch):
     user = type("UserLike", (), {"user_id": "user-1", "provider": "naver"})()
     session_user = SessionUser(
         id="user-1",
-        nickname="테스트",
+        nickname="테스터",
         email=None,
         provider="naver",
         profileImage=None,
@@ -41,13 +41,13 @@ def test_update_profile_session_payload_maps_value_error(monkeypatch):
     monkeypatch.setattr(
         auth_service,
         "update_user_profile_entry",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("닉네임 형식이 올바르지 않아요")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("닉네임 형식이 올바르지 않아요.")),
     )
 
     try:
         auth_service.update_profile_session_payload("db-session", "user-1", object(), Settings())
     except HTTPException as error:
         assert error.status_code == 400
-        assert error.detail == "닉네임 형식이 올바르지 않아요"
+        assert error.detail == "닉네임 형식이 올바르지 않아요."
     else:
         raise AssertionError("Expected HTTPException")

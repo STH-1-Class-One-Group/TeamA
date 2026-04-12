@@ -40,13 +40,13 @@ def test_delete_notification_service_maps_value_error(monkeypatch):
     monkeypatch.setattr(
         notification_service,
         "delete_notification_entry",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("알림을 찾을 수 없어요")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("알림을 찾을 수 없어요.")),
     )
 
     try:
         notification_service.delete_notification_service("db-session", "notification-1", session_user)
     except HTTPException as error:
         assert error.status_code == 404
-        assert error.detail == "알림을 찾을 수 없어요"
+        assert error.detail == "알림을 찾을 수 없어요."
     else:
         raise AssertionError("Expected HTTPException")

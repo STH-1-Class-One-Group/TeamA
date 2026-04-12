@@ -15,7 +15,7 @@ def test_patch_admin_place_service_maps_value_error(monkeypatch):
     monkeypatch.setattr(
         admin_service,
         "update_admin_place_visibility_entry",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("장소를 찾을 수 없어요")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("장소를 찾을 수 없어요.")),
     )
 
     try:
@@ -26,6 +26,6 @@ def test_patch_admin_place_service_maps_value_error(monkeypatch):
         )
     except HTTPException as error:
         assert error.status_code == 404
-        assert error.detail == "장소를 찾을 수 없어요"
+        assert error.detail == "장소를 찾을 수 없어요."
     else:
         raise AssertionError("Expected HTTPException")
