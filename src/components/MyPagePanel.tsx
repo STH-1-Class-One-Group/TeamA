@@ -111,7 +111,6 @@ export function MyPagePanel({
       setShowSettings(true);
     }
   }, [sessionUser?.nickname, sessionUser?.profileCompletedAt]);
-
   const visitPct = useMemo(
     () => (myPage && myPage.stats.totalPlaceCount > 0
       ? Math.round((myPage.stats.uniquePlaceCount / myPage.stats.totalPlaceCount) * 100)

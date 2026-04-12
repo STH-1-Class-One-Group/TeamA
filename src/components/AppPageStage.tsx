@@ -98,9 +98,6 @@ interface AppPageStageProps {
     onOpenReview: (reviewId: string) => Promise<void>;
     onUpdateReview: (reviewId: string, payload: { body: string; mood: ReviewMood; file?: File | null; removeImage?: boolean }) => Promise<void>;
     onDeleteReview: (reviewId: string) => Promise<void>;
-    onMarkNotificationRead: (notificationId: string) => Promise<void>;
-    onMarkAllNotificationsRead: () => Promise<void>;
-    onDeleteNotification: (notificationId: string) => Promise<void>;
     onLoadMoreComments: (initial?: boolean) => Promise<void>;
     onRefreshAdmin: () => Promise<void>;
     onToggleAdminPlace: (placeId: string, nextValue: boolean) => Promise<void>;
