@@ -6,8 +6,6 @@ import type {
   AuthSessionResponse,
   BootstrapResponse,
   CourseBootstrapResponse,
-  DiscoveryRecommendationsResponse,
-  DiscoverySearchResponse,
   MapBootstrapResponse,
   Comment,
   CommentCreateRequest,
@@ -201,10 +199,6 @@ export function getProviderLoginUrl(provider: ProviderKey, nextUrl: string, mode
   return `${getApiBaseUrl()}/api/auth/${provider}/login?next=${encodeURIComponent(nextUrl)}&mode=${mode}`;
 }
 
-export function getAuthSession() {
-  return fetchJson<AuthSessionResponse>('/api/auth/me');
-}
-
 export async function logout() {
   const response = await fetchJson<AuthSessionResponse>('/api/auth/logout', {
     method: 'POST',
@@ -274,10 +268,6 @@ export async function toggleCommunityRouteLike(routeId: string) {
   });
   invalidateApiCache(['/api/community-routes', '/api/my/routes']);
   return response;
-}
-
-export function getMyRoutes() {
-  return fetchJson<UserRoute[]>('/api/my/routes');
 }
 
 export function getReviews(params?: { placeId?: string; userId?: string }) {
@@ -469,14 +459,6 @@ export function getPublicEventBanner() {
 
 export function getFestivals() {
   return fetchJson<FestivalItem[]>('/api/festivals');
-}
-
-export function searchDiscovery(query: string) {
-  return fetchJson<DiscoverySearchResponse>(`/api/discovery/search?q=${encodeURIComponent(query)}`);
-}
-
-export function getPlaceRecommendations(placeId: string) {
-  return fetchJson<DiscoveryRecommendationsResponse>(`/api/discovery/recommendations?placeId=${encodeURIComponent(placeId)}`);
 }
 
 
