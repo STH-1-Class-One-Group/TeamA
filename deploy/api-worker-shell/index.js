@@ -1,9 +1,7 @@
 import { formatDate, formatDateTime, toSeoulDateKey } from './lib/dates.js';
-import { applyCorsHeaders, handlePreflight, jsonResponse, redirectResponse } from './lib/http.js';
+import { applyCorsHeaders, handlePreflight, jsonResponse } from './lib/http.js';
 import {
-  buildAuthProviders,
   createAuthResponse,
-  getSigningSecret,
   handleAuthProviders,
   handleAuthSession,
   handleLogout,
@@ -12,7 +10,6 @@ import {
   handleUpdateProfile,
   naverConfigured,
   readSessionUser,
-  sha256Base64Url,
 } from './services/auth.js';
 import { handleBannerEvents, handleFestivalImport, handleFestivals } from './services/festivals.js';
 import {
@@ -46,15 +43,9 @@ import {
   buildInFilter,
   encodeFilterValue,
   getSupabaseKey,
-  parseListLimit,
   rememberPending,
   supabaseRequest,
 } from './lib/supabase.js';
-
-const PROVIDERS = [
-  { key: 'naver', label: '네이버' },
-  { key: 'kakao', label: '카카오' },
-];
 
 const BADGE_BY_MOOD = {
   '설렘': '첫 방문',
@@ -65,9 +56,7 @@ const BADGE_BY_MOOD = {
 };
 
 const STATIC_BASE_CACHE_TTL_MS = 5 * 60 * 1000;
-const FESTIVALS_CACHE_TTL_MS = 10 * 60 * 1000;
 let staticBaseCache = { expiresAt: 0, value: null, pending: null };
-let festivalsCache = { expiresAt: 0, syncAt: 0, value: null, pending: null };
 
 function formatVisitLabel(visitNumber) {
   const safeVisitNumber = Number.isFinite(Number(visitNumber)) && Number(visitNumber) > 0 ? Number(visitNumber) : 1;

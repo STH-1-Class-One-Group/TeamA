@@ -1,7 +1,6 @@
 import {
   assert,
   baseUrl,
-  buildRequestHeaders,
   fetchJson,
   fetchText,
   loadRuntimeConfig,

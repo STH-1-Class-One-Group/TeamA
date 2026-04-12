@@ -118,7 +118,7 @@ def _load_json(request: Request, default_detail: str) -> dict:
             payload = json.loads(error.read().decode("utf-8"))
             detail = payload.get("error_description") or payload.get("message") or detail
         except Exception:
-            detail = detail
+            pass
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail) from error
     except URLError as error:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=default_detail) from error

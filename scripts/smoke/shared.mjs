@@ -162,7 +162,6 @@ export async function runChecksWithRetries(checks) {
     }
 
     if (attempt === retryAttempts) {
-      pendingChecks = failedChecks;
       break;
     }
 

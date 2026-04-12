@@ -54,12 +54,8 @@ from .seed import seed_database
 from .storage import FileTooLargeError, InvalidFileTypeError, StorageConfigurationError, StorageUploadError
 from .services.admin_service import import_public_data_service, patch_admin_place_service, read_admin_summary_service
 from .services.auth_service import (
-    PROVIDER_LABELS,
-    SUPPORTED_PROVIDERS,
     build_auth_providers,
-    build_auth_response,
     complete_naver_login,
-    get_redirect_target,
     update_profile_session_payload,
 )
 from .services.my_page_service import read_my_page_service
