@@ -1,8 +1,10 @@
-import { categoryInfo, categoryItems } from '../lib/categories';
-import jamissueLogo from '../assets/jamissue-logo.png';
 import { FestivalDetailSheet } from './FestivalDetailSheet';
 import { NaverMap } from './NaverMap';
 import { PlaceDetailSheet } from './PlaceDetailSheet';
+import { MapStageBrandHeader } from './map-stage/MapStageBrandHeader';
+import { MapStageCategoryStrip } from './map-stage/MapStageCategoryStrip';
+import { MapStageDrawerTeaser } from './map-stage/MapStageDrawerTeaser';
+import { MapStageRoutePreviewCard } from './map-stage/MapStageRoutePreviewCard';
 import type {
   ApiStatus,
   BootstrapResponse,
@@ -81,47 +83,15 @@ export function MapTabStage({
   festivalSheet,
   mapActions,
 }: MapTabStageProps) {
+  const showRoutePreview = !placeSheet.selectedPlace && !festivalSheet.selectedFestival;
+
   return (
     <div className="map-stage">
-      <header className="map-stage__header map-stage__header--brand-only">
-        <div className="map-stage__brand map-stage__brand--row">
-          <div className="map-stage__brand-mark">
-            <img src={jamissueLogo} alt="Jam Issue logo" className="map-stage__brand-mark-image" />
-          </div>
-          <div className="map-stage__brand-copy">
-            <p className="map-stage__brand-kicker">DAEJEON LOCAL GUIDE</p>
-            <h1 className="map-stage__brand-title">JAM ISSUE</h1>
-          </div>
-        </div>
-      </header>
-
-      <div className="map-filter-strip">
-        <div className="chip-row compact-gap">
-          {categoryItems.map((item) => {
-            const isActive = item.key === mapData.activeCategory;
-            const info = item.key === 'all' ? null : categoryInfo[item.key];
-            return (
-              <button
-                key={item.key}
-                type="button"
-                className={isActive ? 'chip is-active map-filter-chip' : 'chip map-filter-chip'}
-                onClick={() => mapActions.setActiveCategory(item.key)}
-                style={
-                  info
-                    ? {
-                        background: isActive ? info.color : 'rgba(255,255,255,0.94)',
-                        borderColor: info.jamColor,
-                        color: '#4a3140',
-                      }
-                    : undefined
-                }
-              >
-                {info ? String(info.icon) + ' ' + item.label : item.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <MapStageBrandHeader />
+      <MapStageCategoryStrip
+        activeCategory={mapData.activeCategory}
+        onSelectCategory={mapActions.setActiveCategory}
+      />
 
       <NaverMap
         places={mapData.filteredPlaces}
@@ -142,52 +112,15 @@ export function MapTabStage({
         height="100%"
       />
 
-      {!placeSheet.selectedPlace && !festivalSheet.selectedFestival && routePreviewData.routePreview && (
-        <section className="map-route-preview-card">
-          <div className="map-route-preview-card__top">
-            <div>
-              <p className="eyebrow">ROUTE PREVIEW</p>
-              <h3>{routePreviewData.routePreview.title}</h3>
-              <p className="section-copy">{routePreviewData.routePreview.subtitle}</p>
-            </div>
-            <button
-              type="button"
-              className="map-route-preview-card__close"
-              onClick={routePreviewData.onClearRoutePreview}
-              aria-label="경로 미리보기 닫기"
-            >
-              <span aria-hidden="true">{'\u00D7'}</span>
-            </button>
-          </div>
-          <div className="course-card__places community-route-places map-route-preview-card__places">
-            {routePreviewData.routePreview.placeIds.map((placeId, index) => (
-              <button
-                key={routePreviewData.routePreview!.id + '-' + placeId}
-                type="button"
-                className="soft-tag soft-tag--button course-card__place"
-                onClick={() => routePreviewData.onOpenRoutePreviewPlace(placeId)}
-              >
-                {index + 1}. {routePreviewData.routePreview!.placeNames[index] ?? placeId}
-              </button>
-            ))}
-          </div>
-        </section>
+      {showRoutePreview && (
+        <MapStageRoutePreviewCard
+          routePreview={routePreviewData.routePreview}
+          onClearRoutePreview={routePreviewData.onClearRoutePreview}
+          onOpenRoutePreviewPlace={routePreviewData.onOpenRoutePreviewPlace}
+        />
       )}
 
-      {!placeSheet.selectedPlace && !festivalSheet.selectedFestival && (
-        <section className="map-drawer-teaser">
-          <span className="map-drawer-teaser__handle" aria-hidden="true" />
-          <div className="map-drawer-teaser__peek" aria-hidden="true">
-            <div className="map-drawer-teaser__line" />
-            <div className="map-drawer-teaser__line map-drawer-teaser__line--short" />
-            <div className="map-drawer-teaser__chips">
-              <span className="map-drawer-teaser__chip" />
-              <span className="map-drawer-teaser__chip" />
-              <span className="map-drawer-teaser__chip map-drawer-teaser__chip--wide" />
-            </div>
-          </div>
-        </section>
-      )}
+      {showRoutePreview && <MapStageDrawerTeaser />}
 
       <PlaceDetailSheet
         place={placeSheet.selectedPlace}

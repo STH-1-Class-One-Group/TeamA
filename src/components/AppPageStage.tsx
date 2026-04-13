@@ -1,8 +1,8 @@
 import { memo } from 'react';
-import { CourseTab } from './CourseTab';
 import { EventTab } from './EventTab';
-import { FeedTab } from './FeedTab';
-import { MyPagePanel } from './MyPagePanel';
+import { PageStageCourseView } from './page-stage/PageStageCourseView';
+import { PageStageFeedView } from './page-stage/PageStageFeedView';
+import { PageStageMyView } from './page-stage/PageStageMyView';
 import type {
   AdminSummaryResponse,
   ApiStatus,
@@ -21,7 +21,7 @@ import type {
   UserRoute,
 } from '../types';
 
-interface AppPageStageProps {
+export interface AppPageStageProps {
   activeTab: Exclude<Tab, 'map'>;
   sharedData: {
     sessionUser: SessionUser | null;
@@ -119,110 +119,31 @@ export const AppPageStage = memo(function AppPageStage({
   return (
     <div className="page-stage">
       {activeTab === 'feed' && (
-        <FeedTab
-          feedData={{
-            reviews: feedData.reviews,
-            placeFilterId: feedData.feedPlaceFilterId,
-            placeFilterName: feedData.feedPlaceFilterId ? sharedData.placeNameById[feedData.feedPlaceFilterId] ?? null : null,
-            highlightedReviewId: feedData.highlightedReviewId,
-            reviewLikeUpdatingId: feedData.reviewLikeUpdatingId,
-            hasMore: feedData.feedHasMore && !feedData.feedPlaceFilterId,
-            loadingMore: feedData.feedLoadingMore,
-          }}
-          commentSheetData={{
-            activeCommentReviewId: feedData.activeCommentReviewId,
-            activeCommentReviewComments: feedData.activeCommentReviewComments,
-            activeCommentReviewStatus: feedData.activeCommentReviewStatus,
-            highlightedCommentId: feedData.highlightedCommentId,
-            commentSubmittingReviewId: feedData.commentSubmittingReviewId,
-            commentMutatingId: feedData.commentMutatingId,
-            deletingReviewId: feedData.deletingReviewId,
-          }}
-          sharedData={{
-            sessionUser: sharedData.sessionUser,
-          }}
-          feedActions={{
-            onLoadMore: feedActions.onLoadMoreFeed,
-            onToggleReviewLike: feedActions.onToggleReviewLike,
-            onCreateComment: feedActions.onCreateComment,
-            onUpdateComment: feedActions.onUpdateComment,
-            onDeleteComment: feedActions.onDeleteComment,
-            onDeleteReview: feedActions.onDeleteReview,
-            onClearPlaceFilter: feedActions.onClearPlaceFilter,
-            onOpenComments: feedActions.onOpenComments,
-            onCloseComments: feedActions.onCloseComments,
-          }}
-          sharedActions={{
-            onRequestLogin: sharedActions.onRequestLogin,
-            onOpenPlace: sharedActions.onOpenPlace,
-          }}
+        <PageStageFeedView
+          sharedData={sharedData}
+          feedData={feedData}
+          sharedActions={sharedActions}
+          feedActions={feedActions}
         />
       )}
 
       {activeTab === 'event' && <EventTab festivals={sharedData.festivals} />}
 
       {activeTab === 'course' && (
-        <CourseTab
-          courses={courseData.courses}
-          communityRoutes={courseData.communityRoutes}
-          sort={courseData.communityRouteSort}
-          sessionUser={sharedData.sessionUser}
-          routeLikeUpdatingId={courseData.routeLikeUpdatingId}
-          highlightedRouteId={courseData.highlightedRouteId}
-          placeNameById={sharedData.placeNameById}
-          onChangeSort={courseActions.onChangeRouteSort}
-          onToggleLike={courseActions.onToggleRouteLike}
-          onOpenPlace={sharedActions.onOpenPlace}
-          onOpenRoutePreview={courseActions.onOpenRoutePreview}
-          onRequestLogin={sharedActions.onRequestLogin}
+        <PageStageCourseView
+          sharedData={sharedData}
+          courseData={courseData}
+          sharedActions={sharedActions}
+          courseActions={courseActions}
         />
       )}
 
       {activeTab === 'my' && (
-        <MyPagePanel
-          sessionData={{
-            sessionUser: sharedData.sessionUser,
-            myPage: myPageData.myPage,
-            providers: myPageData.providers,
-            myPageError: myPageData.myPageError,
-          }}
-          panelState={{
-            activeTab: myPageData.myPageTab,
-            isLoggingOut: myPageData.isLoggingOut,
-            profileSaving: myPageData.profileSaving,
-            profileError: myPageData.profileError,
-            routeSubmitting: myPageData.routeSubmitting,
-            routeError: myPageData.routeError,
-            commentsHasMore: myPageData.commentsHasMore,
-            commentsLoadingMore: myPageData.commentsLoadingMore,
-          }}
-          reviewActions={{
-            onOpenPlace: sharedActions.onOpenPlace,
-            onOpenComment: myPageActions.onOpenCommentFromMyPage,
-            onOpenRoute: myPageActions.onOpenRouteFromMyPage,
-            onOpenReview: myPageActions.onOpenReview,
-            onUpdateReview: myPageActions.onUpdateReview,
-            onDeleteReview: myPageActions.onDeleteReview,
-            onLoadMoreComments: myPageActions.onLoadMoreComments,
-          }}
-          panelActions={{
-            onChangeTab: myPageActions.onChangeMyPageTab,
-            onLogin: myPageActions.onLogin,
-            onRetry: myPageActions.onRetryMyPage,
-            onLogout: myPageActions.onLogout,
-            onSaveNickname: myPageActions.onSaveNickname,
-            onPublishRoute: myPageActions.onPublishRoute,
-          }}
-          adminData={{
-            adminSummary: myPageData.adminSummary,
-            adminBusyPlaceId: myPageData.adminBusyPlaceId,
-            adminLoading: myPageData.adminLoading,
-          }}
-          adminActions={{
-            onRefreshAdmin: myPageActions.onRefreshAdmin,
-            onToggleAdminPlace: myPageActions.onToggleAdminPlace,
-            onToggleAdminManualOverride: myPageActions.onToggleAdminManualOverride,
-          }}
+        <PageStageMyView
+          sharedData={sharedData}
+          myPageData={myPageData}
+          sharedActions={sharedActions}
+          myPageActions={myPageActions}
         />
       )}
     </div>
