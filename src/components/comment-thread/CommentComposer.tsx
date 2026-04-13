@@ -35,7 +35,7 @@ export const CommentComposer = memo(function CommentComposer({
     <form className="comment-thread__reply-form" onSubmit={handleSubmit}>
       <input value={body} onChange={(event) => setBody(event.target.value)} placeholder={placeholder} />
       <button type="submit" className="comment-thread__submit" disabled={isSubmitting || body.trim().length < 2}>
-        {isSubmitting ? "?깅줉 以?" : "?깅줉"}
+        {isSubmitting ? '등록 중' : '등록'}
       </button>
     </form>
   );

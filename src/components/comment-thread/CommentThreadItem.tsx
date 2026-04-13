@@ -52,7 +52,7 @@ export const CommentThreadItem = memo(function CommentThreadItem({
   }
 
   async function handleDelete() {
-    if (!window.confirm('?볤?????젣?좉퉴??')) {
+    if (!window.confirm('댓글을 삭제할까요?')) {
       return;
     }
 
@@ -72,7 +72,7 @@ export const CommentThreadItem = memo(function CommentThreadItem({
     <li ref={itemRef} className={isReply ? 'comment-thread__item comment-thread__item--reply' : 'comment-thread__item'}>
       {isReply && (
         <span className="comment-thread__reply-indent" aria-hidden="true">
-          ??
+          ㄴ
         </span>
       )}
 
@@ -88,30 +88,30 @@ export const CommentThreadItem = memo(function CommentThreadItem({
               <input
                 value={editingBody}
                 onChange={(event) => setEditingBody(event.target.value)}
-                placeholder="?볤? ?댁슜???섏젙??蹂댁꽭??"
+                placeholder="댓글 내용을 수정해 보세요."
               />
               <button type="submit" className="comment-thread__submit" disabled={isMutating || editingBody.trim().length < 2}>
-                {isMutating ? "?섏젙 以?" : "?섏젙"}
+                {isMutating ? '수정 중' : '수정'}
               </button>
             </form>
           ) : (
-            <p>{comment.isDeleted ? '??젣???볤??낅땲??' : comment.body}</p>
+            <p>{comment.isDeleted ? '삭제된 댓글입니다.' : comment.body}</p>
           )}
 
           {!comment.isDeleted && (
             <div className="comment-thread__actions">
               {canWriteComment && (
                 <button type="button" className="comment-thread__reply-toggle" onClick={handleReplyToggle}>
-                  ?듦? ?ш린
+                  답글 달기
                 </button>
               )}
               {isMine && !editing && (
                 <>
                   <button type="button" className="comment-thread__reply-toggle" onClick={() => setEditing(true)}>
-                    ?섏젙
+                    수정
                   </button>
                   <button type="button" className="comment-thread__reply-toggle" onClick={() => void handleDelete()} disabled={isMutating}>
-                    ??젣
+                    삭제
                   </button>
                 </>
               )}
@@ -124,7 +124,7 @@ export const CommentThreadItem = memo(function CommentThreadItem({
                     setEditingBody(comment.body);
                   }}
                 >
-                  痍⑥냼
+                  취소
                 </button>
               )}
             </div>
@@ -134,7 +134,7 @@ export const CommentThreadItem = memo(function CommentThreadItem({
         {!isReply && replyOpen && (
           <CommentComposer
             canWriteComment={canWriteComment}
-            placeholder="?듦? ?댁슜???곸뼱 蹂댁꽭??"
+            placeholder="답글 내용을 적어 보세요."
             reviewId={reviewId}
             submittingReviewId={submittingReviewId}
             onRequestLogin={onRequestLogin}
