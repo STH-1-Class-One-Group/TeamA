@@ -39,7 +39,7 @@ def update_place_visibility(
 ) -> AdminPlaceOut:
     place = db.scalars(select(MapPlace).where(MapPlace.slug == place_id)).first()
     if not place:
-        raise ValueError("?μ냼瑜?李얠쓣 ???놁뼱??")
+        raise ValueError("장소를 찾을 수 없어요.")
 
     changed = False
     if is_active is not None and place.is_active != is_active:
@@ -58,4 +58,3 @@ def update_place_visibility(
 
 def import_public_bundle(db: Session, settings: Settings) -> PublicImportResponse:
     return sync_public_bundle(db, settings)
-

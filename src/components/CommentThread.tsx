@@ -20,7 +20,7 @@ export function CommentThread({
       <CommentComposer
         key={reviewId}
         canWriteComment={canWriteComment}
-        placeholder="?볤? ?댁슜???곸뼱 蹂댁꽭??"
+        placeholder="댓글 내용을 적어 보세요."
         reviewId={reviewId}
         submittingReviewId={submittingReviewId}
         onRequestLogin={onRequestLogin}
