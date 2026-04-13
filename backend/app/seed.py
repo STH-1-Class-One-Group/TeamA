@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from .config import Settings
 from .db_models import MapPlace
-from .repository_normalized import cleanup_legacy_demo_content, import_public_bundle
+from .repositories.public_bundle_repository import cleanup_legacy_demo_content, import_public_bundle
 
 
 def seed_database(db: Session, settings: Settings) -> None:

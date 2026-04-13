@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from ..db_models import User
 from ..models import ProfileUpdateRequest, SessionUser
 from ..naver_oauth import NaverProfile
-from ..repository_normalized import link_naver_identity, update_user_profile, upsert_naver_user
+from .profile_data_repository import link_naver_identity, update_user_profile, upsert_naver_user
 from ..repository_support import to_session_user
 
 

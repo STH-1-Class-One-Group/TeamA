@@ -6,7 +6,6 @@ from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from .config import Settings
@@ -19,7 +18,6 @@ from .db_models import (
     TravelSession,
     User,
     UserComment,
-    UserIdentity,
     UserNotification,
     UserRoute,
     UserStamp,
@@ -50,12 +48,23 @@ from .models import (
     UserNotificationOut,
 )
 from .naver_oauth import NaverProfile
-from .public_data import import_public_bundle as sync_public_bundle
-from .public_data import load_public_bundle as load_public_bundle_payload
+from .repositories.profile_data_repository import (
+    build_unique_social_nickname as build_unique_social_nickname_entry,
+    ensure_unique_nickname as ensure_unique_nickname_entry,
+    link_naver_identity as link_naver_identity_entry,
+    link_social_identity as link_social_identity_entry,
+    update_user_profile as update_user_profile_entry,
+    upsert_naver_user as upsert_naver_user_entry,
+    upsert_social_user as upsert_social_user_entry,
+)
+from .repositories.public_bundle_repository import (
+    cleanup_legacy_demo_content as cleanup_legacy_demo_content_entry,
+    import_public_bundle as import_public_bundle_entry,
+    load_public_bundle as load_public_bundle_entry,
+)
 from .storage import derive_review_thumbnail_url
 from .repository_support import (
     BADGE_BY_MOOD,
-    LEGACY_PROVIDERS,
     build_comment_tree,
     build_session_duration_label,
     count_visible_comments,
@@ -63,7 +72,6 @@ from .repository_support import (
     format_date,
     format_datetime,
     format_visit_label,
-    generate_user_id,
     parse_comment_id,
     parse_review_id,
     parse_stamp_id,
@@ -112,33 +120,12 @@ def get_or_create_user(
         db.commit()
         db.refresh(user)
     return user
-
-
-def _nickname_exists(db: Session, nickname: str, *, exclude_user_id: str | None = None) -> bool:
-    stmt = select(User.user_id).where(func.lower(User.nickname) == nickname.lower())
-    if exclude_user_id:
-        stmt = stmt.where(User.user_id != exclude_user_id)
-    return db.scalar(stmt.limit(1)) is not None
-
-
 def ensure_unique_nickname(db: Session, nickname: str, *, exclude_user_id: str | None = None) -> str:
-    normalized = nickname.strip()
-    if len(normalized) < 2:
-        raise ValueError("닉네임은 두 글자 이상으로 적어 주세요.")
-    if _nickname_exists(db, normalized, exclude_user_id=exclude_user_id):
-        raise ValueError("이미 사용 중인 닉네임이에요.")
-    return normalized
+    return ensure_unique_nickname_entry(db, nickname, exclude_user_id=exclude_user_id)
 
 
 def build_unique_social_nickname(db: Session, nickname: str, *, exclude_user_id: str | None = None) -> str:
-    base = nickname.strip() or "이름 없음"
-    if not _nickname_exists(db, base, exclude_user_id=exclude_user_id):
-        return base
-    for suffix in range(2, 10000):
-        candidate = f"{base[:95]}{suffix}"
-        if not _nickname_exists(db, candidate, exclude_user_id=exclude_user_id):
-            return candidate
-    raise ValueError("사용 가능한 닉네임을 만들 수 없어요.")
+    return build_unique_social_nickname_entry(db, nickname, exclude_user_id=exclude_user_id)
 
 
 def upsert_social_user(
@@ -150,64 +137,14 @@ def upsert_social_user(
     email: str | None = None,
     profile_image: str | None = None,
 ) -> User:
-    identity = db.scalars(
-        select(UserIdentity)
-        .options(joinedload(UserIdentity.user))
-        .where(UserIdentity.provider == provider, UserIdentity.provider_user_id == provider_user_id)
-    ).first()
-    now = utcnow_naive()
-
-    if identity:
-        user = identity.user
-        changed = False
-        if user.email != email:
-            user.email = email
-            changed = True
-        if user.provider != provider:
-            user.provider = provider
-            changed = True
-        if identity.email != email:
-            identity.email = email
-            changed = True
-        if identity.profile_image != profile_image:
-            identity.profile_image = profile_image
-            changed = True
-        if changed:
-            identity.updated_at = now
-            user.updated_at = now
-        db.commit()
-        db.refresh(user)
-        return user
-
-    safe_nickname = build_unique_social_nickname(db, nickname)
-    user = User(
-        user_id=generate_user_id(),
-        nickname=safe_nickname,
-        email=email,
+    return upsert_social_user_entry(
+        db,
         provider=provider,
-        created_at=now,
-        updated_at=now,
+        provider_user_id=provider_user_id,
+        nickname=nickname,
+        email=email,
+        profile_image=profile_image,
     )
-    db.add(user)
-    db.flush()
-    db.add(
-        UserIdentity(
-            user_id=user.user_id,
-            provider=provider,
-            provider_user_id=provider_user_id,
-            email=email,
-            profile_image=profile_image,
-            created_at=now,
-            updated_at=now,
-        )
-    )
-    try:
-        db.commit()
-    except IntegrityError as error:
-        db.rollback()
-        raise ValueError("이미 사용 중인 닉네임이에요.") from error
-    db.refresh(user)
-    return user
 
 def link_social_identity(
     db: Session,
@@ -218,92 +155,26 @@ def link_social_identity(
     email: str | None = None,
     profile_image: str | None = None,
 ) -> User:
-    user = db.get(User, user_id)
-    if not user:
-        raise ValueError("연결할 기존 계정을 찾을 수 없어요.")
-
-    now = utcnow_naive()
-    existing_identity = db.scalars(
-        select(UserIdentity).where(UserIdentity.provider == provider, UserIdentity.provider_user_id == provider_user_id)
-    ).first()
-    if existing_identity:
-        if existing_identity.user_id != user_id:
-            raise ValueError("이미 다른 계정에 연결된 로그인 수단이에요.")
-        if existing_identity.email != email or existing_identity.profile_image != profile_image:
-            existing_identity.email = email
-            existing_identity.profile_image = profile_image
-            existing_identity.updated_at = now
-            db.commit()
-            db.refresh(user)
-        return user
-
-    provider_slot = db.scalars(
-        select(UserIdentity).where(UserIdentity.user_id == user_id, UserIdentity.provider == provider)
-    ).first()
-    if provider_slot:
-        raise ValueError("이미 같은 제공자의 계정이 연결되어 있어요.")
-
-    if email and not user.email:
-        user.email = email
-        user.updated_at = now
-
-    db.add(
-        UserIdentity(
-            user_id=user.user_id,
-            provider=provider,
-            provider_user_id=provider_user_id,
-            email=email,
-            profile_image=profile_image,
-            created_at=now,
-            updated_at=now,
-        )
+    return link_social_identity_entry(
+        db,
+        user_id=user_id,
+        provider=provider,
+        provider_user_id=provider_user_id,
+        email=email,
+        profile_image=profile_image,
     )
-    db.commit()
-    db.refresh(user)
-    return user
 
 
 def upsert_naver_user(db: Session, profile: NaverProfile) -> User:
-    nickname = profile.nickname or profile.name or "이름 없음"
-    return upsert_social_user(
-        db,
-        provider="naver",
-        provider_user_id=profile.id,
-        nickname=nickname,
-        email=profile.email,
-        profile_image=profile.profile_image,
-    )
+    return upsert_naver_user_entry(db, profile)
 
 
 def link_naver_identity(db: Session, user_id: str, profile: NaverProfile) -> User:
-    return link_social_identity(
-        db,
-        user_id=user_id,
-        provider="naver",
-        provider_user_id=profile.id,
-        email=profile.email,
-        profile_image=profile.profile_image,
-    )
+    return link_naver_identity_entry(db, user_id, profile)
 
 
 def update_user_profile(db: Session, user_id: str, payload: ProfileUpdateRequest) -> User:
-    user = db.get(User, user_id)
-    if not user:
-        raise ValueError("사용자 정보를 찾을 수 없어요.")
-
-    nickname = ensure_unique_nickname(db, payload.nickname, exclude_user_id=user_id)
-    now = utcnow_naive()
-    user.nickname = nickname
-    if user.profile_completed_at is None:
-        user.profile_completed_at = now
-    user.updated_at = now
-    try:
-        db.commit()
-    except IntegrityError as error:
-        db.rollback()
-        raise ValueError("이미 사용 중인 닉네임이에요.") from error
-    db.refresh(user)
-    return user
+    return update_user_profile_entry(db, user_id, payload)
 
 def build_stamp_logs(stamps: list[UserStamp]) -> list[StampLogOut]:
     today_key = to_seoul_date().isoformat()
@@ -1133,25 +1004,14 @@ def update_place_visibility(
 
 
 def cleanup_legacy_demo_content(db: Session) -> None:
-    legacy_users = db.scalars(select(User).where(User.provider.in_(LEGACY_PROVIDERS))).all()
-    if not legacy_users:
-        return
-    for user in legacy_users:
-        db.delete(user)
-    db.commit()
+    cleanup_legacy_demo_content_entry(db)
 
 
 def load_public_bundle(settings: Settings) -> dict:
-    return load_public_bundle_payload(settings).model_dump(by_alias=True, exclude_none=True)
+    return load_public_bundle_entry(settings)
 
 
 def import_public_bundle(db: Session, settings: Settings) -> PublicImportResponse:
-    return sync_public_bundle(db, settings)
-
-
-
-
-
-
+    return import_public_bundle_entry(db, settings)
 
 
