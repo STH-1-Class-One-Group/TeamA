@@ -742,61 +742,14 @@ def create_user_notification(
 
 def mark_notification_read(db: Session, notification_id: str, user_id: str) -> NotificationReadResponse:
     return mark_notification_read_entry(db, notification_id, user_id)
-    try:
-        notification_key = int(notification_id)
-    except ValueError as error:
-        raise ValueError("알림 ID 형식이 올바르지 않아요.") from error
-
-    notification = db.scalars(
-        select(UserNotification).where(
-            UserNotification.notification_id == notification_key,
-            UserNotification.user_id == user_id,
-        )
-    ).first()
-    if not notification:
-        raise ValueError("알림을 찾지 못했어요.")
-    if not notification.is_read:
-        notification.is_read = True
-        notification.read_at = utcnow_naive()
-        notification.updated_at = utcnow_naive()
-        db.commit()
-    return NotificationReadResponse(notificationId=str(notification.notification_id), read=True)
 
 
 def mark_all_notifications_read(db: Session, user_id: str) -> int:
     return mark_all_notifications_read_entry(db, user_id)
-    notifications = db.scalars(
-        select(UserNotification).where(UserNotification.user_id == user_id, UserNotification.is_read.is_(False))
-    ).all()
-    if not notifications:
-        return 0
-    now = utcnow_naive()
-    for notification in notifications:
-        notification.is_read = True
-        notification.read_at = now
-        notification.updated_at = now
-    db.commit()
-    return len(notifications)
 
 
 def delete_notification(db: Session, notification_id: str, user_id: str) -> NotificationDeleteResponse:
     return delete_notification_entry(db, notification_id, user_id)
-    try:
-        notification_key = int(notification_id)
-    except ValueError as error:
-        raise ValueError("알림 ID 형식이 올바르지 않아요.") from error
-
-    notification = db.scalars(
-        select(UserNotification).where(
-            UserNotification.notification_id == notification_key,
-            UserNotification.user_id == user_id,
-        )
-    ).first()
-    if not notification:
-        raise ValueError("알림을 찾지 못했어요.")
-    db.delete(notification)
-    db.commit()
-    return NotificationDeleteResponse(notificationId=str(notification_key), deleted=True)
 
 def get_my_page(db: Session, user_id: str, is_admin: bool) -> MyPageResponse:
     user = db.get(User, user_id)
