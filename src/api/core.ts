@@ -69,7 +69,7 @@ export function invalidateApiCache(prefixes: string[] = []) {
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    let message = '?붿껌??泥섎━?섏? 紐삵뻽?댁슂.';
+    let message = '요청을 처리하지 못했어요.';
     try {
       const payload = (await response.json()) as { detail?: string };
       if (payload.detail) {
@@ -159,4 +159,3 @@ export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T>
 export function getApiBaseUrl() {
   return getClientConfig().apiBaseUrl;
 }
-

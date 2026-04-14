@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from .db_models import MapPlace, UserRoute, UserRouteLike, UserRoutePlace, UserStamp
 from .models import RouteSort, UserRouteCreate, UserRouteLikeResponse, UserRouteOut
-from .repository import format_datetime, get_or_create_user, utcnow_naive
+from .repository_normalized import get_or_create_user
+from .repository_support import format_datetime, utcnow_naive
 
 MAX_ROUTE_PLACE_COUNT = 6
 MIN_ROUTE_PLACE_COUNT = 2

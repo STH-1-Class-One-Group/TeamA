@@ -113,7 +113,7 @@ function formatErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message;
   }
-  return '?붿껌??泥섎━?섏? 紐삵뻽?댁슂. ?좎떆 ?ㅼ뿉 ?ㅼ떆 ?쒕룄??二쇱꽭??';
+  return '요청을 처리하지 못했어요. 조금 뒤에 다시 시도해 주세요.';
 }
 
 function reportBackgroundError(error: unknown) {

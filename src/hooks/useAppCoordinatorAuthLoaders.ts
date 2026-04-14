@@ -1,5 +1,6 @@
 import { useAppAuthActions } from './useAppAuthActions';
 import { useAppTabDataLoaders } from './useAppTabDataLoaders';
+import { formatCoordinatorErrorMessage } from './useAppCoordinatorActionUtils';
 import type { CoordinatorServicesArgs } from './useAppCoordinatorServices.types';
 
 export function useAppCoordinatorAuthLoaders({
@@ -28,7 +29,7 @@ export function useAppCoordinatorAuthLoaders({
 
   const { startProviderLogin, handleUpdateProfile, handleLogout } = useAppAuthActions({
     setMyPage,
-    formatErrorMessage,
+    formatErrorMessage: formatCoordinatorErrorMessage,
   });
 
   const dataLoaders = useAppTabDataLoaders({
@@ -56,11 +57,4 @@ export function useAppCoordinatorAuthLoaders({
     handleLogout,
     dataLoaders,
   };
-}
-
-function formatErrorMessage(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return '?遺욧퍕??筌ｌ꼶???? 筌륁궢六??곸뒄. ?醫롫뻻 ??쇰퓠 ??쇰뻻 ??뺣즲??雅뚯눘苑??';
 }

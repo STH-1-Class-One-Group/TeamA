@@ -1,6 +1,10 @@
 import { useActiveReviewComments } from './useActiveReviewComments';
 import { useAppPagePaginationActions } from './useAppPagePaginationActions';
 import { useAppViewModels } from './useAppViewModels';
+import {
+  formatCoordinatorErrorMessage,
+  reportCoordinatorBackgroundError,
+} from './useAppCoordinatorActionUtils';
 import type { CoordinatorServicesArgs } from './useAppCoordinatorServices.types';
 import type { useAppCoordinatorAuthLoaders } from './useAppCoordinatorAuthLoaders';
 import type { useAppCoordinatorNavigationNotifications } from './useAppCoordinatorNavigationNotifications';
@@ -65,13 +69,13 @@ export function useAppCoordinatorViewState(
     myPage,
     setReviews,
     setMyPage,
-    reportBackgroundError,
+    reportBackgroundError: reportCoordinatorBackgroundError,
   });
 
   const activeReviewCommentsState = useActiveReviewComments({
     activeCommentReviewId,
     setNotice,
-    formatErrorMessage,
+    formatErrorMessage: formatCoordinatorErrorMessage,
   });
 
   return {
@@ -79,15 +83,4 @@ export function useAppCoordinatorViewState(
     paginationActions,
     activeReviewCommentsState,
   };
-}
-
-function formatErrorMessage(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return '?遺욧퍕??筌ｌ꼶???? 筌륁궢六??곸뒄. ?醫롫뻻 ??쇰퓠 ??쇰뻻 ??뺣즲??雅뚯눘苑??';
-}
-
-function reportBackgroundError(error: unknown) {
-  console.error(error);
 }
