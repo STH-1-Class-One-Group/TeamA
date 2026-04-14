@@ -48,6 +48,16 @@ from .models import (
     UserNotificationOut,
 )
 from .naver_oauth import NaverProfile
+from .repositories.notification_data_repository import (
+    create_user_notification as create_user_notification_entry,
+    delete_notification as delete_notification_entry,
+    get_unread_notification_count as get_unread_notification_count_entry,
+    get_unread_notification_counts as get_unread_notification_counts_entry,
+    list_user_notifications as list_user_notifications_entry,
+    mark_all_notifications_read as mark_all_notifications_read_entry,
+    mark_notification_read as mark_notification_read_entry,
+    to_notification_out as to_notification_out_entry,
+)
 from .repositories.profile_data_repository import (
     build_unique_social_nickname as build_unique_social_nickname_entry,
     ensure_unique_nickname as ensure_unique_nickname_entry,
@@ -62,12 +72,14 @@ from .repositories.public_bundle_repository import (
     import_public_bundle as import_public_bundle_entry,
     load_public_bundle as load_public_bundle_entry,
 )
-from .storage import derive_review_thumbnail_url
+from .repositories.review_query_repository import (
+    get_review_comments as get_review_comments_entry,
+    list_reviews as list_reviews_entry,
+    to_review_out as to_review_out_entry,
+)
 from .repository_support import (
     BADGE_BY_MOOD,
-    build_comment_tree,
     build_session_duration_label,
-    count_visible_comments,
     ensure_stamp_can_be_collected,
     format_date,
     format_datetime,
@@ -285,36 +297,11 @@ def to_review_out(
     comment_count: int | None = None,
     include_comments: bool = True,
 ) -> ReviewOut:
-    comments = list(feed.comments or []) if include_comments else []
-    likes = list(feed.likes or [])
-    liked_by_me = any(like.user_id == current_user_id for like in likes) if current_user_id else False
-    visit_number = feed.stamp.visit_ordinal if feed.stamp else 1
-    has_published_route = bool(
-        feed.stamp
-        and feed.stamp.travel_session
-        and any(route.route_id for route in (feed.stamp.travel_session.routes or []))
-    )
-    return ReviewOut(
-        id=str(feed.feed_id),
-        userId=feed.user_id,
-        placeId=feed.place.slug,
-        placeName=feed.place.name,
-        author=feed.user.nickname,
-        body=feed.body,
-        mood=feed.mood,
-        badge=feed.badge,
-        visitedAt=format_datetime(feed.created_at),
-        imageUrl=feed.image_url,
-        thumbnailUrl=derive_review_thumbnail_url(feed.image_url),
-        commentCount=comment_count if comment_count is not None else count_visible_comments(comments),
-        likeCount=len(likes),
-        likedByMe=liked_by_me,
-        stampId=str(feed.stamp_id) if feed.stamp_id else None,
-        visitNumber=visit_number,
-        visitLabel=format_visit_label(visit_number),
-        travelSessionId=str(feed.stamp.travel_session_id) if feed.stamp and feed.stamp.travel_session_id else None,
-        hasPublishedRoute=has_published_route,
-        comments=build_comment_tree(comments) if include_comments else [],
+    return to_review_out_entry(
+        feed,
+        current_user_id=current_user_id,
+        comment_count=comment_count,
+        include_comments=include_comments,
     )
 
 
@@ -353,61 +340,17 @@ def list_reviews(
     *,
     include_comments: bool = False,
 ) -> list[ReviewOut]:
-    stmt = (
-        select(Feed)
-        .options(
-            joinedload(Feed.user),
-            joinedload(Feed.place),
-            joinedload(Feed.stamp).joinedload(UserStamp.travel_session).joinedload(TravelSession.routes),
-            joinedload(Feed.likes),
-        )
-        .order_by(Feed.created_at.desc(), Feed.feed_id.desc())
+    return list_reviews_entry(
+        db,
+        place_id=place_id,
+        user_id=user_id,
+        current_user_id=current_user_id,
+        include_comments=include_comments,
     )
-    if include_comments:
-        stmt = stmt.options(joinedload(Feed.comments).joinedload(UserComment.user))
-    if place_id:
-        stmt = stmt.join(Feed.place).where(MapPlace.slug == place_id)
-    if user_id:
-        stmt = stmt.where(Feed.user_id == user_id)
-    feeds = db.scalars(stmt).unique().all()
-    if include_comments:
-        return [to_review_out(feed, current_user_id=current_user_id, include_comments=True) for feed in feeds]
-
-    comment_count_by_feed_id: dict[int, int] = {}
-    if feeds:
-        feed_ids = [feed.feed_id for feed in feeds]
-        comments = db.scalars(
-            select(UserComment)
-            .where(UserComment.feed_id.in_(feed_ids))
-            .order_by(UserComment.feed_id.asc(), UserComment.created_at.asc(), UserComment.comment_id.asc())
-        ).all()
-        comments_by_feed_id: dict[int, list[UserComment]] = defaultdict(list)
-        for comment in comments:
-            comments_by_feed_id[comment.feed_id].append(comment)
-        comment_count_by_feed_id = {
-            feed_id: count_visible_comments(comments_by_feed_id.get(feed_id, []))
-            for feed_id in feed_ids
-        }
-    return [
-        to_review_out(
-            feed,
-            current_user_id=current_user_id,
-            comment_count=comment_count_by_feed_id.get(feed.feed_id, 0),
-            include_comments=False,
-        )
-        for feed in feeds
-    ]
 
 
 def get_review_comments(db: Session, review_id: str) -> list[CommentOut]:
-    review_key = parse_review_id(review_id)
-    comments = db.scalars(
-        select(UserComment)
-        .options(joinedload(UserComment.user))
-        .where(UserComment.feed_id == review_key)
-        .order_by(UserComment.created_at.asc(), UserComment.comment_id.asc())
-    ).unique().all()
-    return build_comment_tree(comments)
+    return get_review_comments_entry(db, review_id)
 
 
 def create_review(db: Session, payload: ReviewCreate, user_id: str, nickname: str) -> ReviewOut:
@@ -755,55 +698,19 @@ def build_my_comments(db: Session, user_id: str) -> list[MyCommentOut]:
 
 
 def to_notification_out(notification: UserNotification) -> UserNotificationOut:
-    return UserNotificationOut(
-        id=str(notification.notification_id),
-        type=notification.type,
-        title=notification.title,
-        body=notification.body,
-        createdAt=format_datetime(notification.created_at),
-        isRead=notification.is_read,
-        reviewId=str(notification.review_id) if notification.review_id else None,
-        commentId=str(notification.comment_id) if notification.comment_id else None,
-        routeId=str(notification.route_id) if notification.route_id else None,
-        actorName=notification.actor.nickname if notification.actor else None,
-    )
+    return to_notification_out_entry(notification)
 
 
 def list_user_notifications(db: Session, user_id: str, *, limit: int = 50) -> list[UserNotificationOut]:
-    notifications = db.scalars(
-        select(UserNotification)
-        .options(joinedload(UserNotification.actor))
-        .where(UserNotification.user_id == user_id)
-        .order_by(UserNotification.created_at.desc(), UserNotification.notification_id.desc())
-        .limit(limit)
-    ).unique().all()
-    return [to_notification_out(notification) for notification in notifications]
+    return list_user_notifications_entry(db, user_id, limit=limit)
 
 
 def get_unread_notification_count(db: Session, user_id: str) -> int:
-    return int(
-        db.scalar(
-            select(func.count())
-            .select_from(UserNotification)
-            .where(UserNotification.user_id == user_id, UserNotification.is_read.is_(False))
-        )
-        or 0
-    )
+    return get_unread_notification_count_entry(db, user_id)
 
 
 def get_unread_notification_counts(db: Session, user_ids: list[str]) -> dict[str, int]:
-    if not user_ids:
-        return {}
-
-    counts = {
-        user_id: int(total)
-        for user_id, total in db.execute(
-            select(UserNotification.user_id, func.count(UserNotification.notification_id))
-            .where(UserNotification.user_id.in_(user_ids), UserNotification.is_read.is_(False))
-            .group_by(UserNotification.user_id)
-        ).all()
-    }
-    return {user_id: counts.get(user_id, 0) for user_id in user_ids}
+    return get_unread_notification_counts_entry(db, user_ids)
 
 
 def create_user_notification(
@@ -819,36 +726,22 @@ def create_user_notification(
     route_id: int | None = None,
     payload_metadata: dict | None = None,
 ) -> UserNotificationOut | None:
-    if user_id == actor_user_id:
-        return None
-
-    now = utcnow_naive()
-    notification = UserNotification(
+    return create_user_notification_entry(
+        db,
         user_id=user_id,
         actor_user_id=actor_user_id,
-        type=notification_type,
+        notification_type=notification_type,
         title=title,
         body=body,
         review_id=review_id,
         comment_id=comment_id,
         route_id=route_id,
-        is_read=False,
-        read_at=None,
-        payload_metadata=payload_metadata or {},
-        created_at=now,
-        updated_at=now,
+        payload_metadata=payload_metadata,
     )
-    db.add(notification)
-    db.flush()
-    stored_notification = db.scalars(
-        select(UserNotification)
-        .options(joinedload(UserNotification.actor))
-        .where(UserNotification.notification_id == notification.notification_id)
-    ).unique().one()
-    return to_notification_out(stored_notification)
 
 
 def mark_notification_read(db: Session, notification_id: str, user_id: str) -> NotificationReadResponse:
+    return mark_notification_read_entry(db, notification_id, user_id)
     try:
         notification_key = int(notification_id)
     except ValueError as error:
@@ -871,6 +764,7 @@ def mark_notification_read(db: Session, notification_id: str, user_id: str) -> N
 
 
 def mark_all_notifications_read(db: Session, user_id: str) -> int:
+    return mark_all_notifications_read_entry(db, user_id)
     notifications = db.scalars(
         select(UserNotification).where(UserNotification.user_id == user_id, UserNotification.is_read.is_(False))
     ).all()
@@ -886,6 +780,7 @@ def mark_all_notifications_read(db: Session, user_id: str) -> int:
 
 
 def delete_notification(db: Session, notification_id: str, user_id: str) -> NotificationDeleteResponse:
+    return delete_notification_entry(db, notification_id, user_id)
     try:
         notification_key = int(notification_id)
     except ValueError as error:
@@ -1013,5 +908,3 @@ def load_public_bundle(settings: Settings) -> dict:
 
 def import_public_bundle(db: Session, settings: Settings) -> PublicImportResponse:
     return import_public_bundle_entry(db, settings)
-
-
