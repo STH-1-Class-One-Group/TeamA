@@ -15,7 +15,7 @@ const routeState: RouteState = {
 
 const routePreview: RoutePreview = {
   id: 'route-1',
-  title: '빵집 산책 코스',
+  title: '봄빛 산책 코스',
   subtitle: 'tester / 04. 05. 12:00',
   mood: '데이트',
   placeIds: ['place-1', 'place-2'],
