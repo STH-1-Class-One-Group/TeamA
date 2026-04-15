@@ -10,6 +10,7 @@ enabled = true
 [vars]
 APP_ORIGIN_API_URL = ""
 APP_NAVER_LOGIN_CLIENT_ID = "eiMR4RuAFWOIIoXoxmnN"
+APP_KAKAO_LOGIN_CALLBACK_URL = "https://api.daejeon.jamissue.com/api/auth/kakao/callback"
 APP_FRONTEND_URL = "https://daejeon.jamissue.com"
 APP_CORS_ORIGINS = "https://daejeon.jamissue.com"
 APP_NAVER_LOGIN_CALLBACK_URL = "https://api.daejeon.jamissue.com/api/auth/naver/callback"

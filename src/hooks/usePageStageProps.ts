@@ -5,7 +5,6 @@ type AppShellCoordinatorState = ReturnType<typeof useAppShellCoordinator>;
 export function usePageStageProps(state: AppShellCoordinatorState) {
   const {
     activeTab,
-    activeCategory,
     activeCommentReviewId,
     activeReviewCommentsState,
     adminActions,
@@ -49,7 +48,6 @@ export function usePageStageProps(state: AppShellCoordinatorState) {
     routeSubmitting,
     sessionUser,
     setMyPageTab,
-    stampActionMessage,
     viewModels,
   } = state;
 
