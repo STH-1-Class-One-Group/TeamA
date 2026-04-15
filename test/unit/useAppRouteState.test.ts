@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildHistoryState,
+  getInitialNotice,
   getRoutePreviewFromHistoryState,
   type RouteState,
 } from '../../src/hooks/useAppRouteState';
@@ -15,7 +16,7 @@ const routeState: RouteState = {
 
 const routePreview: RoutePreview = {
   id: 'route-1',
-  title: '봄빛 산책 코스',
+  title: '도심 산책 코스',
   subtitle: 'tester / 04. 05. 12:00',
   mood: '데이트',
   placeIds: ['place-1', 'place-2'],
@@ -34,5 +35,30 @@ describe('useAppRouteState helpers', () => {
     expect(getRoutePreviewFromHistoryState({ routePreview })).toEqual(routePreview);
     expect(getRoutePreviewFromHistoryState({ routePreview: { id: 'broken' } })).toBeNull();
     expect(getRoutePreviewFromHistoryState(null)).toBeNull();
+  });
+
+  it('reads kakao auth query notices from the browser url', () => {
+    const originalWindow = globalThis.window;
+    Object.defineProperty(globalThis, 'window', {
+      value: {
+        location: {
+          search: '?auth=kakao-success',
+          pathname: '/',
+          origin: 'https://daejeon.jamissue.com',
+        },
+        history: {
+          replaceState() {},
+          state: {},
+        },
+      },
+      configurable: true,
+    });
+
+    expect(getInitialNotice()).toBe('카카오 로그인을 완료했어요.');
+
+    Object.defineProperty(globalThis, 'window', {
+      value: originalWindow,
+      configurable: true,
+    });
   });
 });

@@ -4,10 +4,13 @@ import {
   createAuthResponse,
   handleAuthProviders,
   handleAuthSession,
+  handleKakaoCallback,
+  handleStartKakaoLogin,
   handleLogout,
   handleNaverCallback,
   handleStartNaverLogin,
   handleUpdateProfile,
+  kakaoConfigured,
   naverConfigured,
   readSessionUser,
 } from './services/auth.js';
@@ -387,6 +390,11 @@ async function handleHealth(request, env) {
     naverLoginClientSecretConfigured: Boolean(env.APP_NAVER_LOGIN_CLIENT_SECRET),
     naverLoginCallbackUrlConfigured: Boolean(env.APP_NAVER_LOGIN_CALLBACK_URL),
     naverLoginCallbackUrl: env.APP_NAVER_LOGIN_CALLBACK_URL ?? '',
+    kakaoLoginConfigured: kakaoConfigured(env),
+    kakaoLoginClientIdConfigured: Boolean(env.APP_KAKAO_LOGIN_CLIENT_ID),
+    kakaoLoginClientSecretConfigured: Boolean(env.APP_KAKAO_LOGIN_CLIENT_SECRET),
+    kakaoLoginCallbackUrlConfigured: Boolean(env.APP_KAKAO_LOGIN_CALLBACK_URL),
+    kakaoLoginCallbackUrl: env.APP_KAKAO_LOGIN_CALLBACK_URL ?? '',
   }, env, request);
 }
 
@@ -492,6 +500,8 @@ async function routeRequest(request, env) {
     ["PATCH", "/api/auth/profile", () => handleUpdateProfile(request, env)],
     ["GET", "/api/auth/naver/login", () => handleStartNaverLogin(request, env, url)],
     ["GET", "/api/auth/naver/callback", () => handleNaverCallback(request, env, url)],
+    ["GET", "/api/auth/kakao/login", () => handleStartKakaoLogin(request, env, url)],
+    ["GET", "/api/auth/kakao/callback", () => handleKakaoCallback(request, env, url)],
     ["GET", "/api/bootstrap", () => handleBootstrap(request, env)],
     ["GET", "/api/map-bootstrap", () => handleMapBootstrap(request, env)],
     ["GET", "/api/courses/curated", () => handleCuratedCourses(request, env)],

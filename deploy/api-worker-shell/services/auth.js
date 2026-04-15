@@ -13,6 +13,9 @@ const OAUTH_STATE_MAX_AGE_SECONDS = 60 * 10;
 const NAVER_AUTHORIZE_URL = 'https://nid.naver.com/oauth2.0/authorize';
 const NAVER_TOKEN_URL = 'https://nid.naver.com/oauth2.0/token';
 const NAVER_PROFILE_URL = 'https://openapi.naver.com/v1/nid/me';
+const KAKAO_AUTHORIZE_URL = 'https://kauth.kakao.com/oauth/authorize';
+const KAKAO_TOKEN_URL = 'https://kauth.kakao.com/oauth/token';
+const KAKAO_PROFILE_URL = 'https://kapi.kakao.com/v2/user/me';
 const textEncoder = new TextEncoder();
 
 function nowSeconds() {
@@ -169,23 +172,32 @@ export function naverConfigured(env) {
   return Boolean(env.APP_NAVER_LOGIN_CLIENT_ID && env.APP_NAVER_LOGIN_CLIENT_SECRET && env.APP_NAVER_LOGIN_CALLBACK_URL);
 }
 
+export function kakaoConfigured(env) {
+  return Boolean(env.APP_KAKAO_LOGIN_CLIENT_ID && env.APP_KAKAO_LOGIN_CLIENT_SECRET && env.APP_KAKAO_LOGIN_CALLBACK_URL);
+}
+
+function resolveProviderConfiguration(env, providerKey) {
+  if (providerKey === 'naver') {
+    return {
+      isEnabled: naverConfigured(env),
+      loginUrl: '/api/auth/naver/login',
+    };
+  }
+
+  return {
+    isEnabled: kakaoConfigured(env),
+    loginUrl: '/api/auth/kakao/login',
+  };
+}
+
 export function buildAuthProviders(env) {
   return PROVIDERS.map((provider) => {
-    if (provider.key === 'naver') {
-      const enabled = naverConfigured(env);
-      return {
-        key: provider.key,
-        label: provider.label,
-        isEnabled: enabled,
-        loginUrl: enabled ? '/api/auth/naver/login' : null,
-      };
-    }
-
+    const configuration = resolveProviderConfiguration(env, provider.key);
     return {
       key: provider.key,
       label: provider.label,
-      isEnabled: false,
-      loginUrl: null,
+      isEnabled: configuration.isEnabled,
+      loginUrl: configuration.isEnabled ? configuration.loginUrl : null,
     };
   });
 }
@@ -208,6 +220,16 @@ function buildNaverLoginUrl(env, state) {
   return `${NAVER_AUTHORIZE_URL}?${query.toString()}`;
 }
 
+function buildKakaoLoginUrl(env, state) {
+  const query = new URLSearchParams({
+    response_type: 'code',
+    client_id: env.APP_KAKAO_LOGIN_CLIENT_ID,
+    redirect_uri: env.APP_KAKAO_LOGIN_CALLBACK_URL,
+    state,
+  });
+  return `${KAKAO_AUTHORIZE_URL}?${query.toString()}`;
+}
+
 async function exchangeNaverCode(env, code, state) {
   const query = new URLSearchParams({
     grant_type: 'authorization_code',
@@ -226,6 +248,29 @@ async function exchangeNaverCode(env, code, state) {
   return payload;
 }
 
+async function exchangeKakaoCode(env, code) {
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    client_id: env.APP_KAKAO_LOGIN_CLIENT_ID,
+    client_secret: env.APP_KAKAO_LOGIN_CLIENT_SECRET,
+    redirect_uri: env.APP_KAKAO_LOGIN_CALLBACK_URL,
+    code,
+  });
+  const response = await fetch(KAKAO_TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+    },
+    body: body.toString(),
+  });
+  const payload = await response.json();
+  if (!response.ok || payload.error || !payload.access_token) {
+    throw new Error(payload.error_description || payload.error_description || payload.message || '카카오 토큰 교환에 실패했어요.');
+  }
+  return payload;
+}
+
 async function fetchNaverProfile(accessToken) {
   const response = await fetch(NAVER_PROFILE_URL, {
     headers: {
@@ -238,6 +283,30 @@ async function fetchNaverProfile(accessToken) {
     throw new Error(payload.message || '네이버 사용자 정보를 가져오지 못했어요.');
   }
   return payload.response;
+}
+
+async function fetchKakaoProfile(accessToken) {
+  const response = await fetch(KAKAO_PROFILE_URL, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+    },
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.id) {
+    throw new Error(payload.msg || payload.message || '카카오 사용자 정보를 가져오지 못했어요.');
+  }
+
+  return {
+    id: String(payload.id),
+    nickname: payload.properties?.nickname ?? payload.kakao_account?.profile?.nickname ?? '',
+    email: payload.kakao_account?.email ?? null,
+    profile_image:
+      payload.properties?.profile_image ??
+      payload.kakao_account?.profile?.profile_image_url ??
+      null,
+  };
 }
 
 async function findIdentity(env, provider, providerUserId) {
@@ -302,17 +371,17 @@ async function buildUniqueSocialNickname(env, nickname) {
   throw new Error('사용 가능한 닉네임을 만들 수 없어요.');
 }
 
-async function upsertNaverUser(env, profile) {
+async function upsertSocialUser(env, profile, provider) {
   const fallbackNickname = profile.nickname || profile.name || '이름 없음';
   const nowIso = new Date().toISOString();
-  const existingIdentity = await findIdentity(env, 'naver', profile.id);
+  const existingIdentity = await findIdentity(env, provider, profile.id);
 
   if (existingIdentity) {
     await supabaseRequest(env, `user?user_id=eq.${encodeFilterValue(existingIdentity.user_id)}`, {
       method: 'PATCH',
       body: JSON.stringify({
         email: profile.email ?? null,
-        provider: 'naver',
+        provider,
         updated_at: nowIso,
       }),
     });
@@ -329,7 +398,7 @@ async function upsertNaverUser(env, profile) {
       existingIdentity.user_id,
       user?.nickname ?? fallbackNickname,
       user?.email ?? profile.email,
-      'naver',
+      provider,
       profile.profile_image,
       env,
       user?.profile_completed_at ?? null,
@@ -344,7 +413,7 @@ async function upsertNaverUser(env, profile) {
       user_id: userId,
       nickname: safeNickname,
       email: profile.email ?? null,
-      provider: 'naver',
+      provider,
       profile_completed_at: null,
       created_at: nowIso,
       updated_at: nowIso,
@@ -354,7 +423,7 @@ async function upsertNaverUser(env, profile) {
     method: 'POST',
     body: JSON.stringify({
       user_id: userId,
-      provider: 'naver',
+      provider,
       provider_user_id: profile.id,
       email: profile.email ?? null,
       profile_image: profile.profile_image ?? null,
@@ -363,7 +432,15 @@ async function upsertNaverUser(env, profile) {
     }),
   });
 
-  return buildSessionUser(userId, safeNickname, profile.email, 'naver', profile.profile_image, env, null);
+  return buildSessionUser(userId, safeNickname, profile.email, provider, profile.profile_image, env, null);
+}
+
+async function upsertNaverUser(env, profile) {
+  return upsertSocialUser(env, profile, 'naver');
+}
+
+async function upsertKakaoUser(env, profile) {
+  return upsertSocialUser(env, profile, 'kakao');
 }
 
 async function readJsonBody(request) {
@@ -441,36 +518,55 @@ export async function handleUpdateProfile(request, env) {
   });
 }
 
-export async function handleStartNaverLogin(request, env, url) {
-  if (!naverConfigured(env)) {
-    return jsonResponse(503, { detail: '네이버 로그인 설정이 비어 있어요.' }, env, request);
-  }
-
+function buildStateLoginResponse(request, env, url, authorizeUrlBuilder) {
   const next = url.searchParams.get('next') || env.APP_FRONTEND_URL || 'https://daejeon.jamissue.com';
   const state = crypto.randomUUID().replace(/-/g, '');
-  const stateToken = await signPayload(getSigningSecret(env), {
+  return signPayload(getSigningSecret(env), {
     state,
     next,
     exp: nowSeconds() + OAUTH_STATE_MAX_AGE_SECONDS,
-  });
+  }).then((stateToken) =>
+    redirectResponse(authorizeUrlBuilder(env, state), env, request, [
+      serializeCookie(OAUTH_STATE_COOKIE_NAME, stateToken, {
+        maxAge: OAUTH_STATE_MAX_AGE_SECONDS,
+        httpOnly: true,
+        secure: getSecureCookieFlag(request, env),
+        sameSite: 'Lax',
+        path: '/',
+      }),
+    ]),
+  );
+}
 
-  return redirectResponse(buildNaverLoginUrl(env, state), env, request, [
-    serializeCookie(OAUTH_STATE_COOKIE_NAME, stateToken, {
-      maxAge: OAUTH_STATE_MAX_AGE_SECONDS,
-      httpOnly: true,
-      secure: getSecureCookieFlag(request, env),
-      sameSite: 'Lax',
-      path: '/',
-    }),
-  ]);
+export async function handleStartNaverLogin(request, env, url) {
+  if (!naverConfigured(env)) {
+    return jsonResponse(503, { detail: '네이버 로그인이 아직 설정되지 않았어요.' }, env, request);
+  }
+  return buildStateLoginResponse(request, env, url, buildNaverLoginUrl);
+}
+
+export async function handleStartKakaoLogin(request, env, url) {
+  if (!kakaoConfigured(env)) {
+    return jsonResponse(503, { detail: '카카오 로그인이 아직 설정되지 않았어요.' }, env, request);
+  }
+  return buildStateLoginResponse(request, env, url, buildKakaoLoginUrl);
+}
+
+async function readStatePayload(request, env) {
+  const stateToken = parseCookies(request).get(OAUTH_STATE_COOKIE_NAME);
+  return verifyPayload(getSigningSecret(env), stateToken);
+}
+
+function buildCallbackContext(request, env, statePayload) {
+  const secure = getSecureCookieFlag(request, env);
+  const redirectTarget = statePayload?.next || env.APP_FRONTEND_URL || 'https://daejeon.jamissue.com';
+  const cleanupCookie = clearCookie(OAUTH_STATE_COOKIE_NAME, secure);
+  return { secure, redirectTarget, cleanupCookie };
 }
 
 export async function handleNaverCallback(request, env, url) {
-  const secure = getSecureCookieFlag(request, env);
-  const stateToken = parseCookies(request).get(OAUTH_STATE_COOKIE_NAME);
-  const statePayload = await verifyPayload(getSigningSecret(env), stateToken);
-  const redirectTarget = statePayload?.next || env.APP_FRONTEND_URL || 'https://daejeon.jamissue.com';
-  const cleanupCookie = clearCookie(OAUTH_STATE_COOKIE_NAME, secure);
+  const statePayload = await readStatePayload(request, env);
+  const { secure, redirectTarget, cleanupCookie } = buildCallbackContext(request, env, statePayload);
 
   const error = url.searchParams.get('error');
   const errorDescription = url.searchParams.get('error_description');
@@ -503,5 +599,43 @@ export async function handleNaverCallback(request, env, url) {
   } catch (errorValue) {
     const reason = errorValue instanceof Error ? errorValue.message : String(errorValue);
     return redirectResponse(buildRedirectUrl(redirectTarget, { auth: 'naver-error', reason }), env, request, [cleanupCookie]);
+  }
+}
+
+export async function handleKakaoCallback(request, env, url) {
+  const statePayload = await readStatePayload(request, env);
+  const { secure, redirectTarget, cleanupCookie } = buildCallbackContext(request, env, statePayload);
+
+  const error = url.searchParams.get('error');
+  const errorDescription = url.searchParams.get('error_description');
+  if (error) {
+    return redirectResponse(buildRedirectUrl(redirectTarget, { auth: 'kakao-error', reason: errorDescription || error }), env, request, [cleanupCookie]);
+  }
+
+  const code = url.searchParams.get('code');
+  const state = url.searchParams.get('state');
+  if (!code || !state || !statePayload || statePayload.state !== state || statePayload.exp < nowSeconds()) {
+    return redirectResponse(buildRedirectUrl(redirectTarget, { auth: 'kakao-error', reason: 'state-mismatch' }), env, request, [cleanupCookie]);
+  }
+
+  try {
+    const tokenPayload = await exchangeKakaoCode(env, code);
+    const profile = await fetchKakaoProfile(tokenPayload.access_token);
+    const sessionUser = await upsertKakaoUser(env, profile);
+    const sessionToken = await signPayload(getSigningSecret(env), { user: sessionUser, exp: nowSeconds() + SESSION_MAX_AGE_SECONDS });
+
+    return redirectResponse(buildRedirectUrl(redirectTarget, { auth: 'kakao-success' }), env, request, [
+      cleanupCookie,
+      serializeCookie(SESSION_COOKIE_NAME, sessionToken, {
+        maxAge: SESSION_MAX_AGE_SECONDS,
+        httpOnly: true,
+        secure,
+        sameSite: 'Lax',
+        path: '/',
+      }),
+    ]);
+  } catch (errorValue) {
+    const reason = errorValue instanceof Error ? errorValue.message : String(errorValue);
+    return redirectResponse(buildRedirectUrl(redirectTarget, { auth: 'kakao-error', reason }), env, request, [cleanupCookie]);
   }
 }

@@ -49,6 +49,15 @@ export function getInitialNotice() {
   if (auth === 'naver-error') {
     return reason ? `네이버 로그인에 실패했어요. (${reason})` : '네이버 로그인에 실패했어요.';
   }
+  if (auth === 'kakao-success') {
+    return '카카오 로그인을 완료했어요.';
+  }
+  if (auth === 'kakao-linked') {
+    return '카카오 계정을 연결했어요.';
+  }
+  if (auth === 'kakao-error') {
+    return reason ? `카카오 로그인에 실패했어요. (${reason})` : '카카오 로그인에 실패했어요.';
+  }
   return null;
 }
 

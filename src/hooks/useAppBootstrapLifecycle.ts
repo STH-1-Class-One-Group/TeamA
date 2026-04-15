@@ -179,7 +179,7 @@ export function useAppBootstrapLifecycle({
         }
 
         setBootstrapStatus('ready');
-        if (authState === 'naver-success' && bootstrap.auth.user?.profileCompletedAt === null) {
+        if ((authState === 'naver-success' || authState === 'kakao-success') && bootstrap.auth.user?.profileCompletedAt === null) {
           goToTabRef.current('my');
           setNotice('닉네임을 먼저 정하면 같은 계정으로 스탬프와 피드를 이어서 남길 수 있어요.');
         }
