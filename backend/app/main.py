@@ -6,14 +6,12 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from .config import get_settings
-from .db import Base, get_engine, get_session_factory
 from .public_event_api import router as public_event_router
 from .routers.admin import router as admin_router
 from .routers.auth import router as auth_router
 from .routers.content import router as content_router
 from .routers.my import router as my_router
 from .routers.reviews import router as reviews_router
-from .seed import seed_database
 from .storage import (
     FileTooLargeError,
     InvalidFileTypeError,
@@ -21,6 +19,7 @@ from .storage import (
     StorageUploadError,
     mount_storage_backend,
 )
+from .startup import run_startup_bootstrap
 
 settings = get_settings()
 app = FastAPI(
@@ -74,9 +73,4 @@ async def handle_storage_errors(_: Request, exc: ValueError) -> JSONResponse:
 def on_startup() -> None:
     """로컬 개발 환경에서는 업로드 경로와 데이터베이스를 준비합니다."""
 
-    if settings.env == "worker":
-        return
-
-    Base.metadata.create_all(bind=get_engine(settings))
-    with get_session_factory(settings)() as db:
-        seed_database(db, settings)
+    run_startup_bootstrap(settings)
