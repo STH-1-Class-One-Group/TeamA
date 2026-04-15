@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from ..repository_normalized import get_my_page
+from .my_page_data_repository import get_my_page
 
 
 def read_my_page_entry(db: Session, user_id: str, is_admin: bool):

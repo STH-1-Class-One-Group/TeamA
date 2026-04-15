@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 from sqlalchemy import func, select
@@ -19,7 +18,6 @@ from .db_models import (
     User,
     UserComment,
     UserNotification,
-    UserRoute,
     UserStamp,
 )
 from .models import (
@@ -33,7 +31,6 @@ from .models import (
     CourseOut,
     MyCommentOut,
     MyPageResponse,
-    MyStatsOut,
     NotificationDeleteResponse,
     NotificationReadResponse,
     PlaceOut,
@@ -42,12 +39,11 @@ from .models import (
     ReviewCreate,
     ReviewLikeResponse,
     ReviewOut,
-    StampLogOut,
     StampState,
-    TravelSessionOut,
     UserNotificationOut,
 )
 from .naver_oauth import NaverProfile
+from .repositories.my_page_data_repository import build_my_comments as build_my_comments_entry, get_my_page as get_my_page_entry
 from .repositories.notification_data_repository import (
     create_user_notification as create_user_notification_entry,
     delete_notification as delete_notification_entry,
@@ -77,12 +73,10 @@ from .repositories.review_query_repository import (
     list_reviews as list_reviews_entry,
     to_review_out as to_review_out_entry,
 )
+from .repositories.stamp_data_repository import get_stamps as get_stamps_entry, toggle_stamp as toggle_stamp_entry
+from .repositories.user_data_repository import get_or_create_user as get_or_create_user_entry
 from .repository_support import (
     BADGE_BY_MOOD,
-    build_session_duration_label,
-    ensure_stamp_can_be_collected,
-    format_date,
-    format_datetime,
     format_visit_label,
     parse_comment_id,
     parse_review_id,
@@ -90,7 +84,6 @@ from .repository_support import (
     to_admin_place_out,
     to_place_out,
     to_seoul_date,
-    to_session_user,
     utcnow_naive,
 )
 
@@ -102,36 +95,13 @@ def get_or_create_user(
     email: str | None = None,
     provider: str = "demo",
 ) -> User:
-    user = db.get(User, user_id)
-    if not user:
-        user = User(
-            user_id=user_id,
-            nickname=nickname or user_id,
-            email=email,
-            provider=provider,
-            created_at=utcnow_naive(),
-            updated_at=utcnow_naive(),
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        return user
-
-    dirty = False
-    if nickname and user.nickname != nickname:
-        user.nickname = nickname
-        dirty = True
-    if email is not None and user.email != email:
-        user.email = email
-        dirty = True
-    if provider and user.provider != provider:
-        user.provider = provider
-        dirty = True
-    if dirty:
-        user.updated_at = utcnow_naive()
-        db.commit()
-        db.refresh(user)
-    return user
+    return get_or_create_user_entry(
+        db,
+        user_id,
+        nickname,
+        email=email,
+        provider=provider,
+    )
 def ensure_unique_nickname(db: Session, nickname: str, *, exclude_user_id: str | None = None) -> str:
     return ensure_unique_nickname_entry(db, nickname, exclude_user_id=exclude_user_id)
 
@@ -187,107 +157,6 @@ def link_naver_identity(db: Session, user_id: str, profile: NaverProfile) -> Use
 
 def update_user_profile(db: Session, user_id: str, payload: ProfileUpdateRequest) -> User:
     return update_user_profile_entry(db, user_id, payload)
-
-def build_stamp_logs(stamps: list[UserStamp]) -> list[StampLogOut]:
-    today_key = to_seoul_date().isoformat()
-    ordered_stamps = sorted(stamps, key=lambda item: (item.created_at, item.stamp_id), reverse=True)
-    return [
-        StampLogOut(
-            id=str(stamp.stamp_id),
-            placeId=stamp.place.slug,
-            placeName=stamp.place.name,
-            stampedAt=format_datetime(stamp.created_at),
-            stampedDate=format_date(stamp.stamp_date),
-            visitNumber=stamp.visit_ordinal,
-            visitLabel=format_visit_label(stamp.visit_ordinal),
-            travelSessionId=str(stamp.travel_session_id) if stamp.travel_session_id else None,
-            isToday=format_date(stamp.stamp_date) == today_key,
-        )
-        for stamp in ordered_stamps
-        if stamp.place and stamp.place.is_active
-    ]
-
-
-def build_travel_sessions(sessions: list[TravelSession], user_stamps: list[UserStamp], owner_routes: list[UserRoute]) -> list[TravelSessionOut]:
-    stamps_by_session_id: dict[int, list[UserStamp]] = defaultdict(list)
-    for stamp in user_stamps:
-        if stamp.travel_session_id:
-            stamps_by_session_id[stamp.travel_session_id].append(stamp)
-
-    published_route_id_by_session = {
-        route.travel_session_id: str(route.route_id)
-        for route in owner_routes
-        if route.travel_session_id is not None
-    }
-
-    session_payloads: list[TravelSessionOut] = []
-    for session in sorted(sessions, key=lambda item: (item.started_at, item.travel_session_id), reverse=True):
-        ordered_stamps = sorted(stamps_by_session_id.get(session.travel_session_id, []), key=lambda item: (item.created_at, item.stamp_id))
-        unique_place_ids: list[str] = []
-        unique_place_names: list[str] = []
-        seen_place_ids: set[str] = set()
-        for stamp in ordered_stamps:
-            if not stamp.place or not stamp.place.is_active:
-                continue
-            if stamp.place.slug in seen_place_ids:
-                continue
-            seen_place_ids.add(stamp.place.slug)
-            unique_place_ids.append(stamp.place.slug)
-            unique_place_names.append(stamp.place.name)
-
-        session_payloads.append(
-            TravelSessionOut(
-                id=str(session.travel_session_id),
-                startedAt=session.started_at.isoformat(),
-                endedAt=session.ended_at.isoformat(),
-                durationLabel=build_session_duration_label(session),
-                stampCount=session.stamp_count,
-                placeIds=unique_place_ids,
-                placeNames=unique_place_names,
-                canPublish=len(unique_place_ids) >= 2,
-                publishedRouteId=published_route_id_by_session.get(session.travel_session_id),
-                coverPlaceId=unique_place_ids[0] if unique_place_ids else None,
-            )
-        )
-    return session_payloads
-
-
-def _build_stamp_state(db: Session, user_id: str | None) -> StampState:
-    if not user_id:
-        return StampState(collectedPlaceIds=[], logs=[], travelSessions=[])
-
-    stamp_rows = db.scalars(
-        select(UserStamp)
-        .options(joinedload(UserStamp.place))
-        .where(UserStamp.user_id == user_id)
-        .order_by(UserStamp.created_at.desc(), UserStamp.stamp_id.desc())
-    ).unique().all()
-    collected_place_ids: list[str] = []
-    seen_place_ids: set[str] = set()
-    for stamp in stamp_rows:
-        if not stamp.place or not stamp.place.is_active:
-            continue
-        if stamp.place.slug in seen_place_ids:
-            continue
-        seen_place_ids.add(stamp.place.slug)
-        collected_place_ids.append(stamp.place.slug)
-
-    travel_sessions = db.scalars(
-        select(TravelSession)
-        .where(TravelSession.user_id == user_id)
-        .order_by(TravelSession.started_at.desc(), TravelSession.travel_session_id.desc())
-    ).all()
-    owner_routes = db.scalars(
-        select(UserRoute)
-        .where(UserRoute.user_id == user_id)
-        .order_by(UserRoute.created_at.desc(), UserRoute.route_id.desc())
-    ).all()
-
-    return StampState(
-        collectedPlaceIds=collected_place_ids,
-        logs=build_stamp_logs(stamp_rows),
-        travelSessions=build_travel_sessions(travel_sessions, stamp_rows, owner_routes),
-    )
 
 
 def to_review_out(
@@ -579,47 +448,8 @@ def list_courses(db: Session, mood: CourseMood | None = None) -> list[CourseOut]
     return [to_course_out(course) for course in db.scalars(stmt).unique().all()]
 
 
-def _find_or_create_travel_session(db: Session, user_id: str, now: datetime, last_stamp: UserStamp | None) -> TravelSession:
-    if last_stamp and now - last_stamp.created_at <= timedelta(hours=24):
-        if last_stamp.travel_session_id:
-            session = db.get(TravelSession, last_stamp.travel_session_id)
-            if session:
-                session.ended_at = now
-                session.last_stamp_at = now
-                session.stamp_count += 1
-                session.updated_at = now
-                return session
-
-        session = TravelSession(
-            user_id=user_id,
-            started_at=last_stamp.created_at,
-            ended_at=now,
-            last_stamp_at=now,
-            stamp_count=2,
-            created_at=now,
-            updated_at=now,
-        )
-        db.add(session)
-        db.flush()
-        last_stamp.travel_session_id = session.travel_session_id
-        return session
-
-    session = TravelSession(
-        user_id=user_id,
-        started_at=now,
-        ended_at=now,
-        last_stamp_at=now,
-        stamp_count=1,
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(session)
-    db.flush()
-    return session
-
-
 def get_stamps(db: Session, user_id: str | None) -> StampState:
-    return _build_stamp_state(db, user_id)
+    return get_stamps_entry(db, user_id)
 
 
 def toggle_stamp(
@@ -630,71 +460,18 @@ def toggle_stamp(
     longitude: float,
     radius_meters: int,
 ) -> StampState:
-    get_or_create_user(db, user_id, user_id)
-    place = db.scalars(select(MapPlace).where(MapPlace.slug == place_id, MapPlace.is_active.is_(True))).first()
-    if not place:
-        raise ValueError("장소를 찾을 수 없어요.")
-
-    now = utcnow_naive()
-    stamp_date = to_seoul_date(now)
-    existing_today = db.scalars(
-        select(UserStamp).where(
-            UserStamp.user_id == user_id,
-            UserStamp.position_id == place.position_id,
-            UserStamp.stamp_date == stamp_date,
-        )
-    ).first()
-    if existing_today:
-        return get_stamps(db, user_id)
-
-    ensure_stamp_can_be_collected(place, latitude, longitude, radius_meters)
-    visit_count = db.scalar(
-        select(func.count()).select_from(UserStamp).where(UserStamp.user_id == user_id, UserStamp.position_id == place.position_id)
-    ) or 0
-    last_stamp = db.scalars(
-        select(UserStamp)
-        .where(UserStamp.user_id == user_id)
-        .order_by(UserStamp.created_at.desc(), UserStamp.stamp_id.desc())
-        .limit(1)
-    ).first()
-    session = _find_or_create_travel_session(db, user_id, now, last_stamp)
-
-    db.add(
-        UserStamp(
-            user_id=user_id,
-            position_id=place.position_id,
-            travel_session_id=session.travel_session_id,
-            stamp_date=stamp_date,
-            visit_ordinal=int(visit_count) + 1,
-            created_at=now,
-        )
+    return toggle_stamp_entry(
+        db,
+        user_id,
+        place_id,
+        latitude,
+        longitude,
+        radius_meters,
     )
-    db.commit()
-    return get_stamps(db, user_id)
 
 
 def build_my_comments(db: Session, user_id: str) -> list[MyCommentOut]:
-    comment_rows = db.scalars(
-        select(UserComment)
-        .options(joinedload(UserComment.feed).joinedload(Feed.place))
-        .where(UserComment.user_id == user_id)
-        .order_by(UserComment.created_at.desc(), UserComment.comment_id.desc())
-    ).unique().all()
-    return [
-        MyCommentOut(
-            id=str(comment.comment_id),
-            reviewId=str(comment.feed_id),
-            placeId=comment.feed.place.slug,
-            placeName=comment.feed.place.name,
-            body="삭제된 댓글입니다." if comment.is_deleted else comment.body,
-            isDeleted=comment.is_deleted,
-            parentId=str(comment.parent_id) if comment.parent_id else None,
-            createdAt=format_datetime(comment.created_at),
-            reviewBody=comment.feed.body,
-        )
-        for comment in comment_rows
-        if comment.feed and comment.feed.place and not comment.is_deleted
-    ]
+    return build_my_comments_entry(db, user_id)
 
 
 def to_notification_out(notification: UserNotification) -> UserNotificationOut:
@@ -752,42 +529,7 @@ def delete_notification(db: Session, notification_id: str, user_id: str) -> Noti
     return delete_notification_entry(db, notification_id, user_id)
 
 def get_my_page(db: Session, user_id: str, is_admin: bool) -> MyPageResponse:
-    user = db.get(User, user_id)
-    if not user:
-        raise ValueError("사용자 정보를 찾을 수 없어요.")
-
-    reviews = list_reviews(db, user_id=user_id, current_user_id=user_id, include_comments=False)
-    stamp_state = get_stamps(db, user_id)
-    active_places = db.scalars(select(MapPlace).where(MapPlace.is_active.is_(True)).order_by(MapPlace.position_id.asc())).all()
-    visited_place_ids = set(stamp_state.collected_place_ids)
-    visited_places = [to_place_out(place) for place in active_places if place.slug in visited_place_ids]
-    unvisited_places = [to_place_out(place) for place in active_places if place.slug not in visited_place_ids]
-
-    from .user_routes_normalized import list_user_routes_for_owner
-
-    routes = list_user_routes_for_owner(db, user_id)
-    comments = build_my_comments(db, user_id)
-    notifications = list_user_notifications(db, user_id)
-    return MyPageResponse(
-        user=to_session_user(user, is_admin),
-        stats=MyStatsOut(
-            reviewCount=len(reviews),
-            stampCount=len(stamp_state.logs),
-            uniquePlaceCount=len(visited_places),
-            totalPlaceCount=len(active_places),
-            routeCount=len(routes),
-        ),
-        reviews=reviews,
-        comments=comments,
-        notifications=notifications,
-        unreadNotificationCount=get_unread_notification_count(db, user_id),
-        stampLogs=stamp_state.logs,
-        travelSessions=stamp_state.travel_sessions,
-        visitedPlaces=visited_places,
-        unvisitedPlaces=unvisited_places,
-        collectedPlaces=visited_places,
-        routes=routes,
-    )
+    return get_my_page_entry(db, user_id, is_admin)
 
 
 def get_bootstrap(db: Session, user_id: str | None) -> BootstrapResponse:

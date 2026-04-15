@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from ..repository_normalized import get_stamps, toggle_stamp
+from .stamp_data_repository import get_stamps, toggle_stamp
 
 
 def read_stamp_state(db: Session, user_id: str | None):

@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..db_models import MapPlace, UserStamp
 from ..models import StampState
-from ..repository_normalized import get_or_create_user
 from ..repository_support import ensure_stamp_can_be_collected, to_seoul_date, utcnow_naive
+from .user_data_repository import get_or_create_user
 
 
 def get_stamps(db: Session, user_id: str | None) -> StampState:
