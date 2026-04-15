@@ -1,7 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..repositories.account_repository import delete_account_entry
+from ..repositories.account_data_repository import delete_account as delete_account_entry
 
 ACCOUNT_NOT_FOUND_MESSAGE = "사용자 정보를 찾지 못했어요."
 

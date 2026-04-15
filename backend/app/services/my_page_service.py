@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings
 from ..models import SessionUser
-from ..repositories.my_page_repository import read_my_page_entry
+from ..repositories.my_page_data_repository import get_my_page as read_my_page_entry
 
 
 def _raise_not_found(detail: str) -> None:

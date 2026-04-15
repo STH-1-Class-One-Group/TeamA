@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings
 from ..models import SessionUser, StampToggleRequest
-from ..repositories.stamp_repository import read_stamp_state, toggle_stamp_entry
+from ..repositories.stamp_data_repository import get_stamps as read_stamp_state, toggle_stamp as toggle_stamp_entry
 
 
 def _raise_not_found(detail: str) -> None:

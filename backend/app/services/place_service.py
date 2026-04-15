@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..models import CategoryFilter
-from ..repositories.place_repository import list_place_entries, read_place_entry
+from ..repository_normalized import get_place as read_place_entry, list_places as list_place_entries
 
 
 def _raise_not_found(detail: str) -> None:
