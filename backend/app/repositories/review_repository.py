@@ -2,13 +2,7 @@ from sqlalchemy.orm import Session
 
 from ..models import CommentCreate, ReviewCreate
 from .review_query_repository import get_review_comments, list_reviews
-from ..repository_normalized import (
-    create_comment_with_notifications,
-    create_review,
-    delete_comment,
-    delete_review,
-    toggle_review_like,
-)
+from .review_write_repository import create_comment_with_notifications, create_review, delete_comment, delete_review, toggle_review_like
 
 
 def list_review_entries(
