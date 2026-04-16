@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useAutoLoadMore } from '../hooks/useAutoLoadMore';
 import { useScrollRestoration } from '../hooks/useScrollRestoration';
+import { FeedLoadMoreRow } from './feed/FeedLoadMoreRow';
+import { FeedTabHeader } from './feed/FeedTabHeader';
 import { FeedCommentSheet } from './FeedCommentSheet';
 import { ReviewList } from './ReviewList';
 import type { ApiStatus, Comment, Review, SessionUser } from '../types';
@@ -100,29 +102,7 @@ export function FeedTab({
   return (
     <>
       <section ref={scrollRef} className="page-panel page-panel--scrollable">
-        <header className="panel-header">
-          <p className="eyebrow">FEED</p>
-          <h2>{placeFilterName ? `${placeFilterName} 피드` : '방문 피드'}</h2>
-          <p>
-            {placeFilterName ? (
-              '지도에서 고른 장소의 방문 피드만 먼저 보여줍니다.'
-            ) : (
-              <>
-                스탬프를 찍은 뒤에만 남길 수 있는
-                <br />
-                실제 방문 후기만 모아 보여줍니다.
-              </>
-            )}
-          </p>
-          {placeFilterName && (
-            <div className="chip-row compact-gap">
-              <span className="soft-tag">{`현재 장소: ${placeFilterName}`}</span>
-              <button type="button" className="chip" onClick={onClearPlaceFilter}>
-                전체 피드 보기
-              </button>
-            </div>
-          )}
-        </header>
+        <FeedTabHeader placeFilterName={placeFilterName} onClearPlaceFilter={onClearPlaceFilter} />
         <ReviewList
           reviews={visibleReviews}
           canWriteComment={Boolean(sessionUser)}
@@ -142,14 +122,7 @@ export function FeedTab({
           emptyTitle={placeFilterId ? `${placeFilterName} 피드가 아직 없어요` : '아직 공개된 피드가 없어요'}
           emptyBody={placeFilterId ? '이 장소를 찍은 뒤 첫 피드를 남겨 보세요.' : '먼저 스탬프를 찍고 오늘의 분위기를 짧게 남겨 보세요.'}
         />
-        {hasMore && (
-          <div className="list-load-more-row">
-            <div ref={loadMoreRef} className="list-load-more-sentinel" aria-hidden="true" />
-            <button type="button" className="secondary-button" onClick={() => void onLoadMore()} disabled={loadingMore}>
-              {loadingMore ? 'Loading...' : 'More feed'}
-            </button>
-          </div>
-        )}
+        <FeedLoadMoreRow hasMore={hasMore} loadingMore={loadingMore} loadMoreRef={loadMoreRef} onLoadMore={onLoadMore} />
       </section>
       <FeedCommentSheet
         review={activeReview}
