@@ -1,10 +1,8 @@
-import { useEffect, useRef } from 'react';
-import { CommentThread } from './CommentThread';
-import { CommentIcon, HeartIcon } from './review/ReviewActionIcons';
-import { ReviewFeedCardHeader } from './review/ReviewFeedCardHeader';
-import { ReviewImageFrame } from './review/ReviewImageFrame';
-import { ReviewTagRow } from './review/ReviewTagRow';
+import { useRef } from 'react';
 import type { Review } from '../types';
+import { ReviewListEmptyState } from './review/ReviewListEmptyState';
+import { ReviewListItem } from './review/ReviewListItem';
+import { useScrollToHighlightedReview } from './review/useScrollToHighlightedReview';
 
 interface ReviewListProps {
   reviews: Review[];
@@ -46,131 +44,32 @@ export function ReviewList({
   emptyBody,
 }: ReviewListProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!highlightedReviewId) {
-      return;
-    }
-
-    const listEl = listRef.current;
-    if (!listEl) {
-      return;
-    }
-
-    const selector = `[data-review-id="${highlightedReviewId}"]`;
-    const scrollToReview = () => {
-      const target = listEl.querySelector<HTMLElement>(selector);
-      if (!target) {
-        return;
-      }
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    };
-
-    scrollToReview();
-    const rafA = window.requestAnimationFrame(scrollToReview);
-    const rafB = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(scrollToReview);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(rafA);
-      window.cancelAnimationFrame(rafB);
-    };
-  }, [highlightedReviewId, reviews]);
+  useScrollToHighlightedReview(listRef, highlightedReviewId, reviews.length);
 
   if (reviews.length === 0) {
-    return (
-      <section className="sheet-card stack-gap">
-        <strong>{emptyTitle}</strong>
-        <p className="section-copy">{emptyBody}</p>
-      </section>
-    );
+    return <ReviewListEmptyState emptyTitle={emptyTitle} emptyBody={emptyBody} />;
   }
 
   return (
     <div ref={listRef} className="review-stack">
       {reviews.map((review) => (
-        <article
+        <ReviewListItem
           key={review.id}
-          data-review-id={review.id}
-          className={review.id === highlightedReviewId ? 'review-card review-card--feed review-card--highlighted' : 'review-card review-card--feed'}
-        >
-          <ReviewFeedCardHeader
-            title={<strong className="review-card__title">{review.placeName}</strong>}
-            mood={review.mood}
-            meta={`${review.author} · ${review.visitedAt}`}
-          />
-
-          <ReviewTagRow visitLabel={review.visitLabel} badge={review.badge} hasPublishedRoute={review.hasPublishedRoute} />
-
-          {review.imageUrl && (
-            <ReviewImageFrame
-              src={review.imageUrl}
-              thumbnailSrc={review.thumbnailUrl ?? null}
-              alt={`${review.placeName} 후기 이미지`}
-            />
-          )}
-
-          <p className="review-card__body">{review.body}</p>
-
-          <div className="review-card__actions review-card__actions--feed">
-            <div className="review-card__action-group review-card__action-group--feed">
-              <button
-                type="button"
-                className={review.likedByMe ? 'review-action-button is-active' : 'review-action-button'}
-                disabled={likingReviewId === review.id}
-                onClick={() => (canToggleLike ? onToggleLike(review.id) : onRequestLogin())}
-                aria-pressed={review.likedByMe}
-              >
-                <span className="review-action-button__icon" aria-hidden="true">
-                  <HeartIcon filled={review.likedByMe} />
-                </span>
-                <span className="review-action-button__label">{review.likeCount}</span>
-              </button>
-              {onOpenComments ? (
-                <button
-                  type="button"
-                  className="review-action-button"
-                  onClick={() => onOpenComments(review.id)}
-                  aria-label={`댓글 ${review.commentCount}개 보기`}
-                >
-                  <span className="review-action-button__icon" aria-hidden="true">
-                    <CommentIcon />
-                  </span>
-                  <span className="review-action-button__label">{review.commentCount}</span>
-                </button>
-              ) : (
-                <span className="review-action-button review-action-button--static" aria-hidden="true">
-                  <span className="review-action-button__icon">
-                    <CommentIcon />
-                  </span>
-                  <span className="review-action-button__label">{review.commentCount}</span>
-                </span>
-              )}
-            </div>
-            {onOpenPlace && (
-              <button type="button" className="review-link-button" onClick={() => onOpenPlace(review.placeId)}>
-                장소 보기
-              </button>
-            )}
-          </div>
-
-          {!onOpenComments && (
-            <CommentThread
-              comments={review.comments}
-              canWriteComment={canWriteComment}
-              currentUserId={currentUserId}
-              submittingReviewId={submittingReviewId}
-              mutatingCommentId={null}
-              highlightedCommentId={null}
-              reviewId={review.id}
-              onSubmitComment={onSubmitComment}
-              onUpdateComment={onUpdateComment}
-              onDeleteComment={onDeleteComment}
-              onRequestLogin={onRequestLogin}
-            />
-          )}
-        </article>
+          review={review}
+          currentUserId={currentUserId}
+          highlightedReviewId={highlightedReviewId}
+          canWriteComment={canWriteComment}
+          canToggleLike={canToggleLike}
+          likingReviewId={likingReviewId}
+          submittingReviewId={submittingReviewId}
+          onToggleLike={onToggleLike}
+          onSubmitComment={onSubmitComment}
+          onUpdateComment={onUpdateComment}
+          onDeleteComment={onDeleteComment}
+          onRequestLogin={onRequestLogin}
+          onOpenPlace={onOpenPlace}
+          onOpenComments={onOpenComments}
+        />
       ))}
     </div>
   );
