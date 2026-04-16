@@ -1,12 +1,9 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import { useAuthStore } from '../store/auth-store';
-import { useAppPageRuntimeStore } from '../store/app-page-runtime-store';
-import { useAppShellRuntimeStore } from '../store/app-shell-runtime-store';
-import { useAppRouteStore } from '../store/app-route-store';
 import { useAppTabWarmup } from './useAppTabWarmup';
 import { useSelectedPlaceReviewSync } from './useSelectedPlaceReviewSync';
 import { useAppBootstrapSharedRefs } from './useAppBootstrapSharedRefs';
 import { useFestivalBootstrapEffect, useMapBootstrapEffect } from './useAppBootstrapEffects';
+import { useAppBootstrapStoreBindings } from './useAppBootstrapStoreBindings';
 import type {
   AdminSummaryResponse,
   FestivalItem,
@@ -71,20 +68,7 @@ export function useAppBootstrapLifecycle({
   formatErrorMessage,
   reportBackgroundError,
 }: UseAppBootstrapLifecycleParams) {
-  const setSessionUser = useAuthStore((state) => state.setSessionUser);
-  const setProviders = useAuthStore((state) => state.setProviders);
-  const setBootstrapStatus = useAppShellRuntimeStore((state) => state.setBootstrapStatus);
-  const setBootstrapError = useAppShellRuntimeStore((state) => state.setBootstrapError);
-  const setSelectedPlaceId = useAppRouteStore((state) => state.setSelectedPlaceId);
-  const setSelectedFestivalId = useAppRouteStore((state) => state.setSelectedFestivalId);
-  const setNotice = useAppShellRuntimeStore((state) => state.setNotice);
-  const setFeedNextCursor = useAppPageRuntimeStore((state) => state.setFeedNextCursor);
-  const setFeedHasMore = useAppPageRuntimeStore((state) => state.setFeedHasMore);
-  const setFeedLoadingMore = useAppPageRuntimeStore((state) => state.setFeedLoadingMore);
-  const setMyCommentsNextCursor = useAppPageRuntimeStore((state) => state.setMyCommentsNextCursor);
-  const setMyCommentsHasMore = useAppPageRuntimeStore((state) => state.setMyCommentsHasMore);
-  const setMyCommentsLoadingMore = useAppPageRuntimeStore((state) => state.setMyCommentsLoadingMore);
-  const setMyCommentsLoadedOnce = useAppPageRuntimeStore((state) => state.setMyCommentsLoadedOnce);
+  const bootstrapBindings = useAppBootstrapStoreBindings();
 
   const sharedRefs = useAppBootstrapSharedRefs({
     refreshMyPageForUser,
@@ -120,29 +104,29 @@ export function useAppBootstrapLifecycle({
 
   useMapBootstrapEffect({
     ...sharedRefs,
-    setBootstrapStatus,
-    setBootstrapError,
+    setBootstrapStatus: bootstrapBindings.setBootstrapStatus,
+    setBootstrapError: bootstrapBindings.setBootstrapError,
     setPlaces,
     setStampState,
     setHasRealData,
-    setSessionUser,
-    setFeedNextCursor,
-    setFeedHasMore,
-    setFeedLoadingMore,
-    setMyCommentsNextCursor,
-    setMyCommentsHasMore,
-    setMyCommentsLoadingMore,
-    setMyCommentsLoadedOnce,
-    setProviders,
-    setSelectedPlaceId,
-    setSelectedFestivalId,
+    setSessionUser: bootstrapBindings.setSessionUser,
+    setFeedNextCursor: bootstrapBindings.setFeedNextCursor,
+    setFeedHasMore: bootstrapBindings.setFeedHasMore,
+    setFeedLoadingMore: bootstrapBindings.setFeedLoadingMore,
+    setMyCommentsNextCursor: bootstrapBindings.setMyCommentsNextCursor,
+    setMyCommentsHasMore: bootstrapBindings.setMyCommentsHasMore,
+    setMyCommentsLoadingMore: bootstrapBindings.setMyCommentsLoadingMore,
+    setMyCommentsLoadedOnce: bootstrapBindings.setMyCommentsLoadedOnce,
+    setProviders: bootstrapBindings.setProviders,
+    setSelectedPlaceId: bootstrapBindings.setSelectedPlaceId,
+    setSelectedFestivalId: bootstrapBindings.setSelectedFestivalId,
     setMyPage,
-    setNotice,
+    setNotice: bootstrapBindings.setNotice,
   });
 
   useFestivalBootstrapEffect({
     reportBackgroundErrorRef: sharedRefs.reportBackgroundErrorRef,
     setFestivals,
-    setSelectedFestivalId,
+    setSelectedFestivalId: bootstrapBindings.setSelectedFestivalId,
   });
 }
