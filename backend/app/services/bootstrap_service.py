@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from ..models import SessionUser
-from ..repository_normalized import get_bootstrap as read_bootstrap_bundle
+from ..repositories.content_query_repository import get_bootstrap as read_bootstrap_bundle
 
 
 def read_bootstrap_service(db: Session, session_user: SessionUser | None):

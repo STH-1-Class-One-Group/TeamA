@@ -1,4 +1,4 @@
-"""Normalized repository for JamIssue domain flows."""
+﻿"""Normalized repository for JamIssue domain flows."""
 
 from __future__ import annotations
 
@@ -8,18 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from .config import Settings
-from .db_models import (
-    Course,
-    CoursePlace,
-    Feed,
-    FeedLike,
-    MapPlace,
-    TravelSession,
-    User,
-    UserComment,
-    UserNotification,
-    UserStamp,
-)
+from .db_models import Course, Feed, FeedLike, MapPlace, TravelSession, User, UserComment, UserNotification, UserStamp
 from .models import (
     AdminPlaceOut,
     AdminSummaryResponse,
@@ -43,6 +32,13 @@ from .models import (
     UserNotificationOut,
 )
 from .naver_oauth import NaverProfile
+from .repositories.content_query_repository import (
+    get_bootstrap as get_bootstrap_entry,
+    get_place as get_place_entry,
+    list_courses as list_courses_entry,
+    list_places as list_places_entry,
+    to_course_out as to_course_out_entry,
+)
 from .repositories.my_page_data_repository import build_my_comments as build_my_comments_entry, get_my_page as get_my_page_entry
 from .repositories.notification_data_repository import (
     create_user_notification as create_user_notification_entry,
@@ -82,7 +78,6 @@ from .repository_support import (
     parse_review_id,
     parse_stamp_id,
     to_admin_place_out,
-    to_place_out,
     to_seoul_date,
     utcnow_naive,
 )
@@ -175,31 +170,15 @@ def to_review_out(
 
 
 def to_course_out(course: Course) -> CourseOut:
-    ordered_places = sorted(course.course_places, key=lambda item: item.stop_order)
-    return CourseOut(
-        id=course.slug,
-        title=course.title,
-        mood=course.mood,
-        duration=course.duration,
-        note=course.note,
-        color=course.color,
-        placeIds=[item.place.slug for item in ordered_places],
-    )
+    return to_course_out_entry(course)
 
 
 def list_places(db: Session, category: CategoryFilter = "all") -> list[PlaceOut]:
-    stmt = select(MapPlace).where(MapPlace.is_active.is_(True)).order_by(MapPlace.position_id.asc())
-    if category != "all":
-        stmt = stmt.where(MapPlace.category == category)
-    return [to_place_out(place) for place in db.scalars(stmt).all()]
+    return list_places_entry(db, category)
 
 
 def get_place(db: Session, place_id: str) -> PlaceOut:
-    place = db.scalars(select(MapPlace).where(MapPlace.slug == place_id, MapPlace.is_active.is_(True))).first()
-    if not place:
-        raise ValueError("장소를 찾을 수 없어요.")
-    return to_place_out(place)
-
+    return get_place_entry(db, place_id)
 
 def list_reviews(
     db: Session,
@@ -243,7 +222,7 @@ def create_review(db: Session, payload: ReviewCreate, user_id: str, nickname: st
 
     existing_feed = db.scalars(select(Feed).where(Feed.stamp_id == stamp.stamp_id)).first()
     if existing_feed:
-        raise ValueError("같은 방문 인증으로는 피드를 한 번만 남길 수 있어요.")
+        raise ValueError("같은 방문 기록으로는 피드를 한 번만 작성할 수 있어요.")
 
     now = utcnow_naive()
     today = to_seoul_date(now)
@@ -328,7 +307,7 @@ def create_comment_with_notifications(
         parent_id = parse_comment_id(payload.parent_id)
         parent_comment = db.get(UserComment, parent_id)
         if not parent_comment or parent_comment.feed_id != review_key:
-            raise ValueError("같은 리뷰의 댓글에만 답글을 달 수 있어요.")
+            raise ValueError("같은 리뷰 안의 댓글에만 답글을 달 수 있어요.")
         # Enforce 2-level depth: if parent is itself a reply, use its root comment instead
         if parent_comment.parent_id is not None:
             parent_id = parent_comment.parent_id
@@ -436,16 +415,8 @@ def delete_account(db: Session, user_id: str) -> None:
     db.delete(user)
     db.commit()
 
-
 def list_courses(db: Session, mood: CourseMood | None = None) -> list[CourseOut]:
-    stmt = (
-        select(Course)
-        .options(joinedload(Course.course_places).joinedload(CoursePlace.place))
-        .order_by(Course.display_order.asc(), Course.course_id.asc())
-    )
-    if mood and mood != "전체":
-        stmt = stmt.where(Course.mood == mood)
-    return [to_course_out(course) for course in db.scalars(stmt).unique().all()]
+    return list_courses_entry(db, mood)
 
 
 def get_stamps(db: Session, user_id: str | None) -> StampState:
@@ -531,16 +502,8 @@ def delete_notification(db: Session, notification_id: str, user_id: str) -> Noti
 def get_my_page(db: Session, user_id: str, is_admin: bool) -> MyPageResponse:
     return get_my_page_entry(db, user_id, is_admin)
 
-
 def get_bootstrap(db: Session, user_id: str | None) -> BootstrapResponse:
-    places = list_places(db)
-    return BootstrapResponse(
-        places=places,
-        reviews=list_reviews(db, current_user_id=user_id, include_comments=False),
-        courses=list_courses(db),
-        stamps=get_stamps(db, user_id),
-        hasRealData=bool(places),
-    )
+    return get_bootstrap_entry(db, user_id)
 
 
 def get_admin_summary(db: Session, settings: Settings) -> AdminSummaryResponse:
@@ -572,7 +535,7 @@ def update_place_visibility(
     is_active: bool | None = None,
     is_manual_override: bool | None = None,
 ) -> AdminPlaceOut:
-    """장소 노출 여부와 공공데이터 동기화 보호 여부를 변경합니다."""
+    """장소 노출 여부와 공공데이터 덮어쓰기 보호 여부를 변경합니다."""
 
     place = db.scalars(select(MapPlace).where(MapPlace.slug == place_id)).first()
     if not place:
@@ -603,3 +566,5 @@ def load_public_bundle(settings: Settings) -> dict:
 
 def import_public_bundle(db: Session, settings: Settings) -> PublicImportResponse:
     return import_public_bundle_entry(db, settings)
+
+
