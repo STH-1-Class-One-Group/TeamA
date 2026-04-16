@@ -1,3 +1,5 @@
+export const DAEJEON_CENTER = { latitude: 36.3504, longitude: 127.3845 };
+
 declare global {
   interface Window {
     naver?: any;

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import type { Place } from '../../types';
-import { placeMarkerContent } from './naverMapHelpers';
+import { placeMarkerContent } from './markerContent';
 
 type MapsApi = typeof window.naver.maps;
 

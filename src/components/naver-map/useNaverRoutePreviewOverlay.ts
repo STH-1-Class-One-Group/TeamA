@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { Place } from '../../types';
-import { routeStepMarkerContent } from './naverMapHelpers';
+import { routeStepMarkerContent } from './markerContent';
 
 type NaverMapInstance = {
   fitBounds?: (bounds: unknown, padding?: Record<string, number>) => void;

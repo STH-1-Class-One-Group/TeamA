@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { DAEJEON_CENTER, loadNaverMaps } from './naverMapHelpers';
+import { DAEJEON_CENTER, loadNaverMaps } from './mapSdk';
 
 type MapInstanceArgs = {
   clientId: string;

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { FestivalItem, Place } from '../../types';
-import { getSelectionVerticalOffset, hasFestivalCoordinates } from './naverMapHelpers';
+import { hasFestivalCoordinates } from './markerContent';
+import { getSelectionVerticalOffset } from './selectionOffset';
 
 type NaverMapInstance = {
   getZoom?: () => number;
