@@ -8,6 +8,12 @@ import type {
   SessionUser,
   StampState,
 } from '../types';
+import { handleBootstrapAuthNotice } from './app-bootstrap/bootstrapAuthNotice';
+import {
+  applyBootstrapSelections,
+  resetBootstrapRuntime,
+  resetFestivalSelection,
+} from './app-bootstrap/bootstrapRuntimeReset';
 import { clearAuthQueryParams } from './useAppRouteState';
 import type { AppBootstrapSharedRefs } from './useAppBootstrapSharedRefs';
 
@@ -63,7 +69,7 @@ export function useMapBootstrapEffect({
 
     void (async () => {
       const authParams = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search);
-      const authState = authParams?.get('auth');
+      const authState = authParams?.get('auth') ?? null;
 
       setBootstrapStatus('loading');
       setBootstrapError(null);
@@ -79,16 +85,22 @@ export function useMapBootstrapEffect({
         setHasRealData(bootstrap.hasRealData);
         setSessionUser(bootstrap.auth.user);
         resetReviewCachesRef.current();
-        setFeedNextCursor(null);
-        setFeedHasMore(false);
-        setFeedLoadingMore(false);
-        setMyCommentsNextCursor(null);
-        setMyCommentsHasMore(false);
-        setMyCommentsLoadingMore(false);
-        setMyCommentsLoadedOnce(false);
+        resetBootstrapRuntime({
+          setFeedNextCursor,
+          setFeedHasMore,
+          setFeedLoadingMore,
+          setMyCommentsNextCursor,
+          setMyCommentsHasMore,
+          setMyCommentsLoadingMore,
+          setMyCommentsLoadedOnce,
+          setProviders,
+        });
         setProviders(bootstrap.auth.providers);
-        setSelectedPlaceId((current) => (current && bootstrap.places.some((place) => place.id === current) ? current : null));
-        setSelectedFestivalId(() => null);
+        applyBootstrapSelections({
+          placeIds: bootstrap.places.map((place) => place.id),
+          setSelectedPlaceId,
+          setSelectedFestivalId,
+        });
 
         if (bootstrap.auth.user) {
           await refreshMyPageForUserRef.current(bootstrap.auth.user, true);
@@ -100,10 +112,12 @@ export function useMapBootstrapEffect({
         }
 
         setBootstrapStatus('ready');
-        if ((authState === 'naver-success' || authState === 'kakao-success') && bootstrap.auth.user?.profileCompletedAt === null) {
-          goToTabRef.current('my');
-          setNotice('닉네임을 먼저 정하면 같은 계정으로 스탬프와 리뷰를 이어서 쌓을 수 있어요.');
-        }
+        handleBootstrapAuthNotice({
+          authState,
+          user: bootstrap.auth.user,
+          goToTab: goToTabRef.current,
+          setNotice,
+        });
       } catch (error) {
         setBootstrapError(formatErrorMessageRef.current(error));
         setBootstrapStatus('error');
@@ -158,7 +172,10 @@ export function useFestivalBootstrapEffect({
           return;
         }
         setFestivals(festivalResult);
-        setSelectedFestivalId((current) => (current && festivalResult.some((festival) => festival.id === current) ? current : null));
+        resetFestivalSelection(
+          festivalResult.map((festival) => festival.id),
+          setSelectedFestivalId
+        );
       })
       .catch((error) => reportBackgroundErrorRef.current(error));
 
