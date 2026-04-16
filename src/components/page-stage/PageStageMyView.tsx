@@ -1,5 +1,5 @@
 import { MyPagePanel } from '../MyPagePanel';
-import type { AppPageStageProps } from '../AppPageStage';
+import type { AppPageStageProps } from './appPageStageTypes';
 
 type PageStageMyViewProps = Pick<AppPageStageProps, 'sharedData' | 'myPageData' | 'sharedActions' | 'myPageActions'>;
 

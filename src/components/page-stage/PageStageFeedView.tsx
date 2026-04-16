@@ -1,5 +1,5 @@
 import { FeedTab } from '../FeedTab';
-import type { AppPageStageProps } from '../AppPageStage';
+import type { AppPageStageProps } from './appPageStageTypes';
 
 type PageStageFeedViewProps = Pick<AppPageStageProps, 'sharedData' | 'feedData' | 'sharedActions' | 'feedActions'>;
 
