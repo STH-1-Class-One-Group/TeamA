@@ -1,6 +1,8 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo } from 'react';
 import { CommentComposer } from './CommentComposer';
+import { CommentThreadItemActions } from './CommentThreadItemActions';
 import type { CommentItemProps } from './types';
+import { useCommentThreadItemState } from './useCommentThreadItemState';
 
 export const CommentThreadItem = memo(function CommentThreadItem({
   comment,
@@ -16,29 +18,18 @@ export const CommentThreadItem = memo(function CommentThreadItem({
   onRequestLogin,
   isReply = false,
 }: CommentItemProps) {
-  const itemRef = useRef<HTMLLIElement | null>(null);
-  const [replyOpen, setReplyOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [editingBody, setEditingBody] = useState(comment.body);
-
   const isMine = currentUserId === comment.userId;
   const isMutating = mutatingCommentId === comment.id;
   const isHighlighted = highlightedCommentId === comment.id;
-
-  useEffect(() => {
-    setEditingBody(comment.body);
-  }, [comment.body]);
-
-  useEffect(() => {
-    if (!isHighlighted) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      itemRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [isHighlighted]);
+  const {
+    itemRef,
+    replyOpen,
+    setReplyOpen,
+    editing,
+    setEditing,
+    editingBody,
+    setEditingBody,
+  } = useCommentThreadItemState(comment.body, isHighlighted);
 
   async function handleEditSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,7 +43,7 @@ export const CommentThreadItem = memo(function CommentThreadItem({
   }
 
   async function handleDelete() {
-    if (!window.confirm('댓글을 삭제할까요?')) {
+    if (!window.confirm('정말 댓글을 삭제할까요?')) {
       return;
     }
 
@@ -72,7 +63,7 @@ export const CommentThreadItem = memo(function CommentThreadItem({
     <li ref={itemRef} className={isReply ? 'comment-thread__item comment-thread__item--reply' : 'comment-thread__item'}>
       {isReply && (
         <span className="comment-thread__reply-indent" aria-hidden="true">
-          ㄴ
+          ↳
         </span>
       )}
 
@@ -99,35 +90,19 @@ export const CommentThreadItem = memo(function CommentThreadItem({
           )}
 
           {!comment.isDeleted && (
-            <div className="comment-thread__actions">
-              {canWriteComment && (
-                <button type="button" className="comment-thread__reply-toggle" onClick={handleReplyToggle}>
-                  답글 달기
-                </button>
-              )}
-              {isMine && !editing && (
-                <>
-                  <button type="button" className="comment-thread__reply-toggle" onClick={() => setEditing(true)}>
-                    수정
-                  </button>
-                  <button type="button" className="comment-thread__reply-toggle" onClick={() => void handleDelete()} disabled={isMutating}>
-                    삭제
-                  </button>
-                </>
-              )}
-              {isMine && editing && (
-                <button
-                  type="button"
-                  className="comment-thread__reply-toggle"
-                  onClick={() => {
-                    setEditing(false);
-                    setEditingBody(comment.body);
-                  }}
-                >
-                  취소
-                </button>
-              )}
-            </div>
+            <CommentThreadItemActions
+              canWriteComment={canWriteComment}
+              isMine={isMine}
+              editing={editing}
+              isMutating={isMutating}
+              onReplyToggle={handleReplyToggle}
+              onStartEditing={() => setEditing(true)}
+              onDelete={() => void handleDelete()}
+              onCancelEditing={() => {
+                setEditing(false);
+                setEditingBody(comment.body);
+              }}
+            />
           )}
         </div>
 
