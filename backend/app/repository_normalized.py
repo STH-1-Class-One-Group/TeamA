@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .config import Settings
-from .db_models import Course, Feed, MapPlace, User, UserComment, UserNotification, UserStamp
+from .db_models import Course, Feed, UserNotification
 from .models import (
     AdminPlaceOut,
     AdminSummaryResponse,
@@ -30,6 +29,11 @@ from .models import (
     UserNotificationOut,
 )
 from .naver_oauth import NaverProfile
+from .repositories.admin_data_repository import (
+    get_admin_summary as get_admin_summary_entry,
+    import_public_bundle as import_public_bundle_entry,
+    update_place_visibility as update_place_visibility_entry,
+)
 from .repositories.content_query_repository import (
     get_bootstrap as get_bootstrap_entry,
     get_place as get_place_entry,
@@ -58,11 +62,7 @@ from .repositories.profile_data_repository import (
     upsert_naver_user as upsert_naver_user_entry,
     upsert_social_user as upsert_social_user_entry,
 )
-from .repositories.public_bundle_repository import (
-    cleanup_legacy_demo_content as cleanup_legacy_demo_content_entry,
-    import_public_bundle as import_public_bundle_entry,
-    load_public_bundle as load_public_bundle_entry,
-)
+from .repositories.public_bundle_repository import cleanup_legacy_demo_content as cleanup_legacy_demo_content_entry, load_public_bundle as load_public_bundle_entry
 from .repositories.review_query_repository import (
     get_review_comments as get_review_comments_entry,
     list_reviews as list_reviews_entry,
@@ -77,10 +77,7 @@ from .repositories.review_write_repository import (
 )
 from .repositories.stamp_data_repository import get_stamps as get_stamps_entry, toggle_stamp as toggle_stamp_entry
 from .repositories.user_data_repository import get_or_create_user as get_or_create_user_entry
-from .repository_support import (
-    to_admin_place_out,
-    utcnow_naive,
-)
+from .repository_support import utcnow_naive
 
 def get_or_create_user(
     db: Session,
@@ -339,26 +336,7 @@ def get_bootstrap(db: Session, user_id: str | None) -> BootstrapResponse:
 
 
 def get_admin_summary(db: Session, settings: Settings) -> AdminSummaryResponse:
-    user_count = db.scalar(select(func.count()).select_from(User)) or 0
-    place_count = db.scalar(select(func.count()).select_from(MapPlace)) or 0
-    review_count = db.scalar(select(func.count()).select_from(Feed)) or 0
-    comment_count = db.scalar(select(func.count()).select_from(UserComment)) or 0
-    stamp_count = db.scalar(select(func.count()).select_from(UserStamp)) or 0
-    place_rows = db.execute(
-        select(MapPlace, func.count(Feed.feed_id))
-        .outerjoin(Feed, Feed.position_id == MapPlace.position_id)
-        .group_by(MapPlace.position_id)
-        .order_by(MapPlace.is_active.desc(), MapPlace.name.asc())
-    ).all()
-    return AdminSummaryResponse(
-        userCount=int(user_count),
-        placeCount=int(place_count),
-        reviewCount=int(review_count),
-        commentCount=int(comment_count),
-        stampCount=int(stamp_count),
-        sourceReady=settings.public_data_file_path.exists() or bool(settings.public_data_source_url),
-        places=[to_admin_place_out(place, int(count)) for place, count in place_rows],
-    )
+    return get_admin_summary_entry(db, settings)
 
 
 def update_place_visibility(
@@ -367,25 +345,12 @@ def update_place_visibility(
     is_active: bool | None = None,
     is_manual_override: bool | None = None,
 ) -> AdminPlaceOut:
-    """장소 노출 여부와 공공데이터 덮어쓰기 보호 여부를 변경합니다."""
-
-    place = db.scalars(select(MapPlace).where(MapPlace.slug == place_id)).first()
-    if not place:
-        raise ValueError("장소를 찾을 수 없어요.")
-
-    changed = False
-    if is_active is not None and place.is_active != is_active:
-        place.is_active = is_active
-        changed = True
-    if is_manual_override is not None and place.is_manual_override != is_manual_override:
-        place.is_manual_override = is_manual_override
-        changed = True
-    if changed:
-        place.updated_at = utcnow_naive()
-        db.commit()
-
-    review_count = db.scalar(select(func.count()).select_from(Feed).where(Feed.position_id == place.position_id)) or 0
-    return to_admin_place_out(place, int(review_count))
+    return update_place_visibility_entry(
+        db,
+        place_id,
+        is_active=is_active,
+        is_manual_override=is_manual_override,
+    )
 
 
 def cleanup_legacy_demo_content(db: Session) -> None:
