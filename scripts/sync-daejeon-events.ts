@@ -1,12 +1,12 @@
-const SEARCH_URL = 'https://www.daejeon.go.kr/fvu/FvuEventList.do?menuSeq=504';
-const DETAIL_BASE_URL = 'https://www.daejeon.go.kr/fvu/FvuEventView.do';
-const SOURCE_NAME = 'Daejeon Official Event Search';
+import { SEARCH_URL, SOURCE_NAME } from './daejeon-event-sync/constants';
+import { collectEvents } from './daejeon-event-sync/fetch';
+import type { EventSyncRange, ImportedEvent } from './daejeon-event-sync/types';
 
-function parseArgs(argv) {
+function parseArgs(argv: string[]) {
   const options = {
     dryRun: false,
-    from: null,
-    to: null,
+    from: null as string | null,
+    to: null as string | null,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -46,14 +46,14 @@ function getSeoulDateParts(date = new Date()) {
   };
 }
 
-function formatUtcDateKey(date) {
+function formatUtcDateKey(date: Date) {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const day = String(date.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
-function getDefaultRange() {
+function getDefaultRange(): EventSyncRange {
   const todayParts = getSeoulDateParts();
   const start = new Date(Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day));
   const end = new Date(start);
@@ -64,285 +64,7 @@ function getDefaultRange() {
   };
 }
 
-function escapeHtml(text) {
-  return String(text || '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
-}
-
-function stripHtml(text) {
-  return escapeHtml(String(text || '').replace(/<[^>]+>/g, ' '))
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function toStartOfDayIso(dateKey) {
-  return `${dateKey}T00:00:00+09:00`;
-}
-
-function toEndOfDayIso(dateKey) {
-  return `${dateKey}T23:59:59+09:00`;
-}
-
-function normalizeSeriesKeyPart(value) {
-  return String(value || '')
-    .replace(/\[[^\]]*\]/g, ' ')
-    .replace(/\([^)]*\)/g, ' ')
-    .replace(/[&_·/|]+/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-function toSeoulDateKey(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
-}
-
-function parseSeoulDateKey(dateKey) {
-  return new Date(`${dateKey}T00:00:00+09:00`);
-}
-
-function buildSeriesGroupingKey(item) {
-  return [
-    normalizeSeriesKeyPart(item.title),
-    normalizeSeriesKeyPart(item.venueName || item.roadAddress || ''),
-  ].join('|');
-}
-
-function areSeriesDatesAdjacent(leftEnd, rightStart) {
-  const leftKey = toSeoulDateKey(leftEnd);
-  const rightKey = toSeoulDateKey(rightStart);
-  if (!leftKey || !rightKey) {
-    return false;
-  }
-  const nextDate = parseSeoulDateKey(leftKey);
-  nextDate.setDate(nextDate.getDate() + 1);
-  return parseSeoulDateKey(rightKey).getTime() <= nextDate.getTime();
-}
-
-function areSeriesPeriodsMergeable(left, right) {
-  const leftStartTime = new Date(left.startsAt).getTime();
-  const leftEndTime = new Date(left.endsAt).getTime();
-  const rightStartTime = new Date(right.startsAt).getTime();
-  const rightEndTime = new Date(right.endsAt).getTime();
-  if (!Number.isFinite(leftStartTime) || !Number.isFinite(leftEndTime) || !Number.isFinite(rightStartTime) || !Number.isFinite(rightEndTime)) {
-    return false;
-  }
-  if (rightStartTime <= leftEndTime && rightEndTime >= leftStartTime) {
-    return true;
-  }
-  return areSeriesDatesAdjacent(left.endsAt, right.startsAt);
-}
-
-function createSeriesExternalId(title, startsAt, venueName, roadAddress) {
-  const seed = `${normalizeSeriesKeyPart(title)}|${toSeoulDateKey(startsAt)}|${normalizeSeriesKeyPart(venueName || roadAddress || '')}`;
-  return `festival-${Buffer.from(seed).toString('base64url').slice(0, 22)}`;
-}
-
-function mergeEventSeries(items) {
-  const sorted = [...items].sort((left, right) => {
-    const startDiff = new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime();
-    if (startDiff !== 0) {
-      return startDiff;
-    }
-    return left.title.localeCompare(right.title, 'ko');
-  });
-
-  const merged = [];
-  for (const item of sorted) {
-    const previous = merged[merged.length - 1];
-    if (
-      previous &&
-      buildSeriesGroupingKey(previous) === buildSeriesGroupingKey(item) &&
-      areSeriesPeriodsMergeable(previous, item)
-    ) {
-      if (new Date(item.endsAt).getTime() > new Date(previous.endsAt).getTime()) {
-        previous.endsAt = item.endsAt;
-      }
-      previous.summary = previous.summary || item.summary;
-      previous.rawPayload = {
-        ...(previous.rawPayload || {}),
-        mergedEventSeqs: [...new Set([...(previous.rawPayload?.mergedEventSeqs || [previous.rawPayload?.eventSeq].filter(Boolean)), item.rawPayload?.eventSeq].filter(Boolean))],
-      };
-      previous.externalId = createSeriesExternalId(
-        previous.title,
-        previous.startsAt,
-        previous.venueName || null,
-        previous.roadAddress || null,
-      );
-      continue;
-    }
-    merged.push({
-      ...item,
-      externalId: createSeriesExternalId(item.title, item.startsAt, item.venueName || null, item.roadAddress || null),
-      rawPayload: {
-        ...(item.rawPayload || {}),
-        mergedEventSeqs: [item.rawPayload?.eventSeq].filter(Boolean),
-      },
-    });
-  }
-
-  return merged;
-}
-
-function deduplicateSeriesByExternalId(items) {
-  const grouped = new Map();
-  for (const item of items) {
-    const key = String(item.externalId || '');
-    const existing = grouped.get(key);
-    if (!existing) {
-      grouped.set(key, { ...item });
-      continue;
-    }
-    if (new Date(item.startsAt).getTime() < new Date(existing.startsAt).getTime()) {
-      existing.startsAt = item.startsAt;
-    }
-    if (new Date(item.endsAt).getTime() > new Date(existing.endsAt).getTime()) {
-      existing.endsAt = item.endsAt;
-    }
-    if (!existing.summary && item.summary) {
-      existing.summary = item.summary;
-    }
-    existing.rawPayload = {
-      ...(existing.rawPayload || {}),
-      mergedEventSeqs: [...new Set([...(existing.rawPayload?.mergedEventSeqs || []), ...(item.rawPayload?.mergedEventSeqs || []), item.rawPayload?.eventSeq].filter(Boolean))],
-    };
-  }
-  return [...grouped.values()];
-}
-
-function parseMaxPage(html) {
-  const pageNumbers = [...html.matchAll(/fn_link_page\((\d+)\)/g)].map((match) => Number(match[1]));
-  return pageNumbers.length > 0 ? Math.max(...pageNumbers) : 1;
-}
-
-function parseEventRows(html) {
-  const tbodyMatch = html.match(/<tbody>([\s\S]*?)<\/tbody>/i);
-  if (!tbodyMatch) {
-    return [];
-  }
-
-  const items = [];
-  const rowMatches = tbodyMatch[1].matchAll(/<tr>([\s\S]*?)<\/tr>/gi);
-  for (const rowMatch of rowMatches) {
-    const rowHtml = rowMatch[1];
-    const eventSeqMatch = rowHtml.match(/eventSeq=(\d+)/);
-    if (!eventSeqMatch) {
-      continue;
-    }
-
-    const cellMatches = [...rowHtml.matchAll(/<td\b[^>]*class="([^"]*)"[^>]*>([\s\S]*?)<\/td>/gi)];
-    const subjectCell = cellMatches.find((match) => match[1].includes('subject'));
-    const themeCell = cellMatches.find((match) => match[1].includes('theme'));
-    const locationCell = cellMatches.find((match) => match[1].includes('location'));
-    const dateCells = cellMatches.filter((match) => match[1].includes('date3'));
-
-    const title = stripHtml(subjectCell?.[2] ?? '');
-    const theme = stripHtml(themeCell?.[2] ?? '').replace(/^추천\s*:\s*/u, '').trim();
-    const venueName = stripHtml(locationCell?.[2] ?? '');
-    const startDate = stripHtml(dateCells[0]?.[2] ?? '');
-    const endDate = stripHtml(dateCells[1]?.[2] ?? '');
-    const eventSeq = eventSeqMatch[1];
-
-    if (!title || !startDate || !endDate) {
-      continue;
-    }
-
-    items.push({
-      externalId: `daejeon-event-${eventSeq}`,
-      title,
-      venueName: venueName || null,
-      district: '대전',
-      address: venueName || null,
-      roadAddress: venueName || null,
-      startsAt: toStartOfDayIso(startDate),
-      endsAt: toEndOfDayIso(endDate),
-      homepageUrl: `${DETAIL_BASE_URL}?eventSeq=${eventSeq}&menuSeq=504`,
-      latitude: null,
-      longitude: null,
-      summary: [theme, venueName].filter(Boolean).join(' · ') || '대전시 공식 행사안내 일정입니다.',
-      rawPayload: {
-        eventSeq,
-        theme,
-        venueName,
-        startDate,
-        endDate,
-      },
-    });
-  }
-
-  return items;
-}
-
-async function fetchEventListPage({ from, to, pageIndex }) {
-  const body = new URLSearchParams({
-    menuSeq: '504',
-    pageIndex: String(pageIndex),
-    beginDt: from,
-    endDt: to,
-    themeCd: '',
-    placeCd: '',
-    targetCd: '',
-    managementCd: '',
-    searchKeyword: '',
-    eventSeq: '',
-  });
-
-  const response = await fetch(SEARCH_URL, {
-    method: 'POST',
-    headers: {
-      Accept: 'text/html',
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    },
-    body: body.toString(),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Daejeon event list (${response.status}).`);
-  }
-
-  return response.text();
-}
-
-async function collectEvents(range) {
-  const firstPageHtml = await fetchEventListPage({ ...range, pageIndex: 1 });
-  const maxPage = parseMaxPage(firstPageHtml);
-  const pages = [{ pageIndex: 1, html: firstPageHtml }];
-
-  for (let pageIndex = 2; pageIndex <= maxPage; pageIndex += 1) {
-    pages.push({
-      pageIndex,
-      html: await fetchEventListPage({ ...range, pageIndex }),
-    });
-  }
-
-  const uniqueItems = new Map();
-  for (const page of pages) {
-    for (const item of parseEventRows(page.html)) {
-      uniqueItems.set(item.externalId, item);
-    }
-  }
-
-  return {
-    pageCount: maxPage,
-    items: deduplicateSeriesByExternalId(mergeEventSeries([...uniqueItems.values()])),
-  };
-}
-
-async function uploadEvents(items, range) {
+async function uploadEvents(items: ImportedEvent[], range: EventSyncRange) {
   const importUrl = String(process.env.PUBLIC_EVENT_IMPORT_URL || '').trim();
   const token = String(process.env.EVENT_IMPORT_TOKEN || '').trim();
 
@@ -377,7 +99,7 @@ async function uploadEvents(items, range) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const defaultRange = getDefaultRange();
-  const range = {
+  const range: EventSyncRange = {
     from: options.from || defaultRange.from,
     to: options.to || defaultRange.to,
   };
