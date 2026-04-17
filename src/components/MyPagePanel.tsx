@@ -28,7 +28,6 @@ export function MyPagePanel({
     routeError,
     commentsHasMore,
     commentsLoadingMore,
-    unreadNotificationCount,
   } = panelState;
   const {
     onOpenPlace,
@@ -52,9 +51,6 @@ export function MyPagePanel({
     onRefreshAdmin,
     onToggleAdminPlace,
     onToggleAdminManualOverride,
-    onOpenNotification,
-    onMarkAllNotificationsRead,
-    onDeleteNotification,
   } = adminActions;
   const [nickname, setNickname] = useState(sessionUser?.nickname ?? '');
   const [showVisitedDetail, setShowVisitedDetail] = useState(false);
@@ -112,16 +108,10 @@ export function MyPagePanel({
       <MyPageSettingsSection
         nickname={nickname}
         showSettings={showSettings}
-        sessionUserName={sessionUser.nickname}
-        notifications={myPage?.notifications ?? []}
-        unreadNotificationCount={unreadNotificationCount}
         profileCompletedAt={sessionUser.profileCompletedAt}
         profileSaving={profileSaving}
         profileError={profileError}
         onNicknameChange={setNickname}
-        onOpenNotification={onOpenNotification}
-        onMarkAllNotificationsRead={onMarkAllNotificationsRead}
-        onDeleteNotification={onDeleteNotification}
         onClose={() => setShowSettings(false)}
         onSubmit={handleNicknameSubmit}
       />

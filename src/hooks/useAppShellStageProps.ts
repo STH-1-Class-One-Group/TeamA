@@ -19,5 +19,13 @@ export function useAppShellStageProps(state: AppShellCoordinatorState) {
     handleNavigateBack,
     handleBottomNavChange,
     globalStatus: viewModels.globalStatus,
+    globalUtility: {
+      sessionUserName: state.sessionUser?.nickname ?? null,
+      notifications: viewModels.hydratedMyPage?.notifications ?? [],
+      unreadCount: viewModels.hydratedMyPage?.unreadNotificationCount ?? 0,
+      onOpenNotification: state.handleOpenGlobalNotification,
+      onMarkAllNotificationsRead: state.handleMarkAllNotificationsRead,
+      onDeleteNotification: state.handleDeleteNotification,
+    },
   };
 }

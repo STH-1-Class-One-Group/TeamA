@@ -1,6 +1,5 @@
 import { NotificationListItem } from './NotificationListItem';
-import type { NotificationItem } from './notificationTypes';
-import type { NotificationPanelActions } from './notificationTypes';
+import type { NotificationItem, NotificationPanelActions } from './notificationTypes';
 
 interface NotificationPanelProps {
   sessionUserName: string | null;
@@ -19,11 +18,11 @@ export function NotificationPanel({
 }: NotificationPanelProps) {
   const {
     busyAll,
-    busyId,
     error,
     handleDelete,
     handleMarkAll,
     handleOpenNotification,
+    busyId,
   } = actions;
 
   return (
@@ -32,7 +31,7 @@ export function NotificationPanel({
         <div>
           <p className="eyebrow">ALERT</p>
           <h3>{sessionUserName ? `${sessionUserName}님의 새 알림` : '새 알림'}</h3>
-          <p className="section-copy">탭에 있던 내용을 잃지 않고 바로 확인하고 이동할 수 있어요.</p>
+          <p className="section-copy">탭에 있던 내용을 닫지 않고 바로 확인하고 이동할 수 있어요.</p>
         </div>
         <button type="button" className="secondary-button notification-panel__mark-all" onClick={() => void handleMarkAll()} disabled={busyAll || unreadCount === 0}>
           {busyAll ? '처리 중' : '모두 읽음'}

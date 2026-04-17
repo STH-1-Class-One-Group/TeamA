@@ -1,22 +1,12 @@
-import { useState, type FormEvent } from 'react';
-import { FEEDBACK_FORM_URL } from '../GlobalFeedbackButton';
-import { NotificationPanel } from '../notifications/NotificationPanel';
-import type { NotificationItem } from '../notifications/notificationTypes';
-import { useNotificationPanelActions } from '../notifications/useNotificationPanelActions';
+import type { FormEvent } from 'react';
 
 type MyPageSettingsSectionProps = {
   nickname: string;
   showSettings: boolean;
-  sessionUserName: string;
-  notifications: NotificationItem[];
-  unreadNotificationCount: number;
   profileCompletedAt: string | null | undefined;
   profileSaving: boolean;
   profileError: string | null;
   onNicknameChange: (value: string) => void;
-  onOpenNotification: (notification: NotificationItem) => Promise<void>;
-  onMarkAllNotificationsRead: () => Promise<void>;
-  onDeleteNotification: (notificationId: string) => Promise<void>;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
@@ -24,27 +14,13 @@ type MyPageSettingsSectionProps = {
 export function MyPageSettingsSection({
   nickname,
   showSettings,
-  sessionUserName,
-  notifications,
-  unreadNotificationCount,
   profileCompletedAt,
   profileSaving,
   profileError,
   onNicknameChange,
-  onOpenNotification,
-  onMarkAllNotificationsRead,
-  onDeleteNotification,
   onClose,
   onSubmit,
 }: MyPageSettingsSectionProps) {
-  const [showNotifications, setShowNotifications] = useState(false);
-  const notificationActions = useNotificationPanelActions({
-    onOpenNotification,
-    onMarkAllNotificationsRead,
-    onDeleteNotification,
-    onClose: () => setShowNotifications(false),
-  });
-
   if (!showSettings && profileCompletedAt) {
     return null;
   }
@@ -73,28 +49,6 @@ export function MyPageSettingsSection({
           {profileSaving ? '저장 중' : '프로필 저장'}
         </button>
       </form>
-      <div className="settings-card__links">
-        <button
-          type="button"
-          className={showNotifications ? 'secondary-button is-complete settings-card__link-button' : 'secondary-button settings-card__link-button'}
-          onClick={() => setShowNotifications((current) => !current)}
-        >
-          <span>알람</span>
-          {unreadNotificationCount > 0 && <strong>{unreadNotificationCount}</strong>}
-        </button>
-        <a className="secondary-button settings-card__link-button" href={FEEDBACK_FORM_URL} target="_blank" rel="noreferrer">
-          <span>피드백</span>
-        </a>
-      </div>
-      {showNotifications && (
-        <NotificationPanel
-          sessionUserName={sessionUserName}
-          notifications={notifications}
-          unreadCount={unreadNotificationCount}
-          actions={notificationActions}
-          embedded
-        />
-      )}
     </section>
   );
 }

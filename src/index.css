@@ -122,10 +122,11 @@ textarea {
   position: absolute;
   top: 10px;
   right: 16px;
-  z-index: 42;
+  z-index: 1200;
   display: inline-flex;
   align-items: flex-start;
   gap: 10px;
+  pointer-events: auto;
 }
 
 .phone-shell__body {
@@ -148,6 +149,41 @@ textarea {
   position: relative;
 }
 
+.global-settings-menu {
+  position: relative;
+}
+
+.global-settings-menu__trigger {
+  min-width: 48px;
+  width: 48px;
+  height: 48px;
+  border-radius: 18px;
+}
+
+.global-settings-menu__menu {
+  position: absolute;
+  top: 56px;
+  right: 0;
+  z-index: 1201;
+  display: grid;
+  gap: 10px;
+  width: min(220px, calc(100vw - 40px));
+  padding: 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 197, 217, 0.42);
+  background: rgba(255, 252, 249, 0.98);
+  box-shadow: 0 20px 42px rgba(66, 40, 60, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.global-settings-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  text-decoration: none;
+}
+
 .feedback-button {
   min-width: 48px;
   width: 48px;
@@ -158,8 +194,9 @@ textarea {
 
 .global-notification-panel {
   position: absolute;
-  top: 56px;
+  top: 156px;
   right: 0;
+  z-index: 1201;
   width: min(332px, calc(100vw - 40px));
   max-height: min(62vh, 520px);
   overflow-y: auto;

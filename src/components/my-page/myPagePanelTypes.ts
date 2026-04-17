@@ -5,7 +5,6 @@ import type {
   MyPageTabKey,
   ReviewMood,
   SessionUser,
-  UserNotification,
 } from '../../types';
 
 export interface MyPagePanelProps {
@@ -24,7 +23,6 @@ export interface MyPagePanelProps {
     routeError: string | null;
     commentsHasMore: boolean;
     commentsLoadingMore: boolean;
-    unreadNotificationCount: number;
   };
   reviewActions: {
     onOpenPlace: (placeId: string) => void;
@@ -52,8 +50,5 @@ export interface MyPagePanelProps {
     onRefreshAdmin: () => Promise<void>;
     onToggleAdminPlace: (placeId: string, nextValue: boolean) => Promise<void>;
     onToggleAdminManualOverride: (placeId: string, nextValue: boolean) => Promise<void>;
-    onOpenNotification: (notification: UserNotification) => Promise<void>;
-    onMarkAllNotificationsRead: () => Promise<void>;
-    onDeleteNotification: (notificationId: string) => Promise<void>;
   };
 }

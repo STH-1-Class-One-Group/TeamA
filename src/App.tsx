@@ -3,6 +3,7 @@ import { AppMapStageView } from './components/AppMapStageView';
 import { AppPageStage } from './components/AppPageStage';
 import { BottomNav } from './components/BottomNav';
 import { FloatingBackButton } from './components/FloatingBackButton';
+import { GlobalSettingsMenu } from './components/GlobalSettingsMenu';
 import { GlobalStatusBanner } from './components/GlobalStatusBanner';
 import {
   useAppRouteState,
@@ -49,6 +50,7 @@ export default function App() {
     handleNavigateBack,
     handleBottomNavChange,
     globalStatus,
+    globalUtility,
     mapStageProps,
     pageStageProps,
   } = useAppStageProps(coordinator);
@@ -69,6 +71,9 @@ export default function App() {
             />
           </div>
         )}
+        <div className="phone-shell__utility-slot">
+          <GlobalSettingsMenu {...globalUtility} />
+        </div>
         <div className="phone-shell__body">
           {activeTab === 'map' ? (
             <AppMapStageView {...mapStageProps} />
