@@ -18,7 +18,7 @@ def build_session(tmp_path: Path):
 
 
 def write_event_fixture(tmp_path: Path) -> Path:
-    fixture_path = tmp_path / 'public_events.json'
+    fixture_path = tmp_path / "public_events.json"
     fixture_path.write_text(
         """
 {
@@ -32,7 +32,7 @@ def write_event_fixture(tmp_path: Path) -> Path:
             "소재지도로명주소": "대전 유성구 엑스포로 107",
             "축제시작일자": "20990320",
             "축제종료일자": "20990322",
-            "축제내용": "빵과 디저트, 로컬 브랜드가 함께 모이는 행사",
+            "축제내용": "빵과 로컬 브랜드가 함께 모이는 행사",
             "홈페이지주소": "https://example.com/dj-bread"
           },
           {
@@ -41,7 +41,7 @@ def write_event_fixture(tmp_path: Path) -> Path:
             "소재지도로명주소": "서울 중구 세종대로 110",
             "축제시작일자": "20990325",
             "축제종료일자": "20990326",
-            "축제내용": "대전이 아닌 데이터라서 필터링되어야 합니다."
+            "축제내용": "대전이 아닌 데이터라서 필터링돼야 합니다"
           }
         ]
       }
@@ -72,11 +72,11 @@ def seed_map_place(session) -> None:
             category="landmark",
             latitude=36.3740,
             longitude=127.3860,
-            summary="행사와 산책이 모이는 광장",
+            summary="행사가 열리는 야외 광장",
             description="행사 테스트용 map 장소입니다.",
             vibe_tags=["행사", "광장"],
             visit_time="30분 - 1시간",
-            route_hint="행사와 강변 산책을 함께 보기 좋아요.",
+            route_hint="행사장 동선을 가볍게 둘러보기 좋아요.",
             stamp_reward="광장 스탬프",
             hero_label="Expo Plaza",
             jam_color="#ff8fb7",

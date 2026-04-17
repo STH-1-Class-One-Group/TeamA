@@ -1,4 +1,4 @@
-"""공공 행사 배너 API 라우터입니다."""
+"""공공 행사 배너 API 라우트입니다."""
 
 from __future__ import annotations
 

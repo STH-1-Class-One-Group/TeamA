@@ -28,7 +28,7 @@ class PublicEventBannerItem(ApiModel):
 
 
 class PublicEventBannerResponse(ApiModel):
-    """배너 프리뷰가 읽는 행사 일정 목록 응답입니다."""
+    """배너 프리뷰가 쓰는 행사 일정 목록 응답입니다."""
 
     source_ready: bool = Field(alias="sourceReady")
     source_name: str | None = Field(default=None, alias="sourceName")

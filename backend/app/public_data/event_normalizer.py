@@ -16,7 +16,7 @@ ADDRESS_KEYS = ("address", "addr1", "소재지도로명주소", "소재지지번
 ROAD_ADDRESS_KEYS = ("roadAddress", "도로명주소", "소재지도로명주소", "rdnmadr")
 START_KEYS = ("startDate", "eventStartDate", "startDt", "축제시작일자", "행사시작일자", "fstvlStartDate", "beginDate")
 END_KEYS = ("endDate", "eventEndDate", "endDt", "축제종료일자", "행사종료일자", "fstvlEndDate", "finishDate")
-SUMMARY_KEYS = ("summary", "overview", "한줄소개", "소개", "축제내용")
+SUMMARY_KEYS = ("summary", "overview", "행사소개", "소개", "축제내용")
 DESCRIPTION_KEYS = ("description", "detail", "상세내용", "행사내용", "content", "축제내용")
 IMAGE_KEYS = ("imageUrl", "image", "대표이미지", "firstimage", "mainImage")
 CONTACT_KEYS = ("contact", "tel", "전화번호", "문의및안내")
@@ -28,7 +28,7 @@ UPDATED_KEYS = ("sourceUpdatedAt", "modifiedtime", "수정일시", "lastUpdatedA
 
 
 def first_value(payload: Mapping[str, Any], keys: tuple[str, ...]) -> Any:
-    """후보 키 순서대로 첫 값을 꺼냅니다."""
+    """후보 키 순서대로 첫 값을 고릅니다."""
 
     for key in keys:
         value = payload.get(key)
@@ -137,7 +137,7 @@ def build_external_id(payload: Mapping[str, Any], title: str, starts_at: datetim
 
 
 def is_target_city(payload: Mapping[str, Any], city_keyword: str) -> bool:
-    """대상 도시 키워드가 포함된 행사만 통과시킵니다."""
+    """대전광역시 키워드가 포함된 행사만 통과시킵니다."""
 
     haystack = " ".join(
         str(value)
@@ -154,7 +154,7 @@ def is_target_city(payload: Mapping[str, Any], city_keyword: str) -> bool:
 
 
 def normalize_public_event(payload: Mapping[str, Any], city_keyword: str = "대전") -> NormalizedPublicEvent | None:
-    """원본 행사 레코드를 배너/DB 저장용으로 정규화합니다."""
+    """원본 행사 레코드를 배너와 DB 저장용으로 정규화합니다."""
 
     if not is_target_city(payload, city_keyword):
         return None
