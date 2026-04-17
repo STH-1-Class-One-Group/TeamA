@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { getFestivals, getMapBootstrap } from '../api/bootstrapClient';
+
 import type {
   FestivalItem,
   MyPageResponse,
@@ -8,12 +8,8 @@ import type {
   SessionUser,
   StampState,
 } from '../types';
-import { handleBootstrapAuthNotice } from './app-bootstrap/bootstrapAuthNotice';
-import {
-  applyBootstrapSelections,
-  resetBootstrapRuntime,
-  resetFestivalSelection,
-} from './app-bootstrap/bootstrapRuntimeReset';
+import { bootstrapFestivalLoader } from './app-bootstrap/bootstrapFestivalLoader';
+import { bootstrapMapSession } from './app-bootstrap/bootstrapMapSession';
 import { clearAuthQueryParams } from './useAppRouteState';
 import type { AppBootstrapSharedRefs } from './useAppBootstrapSharedRefs';
 
@@ -75,17 +71,15 @@ export function useMapBootstrapEffect({
       setBootstrapError(null);
 
       try {
-        const bootstrap = await getMapBootstrap();
-        if (!active) {
-          return;
-        }
-
-        setPlaces(bootstrap.places);
-        setStampState(bootstrap.stamps);
-        setHasRealData(bootstrap.hasRealData);
-        setSessionUser(bootstrap.auth.user);
-        resetReviewCachesRef.current();
-        resetBootstrapRuntime({
+        await bootstrapMapSession({
+          authState,
+          refreshMyPageForUserRef,
+          resetReviewCachesRef,
+          goToTabRef,
+          setPlaces,
+          setStampState,
+          setHasRealData,
+          setSessionUser,
           setFeedNextCursor,
           setFeedHasMore,
           setFeedLoadingMore,
@@ -94,30 +88,17 @@ export function useMapBootstrapEffect({
           setMyCommentsLoadingMore,
           setMyCommentsLoadedOnce,
           setProviders,
-        });
-        setProviders(bootstrap.auth.providers);
-        applyBootstrapSelections({
-          placeIds: bootstrap.places.map((place) => place.id),
           setSelectedPlaceId,
           setSelectedFestivalId,
+          setMyPage,
+          setNotice,
+          isActive: () => active,
         });
-
-        if (bootstrap.auth.user) {
-          await refreshMyPageForUserRef.current(bootstrap.auth.user, true);
-          if (!active) {
-            return;
-          }
-        } else {
-          setMyPage(null);
+        if (!active) {
+          return;
         }
 
         setBootstrapStatus('ready');
-        handleBootstrapAuthNotice({
-          authState,
-          user: bootstrap.auth.user,
-          goToTab: goToTabRef.current,
-          setNotice,
-        });
       } catch (error) {
         setBootstrapError(formatErrorMessageRef.current(error));
         setBootstrapStatus('error');
@@ -166,18 +147,11 @@ export function useFestivalBootstrapEffect({
   useEffect(() => {
     let active = true;
 
-    void getFestivals()
-      .then((festivalResult) => {
-        if (!active) {
-          return;
-        }
-        setFestivals(festivalResult);
-        resetFestivalSelection(
-          festivalResult.map((festival) => festival.id),
-          setSelectedFestivalId
-        );
-      })
-      .catch((error) => reportBackgroundErrorRef.current(error));
+    void bootstrapFestivalLoader({
+      setFestivals,
+      setSelectedFestivalId,
+      isActive: () => active,
+    }).catch((error) => reportBackgroundErrorRef.current(error));
 
     return () => {
       active = false;

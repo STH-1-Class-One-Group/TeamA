@@ -1,7 +1,7 @@
 import type { SessionUser } from '../../types';
 
 const PROFILE_COMPLETION_NOTICE =
-  '닉네임을 먼저 정하면 같은 계정으로 스탬프와 리뷰를 이어서 남길 수 있어요.';
+  '프로필을 먼저 완성하면 같은 계정으로 스탬프와 리뷰를 이어서 남길 수 있어요.';
 
 interface HandleBootstrapAuthNoticeParams {
   authState: string | null;
