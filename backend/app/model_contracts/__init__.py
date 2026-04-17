@@ -1,47 +1,27 @@
-"""FastAPI request and response models for JamIssue."""
+"""Domain-organized request and response models for JamIssue."""
 
-from __future__ import annotations
-
-from .model_contracts import (
+from .admin import (
     AdminPlaceOut,
     AdminSummaryResponse,
-    ApiModel,
-    AuthProviderOut,
-    AuthSessionResponse,
-    BootstrapResponse,
-    CategoryFilter,
-    CategoryType,
-    CommentCreate,
-    CommentOut,
-    CourseMood,
-    CourseOut,
-    HealthResponse,
+    PlaceVisibilityUpdate,
+    PublicImportResponse,
+    UploadResponse,
+)
+from .auth import AuthProviderOut, AuthSessionResponse, ProfileUpdateRequest, SessionUser
+from .content import BootstrapResponse, CourseOut, PlaceOut
+from .core import ApiModel, CategoryFilter, CategoryType, CourseMood, ProviderKey, ReviewMood, RouteSort
+from .my_page import (
     MyCommentOut,
     MyPageResponse,
     MyStatsOut,
     NotificationDeleteResponse,
     NotificationReadResponse,
-    PlaceOut,
-    PlaceVisibilityUpdate,
-    ProfileUpdateRequest,
-    ProviderKey,
-    PublicImportResponse,
-    ReviewCreate,
-    ReviewLikeResponse,
-    ReviewMood,
-    ReviewOut,
-    RouteSort,
-    SessionUser,
-    StampLogOut,
-    StampState,
-    StampToggleRequest,
-    TravelSessionOut,
-    UploadResponse,
     UserNotificationOut,
-    UserRouteCreate,
-    UserRouteLikeResponse,
-    UserRouteOut,
 )
+from .review import CommentCreate, CommentOut, ReviewCreate, ReviewLikeResponse, ReviewOut
+from .routes import UserRouteCreate, UserRouteLikeResponse, UserRouteOut
+from .stamp import StampLogOut, StampState, StampToggleRequest, TravelSessionOut
+from .system import HealthResponse
 
 __all__ = [
     'AdminPlaceOut',
@@ -83,5 +63,3 @@ __all__ = [
     'UserRouteLikeResponse',
     'UserRouteOut',
 ]
-
-CommentOut.model_rebuild()
