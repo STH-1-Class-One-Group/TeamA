@@ -15,6 +15,14 @@ ACCESS_TOKEN_COOKIE = "jamissue_access_token"
 logger = logging.getLogger(__name__)
 
 
+def _has_unsupported_critical_header(token: str) -> bool:
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.PyJWTError:
+        return False
+    return bool(header.get("crit"))
+
+
 def issue_access_token(settings: Settings, user: SessionUser) -> str:
     """세션 사용자 정보를 담은 액세스 토큰을 발급합니다."""
 
@@ -54,6 +62,10 @@ def read_access_token(settings: Settings, token: str | None) -> SessionUser | No
     """전달받은 JWT를 읽어 세션 사용자로 복원합니다."""
 
     if not token:
+        return None
+
+    if _has_unsupported_critical_header(token):
+        logger.warning("Rejected access token with unsupported critical header")
         return None
 
     try:

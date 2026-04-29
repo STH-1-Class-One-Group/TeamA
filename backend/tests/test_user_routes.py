@@ -7,7 +7,12 @@ from app.config import Settings
 from app.db import Base
 from app.models import UserRouteCreate
 from app.repository_normalized import get_my_page, import_public_bundle, toggle_stamp
-from app.user_routes_normalized import create_user_route, list_public_user_routes, list_user_routes_for_owner, toggle_user_route_like
+from app.repositories.route_data_repository import (
+    create_user_route,
+    list_public_user_routes,
+    list_user_routes_for_owner,
+    toggle_user_route_like,
+)
 
 
 def build_session(tmp_path: Path):

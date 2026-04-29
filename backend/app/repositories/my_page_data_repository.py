@@ -48,7 +48,7 @@ def get_my_page(db: Session, user_id: str, is_admin: bool) -> MyPageResponse:
     visited_places = [to_place_out(place) for place in active_places if place.slug in visited_place_ids]
     unvisited_places = [to_place_out(place) for place in active_places if place.slug not in visited_place_ids]
 
-    from ..user_routes_normalized import list_user_routes_for_owner
+    from .route_data_repository import list_user_routes_for_owner
 
     routes = list_user_routes_for_owner(db, user_id)
     comments = build_my_comments(db, user_id)

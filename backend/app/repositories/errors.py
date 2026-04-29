@@ -8,3 +8,7 @@ class RepositoryNotFoundError(RepositoryError):
 
 class RepositoryValidationError(RepositoryError):
     """Raised when repository input or identifier validation fails."""
+
+
+class RepositoryPermissionError(RepositoryError):
+    """Raised when the caller cannot perform the requested repository action."""

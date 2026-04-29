@@ -16,6 +16,7 @@ JamIssue는 대전 지역 방문 피드, 스탬프, 코스, 축제 정보를 한
 - Worker 프로젝트: `daejeon-jamissue-api`
 
 JamIssue는 현재 `Pages + Worker + Supabase` 조합을 기준으로 운영합니다.
+운영 API 진입점은 Cloudflare Worker이며, FastAPI 백엔드는 로컬 검증과 레거시 origin fallback 성격으로 유지합니다.
 
 - Pages
   - 정적 프론트 번들 제공

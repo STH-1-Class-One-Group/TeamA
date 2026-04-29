@@ -4,6 +4,7 @@ import pytest
 from fastapi import HTTPException, status
 
 from app.models import CommentCreate, ReviewCreate, SessionUser, UserNotificationOut
+from app.repositories.errors import RepositoryNotFoundError, RepositoryPermissionError, RepositoryValidationError
 from app.services import review_service
 
 
@@ -36,7 +37,7 @@ def build_notification(notification_id: str) -> UserNotificationOut:
 
 def test_create_review_service_maps_missing_place_to_404(monkeypatch):
     def failing_create_review(*_args, **_kwargs):
-        raise ValueError("장소를 찾을 수 없어요.")
+        raise RepositoryNotFoundError("장소를 찾을 수 없어요.")
 
     monkeypatch.setattr(review_service, "create_review_entry", failing_create_review)
 
@@ -110,7 +111,7 @@ def test_create_comment_service_publishes_notifications(monkeypatch):
 
 def test_create_comment_service_maps_missing_review_to_404(monkeypatch):
     def failing_create_comment(*_args, **_kwargs):
-        raise ValueError("리뷰를 찾을 수 없어요.")
+        raise RepositoryNotFoundError("리뷰를 찾을 수 없어요.")
 
     monkeypatch.setattr(review_service, "create_review_comment_with_notifications", failing_create_comment)
 
@@ -127,7 +128,7 @@ def test_create_comment_service_maps_missing_review_to_404(monkeypatch):
 
 def test_create_comment_service_maps_invalid_reply_target_to_400(monkeypatch):
     def failing_create_comment(*_args, **_kwargs):
-        raise ValueError("같은 리뷰의 댓글에만 답글을 달 수 있어요.")
+        raise RepositoryValidationError("같은 리뷰의 댓글에만 답글을 달 수 있어요.")
 
     monkeypatch.setattr(review_service, "create_review_comment_with_notifications", failing_create_comment)
 
@@ -144,7 +145,7 @@ def test_create_comment_service_maps_invalid_reply_target_to_400(monkeypatch):
 
 def test_toggle_review_like_service_maps_missing_review_to_404(monkeypatch):
     def failing_toggle_review_like(*_args, **_kwargs):
-        raise ValueError("리뷰를 찾을 수 없어요.")
+        raise RepositoryNotFoundError("리뷰를 찾을 수 없어요.")
 
     monkeypatch.setattr(review_service, "toggle_review_like_entry", failing_toggle_review_like)
 
@@ -160,7 +161,7 @@ def test_toggle_review_like_service_maps_missing_review_to_404(monkeypatch):
 
 def test_delete_review_service_maps_permission_error_to_403(monkeypatch):
     def failing_delete_review(*_args, **_kwargs):
-        raise PermissionError("forbidden")
+        raise RepositoryPermissionError("forbidden")
 
     monkeypatch.setattr(review_service, "delete_review_entry", failing_delete_review)
 
@@ -176,7 +177,7 @@ def test_delete_review_service_maps_permission_error_to_403(monkeypatch):
 
 def test_delete_comment_service_maps_permission_error_to_403(monkeypatch):
     def failing_delete_comment(*_args, **_kwargs):
-        raise PermissionError("forbidden")
+        raise RepositoryPermissionError("forbidden")
 
     monkeypatch.setattr(review_service, "delete_review_comment", failing_delete_comment)
 
@@ -193,7 +194,7 @@ def test_delete_comment_service_maps_permission_error_to_403(monkeypatch):
 
 def test_delete_comment_service_maps_missing_comment_to_404(monkeypatch):
     def failing_delete_comment(*_args, **_kwargs):
-        raise ValueError("missing")
+        raise RepositoryNotFoundError("missing")
 
     monkeypatch.setattr(review_service, "delete_review_comment", failing_delete_comment)
 

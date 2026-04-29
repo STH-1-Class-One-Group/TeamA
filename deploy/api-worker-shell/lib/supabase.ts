@@ -1,3 +1,87 @@
-﻿export function getSupabaseKey(env: any) {   return env.APP_SUPABASE_SERVICE_ROLE_KEY || env.APP_SUPABASE_ANON_KEY || ''; }  export async function supabaseRequest(env: any, path: string, init: any = {}) {   if (!env.APP_SUPABASE_URL) {     throw new Error('APP_SUPABASE_URL is empty.');   }    const apiKey = getSupabaseKey(env);   if (!apiKey) {     throw new Error('Supabase API key is missing.');   }    const headers = new Headers(init.headers || undefined);   headers.set('apikey', apiKey);   headers.set('Authorization', `Bearer ${apiKey}`);   headers.set('Accept', 'application/json');    const method = init.method ?? 'GET';   if (init.body && !headers.has('Content-Type')) {     headers.set('Content-Type', 'application/json');   }   if (method !== 'GET' && method !== 'HEAD' && !headers.has('Prefer')) {     headers.set('Prefer', 'return=representation');   }    const response = await fetch(`${env.APP_SUPABASE_URL}/rest/v1/${path}`, {     method,     headers,     body: init.body,   });    if (!response.ok) {     const detail = await response.text();     throw new Error(`Supabase request failed (${response.status}): ${detail}`);   }    const text = await response.text();   if (!text) {     return null;   }    const contentType = response.headers.get('content-type') ?? '';   return contentType.includes('application/json') ? JSON.parse(text) : text; }  export function encodeFilterValue(value: unknown) {   return encodeURIComponent(String(value)); }  export function parseListLimit(url: URL, defaultLimit = 12, maxLimit = 24) {   const raw = Number(url.searchParams.get('limit') ?? defaultLimit);   if (!Number.isFinite(raw) || raw <= 0) {     return defaultLimit;   }   return Math.min(Math.floor(raw), maxLimit); }  export function uniqueValues(values: unknown[]) {   return [...new Set((values ?? []).filter((value) => value !== null && value !== undefined && value !== ''))]; }  export function buildInFilter(values: unknown[]) {   const unique = uniqueValues(values);   if (unique.length === 0) {     return null;   }   return `in.(${unique.map((value) => encodeFilterValue(value)).join(',')})`; }  export async function rememberPending<T>(cacheState: any, loader: () => Promise<T>): Promise<T> {   if (cacheState.pending) {     return cacheState.pending;   }   cacheState.pending = loader().finally(() => {     cacheState.pending = null;   });   return cacheState.pending; }
+import type { SupabaseRequestOptions, WorkerEnv } from '../types';
 
+export function getSupabaseKey(env: WorkerEnv) {
+  return env.APP_SUPABASE_SERVICE_ROLE_KEY || env.APP_SUPABASE_ANON_KEY || '';
+}
 
+export async function supabaseRequest<T = any>(
+  env: WorkerEnv,
+  path: string,
+  init: SupabaseRequestOptions = {},
+): Promise<T> {
+  if (!env.APP_SUPABASE_URL) {
+    throw new Error('APP_SUPABASE_URL is empty.');
+  }
+
+  const apiKey = getSupabaseKey(env);
+  if (!apiKey) {
+    throw new Error('Supabase API key is missing.');
+  }
+
+  const headers = new Headers(init.headers || undefined);
+  headers.set('apikey', apiKey);
+  headers.set('Authorization', `Bearer ${apiKey}`);
+  headers.set('Accept', 'application/json');
+
+  const method = init.method ?? 'GET';
+  if (init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (method !== 'GET' && method !== 'HEAD' && !headers.has('Prefer')) {
+    headers.set('Prefer', 'return=representation');
+  }
+
+  const response = await fetch(`${env.APP_SUPABASE_URL}/rest/v1/${path}`, {
+    method,
+    headers,
+    body: init.body,
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Supabase request failed (${response.status}): ${detail}`);
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return null as T;
+  }
+
+  const contentType = response.headers.get('content-type') ?? '';
+  return (contentType.includes('application/json') ? JSON.parse(text) : text) as T;
+}
+
+export function encodeFilterValue(value: unknown) {
+  return encodeURIComponent(String(value));
+}
+
+export function parseListLimit(url: URL, defaultLimit = 12, maxLimit = 24) {
+  const raw = Number(url.searchParams.get('limit') ?? defaultLimit);
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return defaultLimit;
+  }
+  return Math.min(Math.floor(raw), maxLimit);
+}
+
+export function uniqueValues(values: unknown[]) {
+  return [...new Set((values ?? []).filter((value) => value !== null && value !== undefined && value !== ''))];
+}
+
+export function buildInFilter(values: unknown[]) {
+  const unique = uniqueValues(values);
+  if (unique.length === 0) {
+    return null;
+  }
+  return `in.(${unique.map((value) => encodeFilterValue(value)).join(',')})`;
+}
+
+export async function rememberPending<T>(cacheState: any, loader: () => Promise<T>): Promise<T> {
+  if (cacheState.pending) {
+    return cacheState.pending;
+  }
+
+  cacheState.pending = loader().finally(() => {
+    cacheState.pending = null;
+  });
+  return cacheState.pending;
+}

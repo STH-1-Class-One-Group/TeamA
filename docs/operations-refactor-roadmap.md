@@ -11,11 +11,14 @@
 - 프론트 상태 관리 규칙을 팀 차원에서 정리한다.
 - 백엔드 도메인 경계를 더 분명히 하여 책임을 고립한다.
 - 운영 배포 후 실제 동작을 자동으로 확인하는 최소 스모크 테스트 체계를 만든다.
+- 운영 백엔드는 Worker-first로 두고, FastAPI는 로컬 검증과 레거시 origin fallback 역할로 관리한다.
 
 ## 우선순위
 1. 운영 스모크 테스트 자동화
 2. 프론트 store를 auth/map/review/my 도메인으로 분리
-3. `repository_normalized.py`를 도메인별로 분리
+3. FastAPI repository/service 예외 계약 정리
+4. Worker route/data/security 경계 분리
+5. `repository_normalized.py` 잔여 facade 축소
 
 ## 1. 운영 스모크 테스트 자동화
 
@@ -191,11 +194,14 @@
   - [x] anonymous user 전달값
   - [x] admin flag 전달값
   - [x] not-found / forbidden 매핑
+- [x] JWT `crit` 헤더 거부 보안 회귀 복구
+- [x] `backend/tests/conftest.py`에서 backend root를 `sys.path`에 고정
+- [x] `user_routes_normalized.py`를 호환 facade로 축소하고 실제 로직을 `repositories/route_data_repository.py`로 이동
+- [x] repository 예외 계약을 `RepositoryNotFoundError`, `RepositoryValidationError`, `RepositoryPermissionError`로 통일
 
 ### 남은 TODO
 - [ ] `repository_normalized.py` 공개 함수 목록을 `review/comment/profile/stamp/bootstrap/place/course/my-page` 기준으로 재분류
 - [ ] `profile` 경계 분리 여부 결정
-- [ ] review mutation 쪽 문자열 토큰 기반 예외 분류를 공통 helper로 정리할지 결정
 - [ ] facade별 import surface를 더 줄일 필요가 있는지 재평가
 - [ ] 순차 PR 머지 후 `main` 기준으로 잔여 dead code와 문서 drift 재점검
 
@@ -212,6 +218,36 @@
 - `repository_normalized.py`가 더 이상 프로젝트의 만능 파일이 아니다.
 - `main.py -> service -> repository` 흐름이 대부분의 경로에서 일관된다.
 - 리뷰/스탬프/프로필 변경 시 관련 파일 경계가 명확하다.
+
+## 4. Worker route/data/security 경계 분리
+
+상태: IN PROGRESS
+우선순위: 높음
+성격: 운영 백엔드 구조 안정화
+
+### 배경
+운영 기준 백엔드는 Cloudflare Worker입니다. 기존 Worker 진입점은 인증, 라우팅, 기본 데이터 로딩, 매핑 책임이 `index.ts`에 같이 섞여 있어 리뷰와 회귀 검증 비용이 컸습니다.
+
+### 진행됨
+- [x] Worker 공통 타입 추가
+  - [x] `WorkerEnv`
+  - [x] `WorkerSessionUser`
+  - [x] `SupabaseRequestOptions`
+- [x] OAuth/session 발급 시 `APP_SESSION_SECRET` 또는 `APP_JWT_SECRET` 누락을 503으로 차단
+- [x] Kakao/Naver provider 설정 회귀 테스트 추가
+- [x] OAuth state mismatch, admin 403, public event import token 회귀 테스트 추가
+- [x] Worker 소스가 긴 한 줄 blob으로 돌아가지 않도록 unit 품질 게이트 추가
+- [x] `index.ts` 부트스트랩, `runtime/base-data.ts` 데이터 로딩/매핑, `runtime/routing.ts` 라우팅으로 분리
+
+### 남은 TODO
+- [ ] `services/reviews.ts`, `services/my.ts`, `services/community-routes.ts`의 긴 라인 포맷을 추가 정리
+- [ ] Supabase row 타입을 리뷰/마이/커뮤니티 경로까지 점진 확장
+- [ ] 운영 protected smoke 토큰 발급/로테이션 절차와 Worker 세션 시크릿 로테이션 절차 연결
+
+### 완료 조건
+- Worker `index.ts`가 부트스트랩과 fetch error boundary 중심으로 유지된다.
+- 인증/session, route dispatch, base data loading이 서로 다른 파일에서 관리된다.
+- 세션 secret 누락, OAuth state mismatch, admin 403, import token 오류가 테스트로 고정된다.
 
 ## 실행 원칙
 - 현재 동작과 UI를 깨지 않는 범위에서 단계적으로 진행합니다.

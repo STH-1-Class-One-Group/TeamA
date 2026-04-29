@@ -18,6 +18,7 @@ GitHub main
 - 프런트: `https://daejeon.jamissue.com`
 - API: `https://api.daejeon.jamissue.com`
 - 운영 반영 브랜치: `main`
+- 백엔드 기준: Cloudflare Worker가 운영 진입점이며, FastAPI는 로컬 검증과 레거시 origin fallback 성격으로 유지합니다.
 
 ## 2. GitHub Actions 워크플로
 
@@ -79,6 +80,8 @@ APP_FRONTEND_URL=https://daejeon.jamissue.com
 APP_CORS_ORIGINS=https://daejeon.jamissue.com
 APP_NAVER_LOGIN_CLIENT_ID=<NAVER_LOGIN_CLIENT_ID>
 APP_NAVER_LOGIN_CALLBACK_URL=https://api.daejeon.jamissue.com/api/auth/naver/callback
+APP_KAKAO_LOGIN_CLIENT_ID=<KAKAO_REST_API_KEY>
+APP_KAKAO_LOGIN_CALLBACK_URL=https://api.daejeon.jamissue.com/api/auth/kakao/callback
 APP_STORAGE_BACKEND=supabase
 APP_SUPABASE_URL=https://<project-ref>.supabase.co
 APP_SUPABASE_STORAGE_BUCKET=review-images
@@ -96,6 +99,7 @@ APP_JWT_SECRET=<random 64+ chars>
 APP_DATABASE_URL=postgres://postgres.<project-ref>:<DB_PASSWORD>@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
 APP_SUPABASE_SERVICE_ROLE_KEY=<SUPABASE_SERVICE_ROLE_KEY>
 APP_NAVER_LOGIN_CLIENT_SECRET=<NAVER_LOGIN_CLIENT_SECRET>
+APP_KAKAO_LOGIN_CLIENT_SECRET=<KAKAO_CLIENT_SECRET>
 APP_EVENT_IMPORT_TOKEN=<same value as GitHub EVENT_IMPORT_TOKEN>
 ```
 
@@ -119,6 +123,20 @@ https://daejeon.jamissue.com
 Callback URL
 https://api.daejeon.jamissue.com/api/auth/naver/callback
 ```
+
+### 카카오 개발자 콘솔
+
+입력값:
+
+```text
+Redirect URI
+https://api.daejeon.jamissue.com/api/auth/kakao/callback
+```
+
+Worker 변수/시크릿 대응:
+- `APP_KAKAO_LOGIN_CLIENT_ID`: 카카오 REST API 키
+- `APP_KAKAO_LOGIN_CLIENT_SECRET`: 카카오 Client Secret
+- `APP_KAKAO_LOGIN_CALLBACK_URL`: 위 Redirect URI와 동일한 값
 
 ## 4. 행사 동기화 운영 원칙
 
@@ -166,6 +184,13 @@ cd D:\JamIssue\backend
 python -m pytest tests
 ```
 
+저장소 번들 Python을 사용할 때:
+
+```powershell
+cd D:\JamIssue\backend
+..\.tools\python313\python.exe -m pytest -p no:cacheprovider tests
+```
+
 ## 7. 장애 점검 포인트
 
 ### 행사 API가 0건일 때
@@ -183,3 +208,12 @@ python -m pytest tests
 2. Worker secret `APP_NAVER_LOGIN_CLIENT_SECRET`
 3. Worker variable `APP_NAVER_LOGIN_CALLBACK_URL`
 4. 네이버 개발자센터 서비스 URL / callback URL
+
+### 카카오 로그인이 비활성화될 때
+
+확인 순서:
+1. Worker variable `APP_KAKAO_LOGIN_CLIENT_ID`
+2. Worker secret `APP_KAKAO_LOGIN_CLIENT_SECRET`
+3. Worker variable `APP_KAKAO_LOGIN_CALLBACK_URL`
+4. 카카오 개발자 콘솔 Redirect URI
+5. Worker secret `APP_SESSION_SECRET`
